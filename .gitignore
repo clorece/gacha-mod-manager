@@ -1,0 +1,26 @@
+# Rust
+/target/
+**/target/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+
+# Tauri
+apps/desktop/src-tauri/gen/
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Local env and logs
+.env
+*.log
+
+# Internal research notes (keep out of the public repo)
+docs/research/
