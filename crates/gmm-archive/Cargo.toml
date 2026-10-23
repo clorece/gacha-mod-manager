@@ -1,0 +1,26 @@
+[package]
+name = "gmm-archive"
+description = "Hardened extraction of mod archives, plus a policy scan of what came out"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+gmm-fsguard.workspace = true
+# LZMA/LZMA2 (what mod archives use) are built in. BZip2 is left out: its decoder's license
+# (bzip2-1.0.6) isn't on our allowlist, and 7z mod archives practically never use it.
+sevenz-rust2 = { workspace = true, features = ["deflate", "ppmd"] }
+thiserror.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+# The writer side is only needed to build test archives.
+sevenz-rust2 = { workspace = true, features = ["compress", "deflate", "ppmd"] }
+tempfile.workspace = true
+
+[lints]
+workspace = true

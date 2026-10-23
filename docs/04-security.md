@@ -63,12 +63,20 @@ does is the failure we design out.
 
 ## Archive hardening (gmm-archive)
 
+- Detect the format from magic bytes, never the extension. Supported: zip, 7z (pure-Rust
+  decoders only; 7z BZip2 is left out for licensing). Encrypted archives are rejected.
+- Validate **every** entry's metadata before writing anything (two passes).
 - Extract into a fresh temp dir under the app cache, then stage under `Mods/GMM/.staging/`.
+  On any error the destination is removed.
 - Reject absolute paths, `..`, drive letters, NUL bytes, reserved Windows names (`CON`, `NUL`,
   `COM1`…), alternate data streams (`:`), and anything that normalizes outside the root.
-- Reject symlinks/hardlinks inside archives.
-- Limits: total uncompressed ≤ 4 GiB, ≤ 20,000 entries, per-entry ratio ≤ 200:1, path length ≤
-  240, depth ≤ 16. Nested archives are not auto-extracted.
+- Reject symlinks, reparse points and special files inside archives, and names that collide
+  on a case-insensitive file system (`a.ini` vs `A.INI`, or a file and a folder with the same
+  name).
+- Limits: total uncompressed ≤ 4 GiB, ≤ 20,000 entries, ratio ≤ 200:1 (per entry for zip, and
+  for the whole archive) above a 16 MiB floor, path length ≤ 240, depth ≤ 16. Sizes are
+  checked against the metadata first, then against the **actual** bytes written, so archives
+  that lie about sizes are still caught. Nested archives are not auto-extracted.
 - **Policy scan:**
   - Block by default: `.exe .dll .bat .cmd .ps1 .vbs .js .wsf .sh .scr .msi .jar .com .lnk .reg`.
     The user can override per mod with a named-file warning. Overridden files are kept out of
@@ -92,7 +100,7 @@ does is the failure we design out.
 
 | Phase | Harness | Proves |
 |---|---|---|
-| 1 | Malicious archive corpus (`tests/fixtures/evil/`) incl. Windows-specific tricks | Extractor rejects each case |
+| 1 | Malicious archive corpus (`crates/gmm-archive/tests/corpus.rs`, archives built in code) incl. Windows-specific tricks; randomized corruption tests (`tests/robustness.rs`) | Extractor rejects each case, never panics, never writes outside its root |
 | 1 | `cargo-fuzz` targets: extractor, migoto ini parser, VDF/ACF parser, GB JSON, XXMI config | No panics or escapes |
 | 1 | Lint gates: `disallowed_methods` (`std::fs`, `std::process`, `reqwest` outside their crates), `cargo-deny`, `cargo-audit`, `pnpm audit` | R1–R3, R7 can't be bypassed silently |
 | 2 | **XXMI config secret test**: fixture config with canary `github_token`/`user_signature`. Assert the canaries never appear in logs, DB, cache or IPC output | R4 |

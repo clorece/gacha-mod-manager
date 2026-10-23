@@ -34,7 +34,10 @@ Exit: every **[verify]** in the docs is resolved, or explicitly deferred.
 - [x] `gmm-fsguard` (ScopedPath, RelPath, roots, denylist, junction/symlink escape checks) +
       `disallowed_methods` lints (verified to fire outside fsguard)
 - [ ] `gmm-net` (allowlist, redirect checks, rate limit, resumable downloads)
-- [ ] `gmm-archive` (zip, 7z; RAR behind a feature) + malicious corpus + fuzz targets
+- [x] `gmm-archive`: hardened zip + 7z extraction, policy scan, malicious archive corpus,
+      randomized corruption tests
+- [ ] RAR support (C `unrar`, in a sandboxed subprocess)
+- [ ] cargo-fuzz targets (archive extraction, `RelPath`) as a nightly CI job
 - [ ] `gmm-catalog`: GameBanana client, SQLite HTTP cache, recorded-response fixtures
 - [ ] `gmm-adapters`: trait, registry, manifest schema + validation, conformance-suite scaffold
 - [ ] `gmm catalog list|show --game zzz` in the CLI
