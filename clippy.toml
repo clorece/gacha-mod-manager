@@ -1,0 +1,32 @@
+# Security rule R3/R7 (docs/04-security.md): filesystem access goes through gmm-fsguard and
+# process launching through its own crate. The crates that own these APIs opt out locally with
+# `#![allow(clippy::disallowed_methods)]` and a comment saying why.
+
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+
+disallowed-methods = [
+  { path = "std::fs::read", reason = "use gmm-fsguard" },
+  { path = "std::fs::read_to_string", reason = "use gmm-fsguard" },
+  { path = "std::fs::read_dir", reason = "use gmm-fsguard" },
+  { path = "std::fs::write", reason = "use gmm-fsguard" },
+  { path = "std::fs::copy", reason = "use gmm-fsguard" },
+  { path = "std::fs::rename", reason = "use gmm-fsguard" },
+  { path = "std::fs::create_dir", reason = "use gmm-fsguard" },
+  { path = "std::fs::create_dir_all", reason = "use gmm-fsguard" },
+  { path = "std::fs::remove_file", reason = "use gmm-fsguard" },
+  { path = "std::fs::remove_dir", reason = "use gmm-fsguard" },
+  { path = "std::fs::remove_dir_all", reason = "use gmm-fsguard" },
+  { path = "std::fs::metadata", reason = "use gmm-fsguard" },
+  { path = "std::fs::symlink_metadata", reason = "use gmm-fsguard" },
+  { path = "std::fs::canonicalize", reason = "use gmm-fsguard" },
+  { path = "std::fs::File::open", reason = "use gmm-fsguard" },
+  { path = "std::fs::File::create", reason = "use gmm-fsguard" },
+  { path = "std::fs::File::create_new", reason = "use gmm-fsguard" },
+  { path = "std::fs::OpenOptions::open", reason = "use gmm-fsguard" },
+  { path = "std::path::Path::exists", reason = "use gmm-fsguard" },
+  { path = "std::path::Path::metadata", reason = "use gmm-fsguard" },
+  { path = "std::path::Path::read_dir", reason = "use gmm-fsguard" },
+  { path = "std::path::Path::canonicalize", reason = "use gmm-fsguard" },
+  { path = "std::process::Command::new", reason = "process launching is restricted (security rule R7)" },
+]

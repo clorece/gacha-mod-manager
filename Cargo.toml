@@ -1,0 +1,27 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/clorece/gacha-mod-manager"
+
+[workspace.dependencies]
+gmm-fsguard = { path = "crates/gmm-fsguard" }
+thiserror = "2"
+
+# dev
+proptest = "1"
+tempfile = "3"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+expect_used = "warn"
+unwrap_used = "warn"

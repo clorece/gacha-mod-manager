@@ -27,9 +27,12 @@ Exit: every **[verify]** in the docs is resolved, or explicitly deferred.
 
 ## Phase 1 — Backend foundations
 
-- [ ] Repo scaffold (cargo workspace + pnpm + Tauri app shell), CI on Windows (+ Linux for core
-      crates): fmt, clippy, tests, `cargo-deny`, `cargo-audit`, `pnpm audit`, license checks
-- [ ] `gmm-fsguard` (ScopedPath, roots, denylist) + `disallowed_methods` lints
+- [x] Cargo workspace, pinned toolchain, rustfmt/clippy config, `justfile`
+- [x] CI on Windows + Linux: fmt, clippy `-D warnings`, tests; `cargo-deny` (licenses, bans,
+      advisories, sources)
+- [ ] pnpm + Tauri app shell; `pnpm audit` and npm license checks in CI
+- [x] `gmm-fsguard` (ScopedPath, RelPath, roots, denylist, junction/symlink escape checks) +
+      `disallowed_methods` lints (verified to fire outside fsguard)
 - [ ] `gmm-net` (allowlist, redirect checks, rate limit, resumable downloads)
 - [ ] `gmm-archive` (zip, 7z; RAR behind a feature) + malicious corpus + fuzz targets
 - [ ] `gmm-catalog`: GameBanana client, SQLite HTTP cache, recorded-response fixtures
