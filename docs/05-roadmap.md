@@ -20,8 +20,9 @@ Partly done 2026-10-22; see [research/phase0-observations.md](research/phase0-ob
 - [ ] Test that a nested `Mods/GMM/<mod>/` loads, that a `DISABLED …` folder is skipped, and
       whether a `.staging` folder is ignored
 - [ ] Install one mod by hand per game and confirm it renders
-- [ ] Confirm GameBanana list/page/sort params, image fields, updates endpoint; check GB rules
-      for API clients
+- [x] Confirm GameBanana list/page/sort params, image fields, updates endpoint, download
+      redirect chain
+- [ ] Check GameBanana's rules for API clients (no public API terms found)
 
 Exit: every **[verify]** in the docs is resolved, or explicitly deferred.
 
@@ -33,14 +34,17 @@ Exit: every **[verify]** in the docs is resolved, or explicitly deferred.
 - [ ] pnpm + Tauri app shell; `pnpm audit` and npm license checks in CI
 - [x] `gmm-fsguard` (ScopedPath, RelPath, roots, denylist, junction/symlink escape checks) +
       `disallowed_methods` lints (verified to fire outside fsguard)
-- [ ] `gmm-net` (allowlist, redirect checks, rate limit, resumable downloads)
+- [x] `gmm-net`: host allowlist (incl. every redirect hop), rate limiting, retries/backoff,
+      size caps, resumable verified downloads (SHA-256 + MD5)
 - [x] `gmm-archive`: hardened zip + 7z extraction, policy scan, malicious archive corpus,
       randomized corruption tests
 - [ ] RAR support (C `unrar`, in a sandboxed subprocess)
 - [ ] cargo-fuzz targets (archive extraction, `RelPath`) as a nightly CI job
-- [ ] `gmm-catalog`: GameBanana client, SQLite HTTP cache, recorded-response fixtures
+- [x] `gmm-catalog`: `CatalogSource` trait + GameBanana client (list, search, mod page, files,
+      updates, categories), in-memory cache, synthetic fixtures, live API smoke test
+- [ ] SQLite-backed HTTP cache (with the database crate)
 - [ ] `gmm-adapters`: trait, registry, manifest schema + validation, conformance-suite scaffold
-- [ ] `gmm catalog list|show --game zzz` in the CLI
+- [x] CLI: `gmm catalog list|search|show|categories`, `gmm fetch` (download → extract → scan)
 
 Exit: the CLI browses both catalogues and prints a full mod page. Archive harness green.
 

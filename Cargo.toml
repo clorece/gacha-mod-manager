@@ -10,7 +10,24 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/clorece/gacha-mod-manager"
 
 [workspace.dependencies]
+gmm-archive = { path = "crates/gmm-archive" }
+gmm-catalog = { path = "crates/gmm-catalog" }
 gmm-fsguard = { path = "crates/gmm-fsguard" }
+gmm-net = { path = "crates/gmm-net" }
+
+clap = { version = "4", features = ["derive"] }
+dirs = "7"
+hex = "0.4"
+md-5 = "0.11"
+# HTTPS via rustls with the ring backend (no aws-lc/C build tools) and the OS certificate
+# store. Only gmm-net may use reqwest (security rule R2).
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "http2"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+tokio = { version = "1", features = ["rt", "time", "sync", "macros"] }
+url = "2"
 # 7z: pure-Rust decoders only. Features are chosen per crate.
 sevenz-rust2 = { version = "0.24", default-features = false }
 thiserror = "2"
@@ -24,6 +41,7 @@ zip = { version = "9", default-features = false, features = [
 # dev
 proptest = "1"
 tempfile = "3"
+wiremock = "0.6"
 
 # Compression and hashing crates are painfully slow unoptimized; our own code stays debuggable.
 [profile.dev.package."*"]

@@ -25,9 +25,13 @@ does is the failure we design out.
   profile path redacted to `~`. CI fails if a known telemetry crate or package shows up in a
   lockfile.
 - **R2 — Network allowlist.** Only `gmm-net` opens connections (enforced with clippy
-  `disallowed_types`/`disallowed_methods` plus a CI grep). Hosts are compiled in: `gamebanana.com`
-  and its file/image CDN hosts **[verify exact hosts]**, plus `github.com` and
-  `objects.githubusercontent.com` for GMM's own updates. The webview makes **no** network
+  `disallowed_types` on HTTP clients and sockets). Every URL and every redirect hop must be
+  HTTPS on port 443 to a compiled-in host: `gamebanana.com`, `files.gamebanana.com`,
+  `images.gamebanana.com`, or a numbered download mirror `filecache<digits>.gamebanana.com`.
+  IP literals and URLs with credentials are refused. `github.com` and
+  `objects.githubusercontent.com` get added only when GMM's own updater is built (Phase 5).
+  A test-only feature that allows plain HTTP to `127.0.0.1` (for mock servers) is checked in CI
+  never to reach a shipped binary. The webview makes **no** network
   requests: CSP `connect-src ipc: http://ipc.localhost`, and images arrive via the `gmmimg://`
   protocol served from the Rust cache.
 - **R3 — Filesystem scope.** All I/O goes through `gmm-fsguard::ScopedPath`.

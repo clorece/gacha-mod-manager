@@ -72,6 +72,36 @@ fn read_write_inside_rw_root() {
 }
 
 #[test]
+fn append_and_ensure_root() {
+    let f = fixture();
+    let part = f.guard.path(f.rw, "dl.part").unwrap();
+    f.guard.write_atomic(&part, b"abc").unwrap();
+    {
+        use std::io::Write;
+        let mut file = f.guard.open_append(&part).unwrap();
+        file.write_all(b"def").unwrap();
+    }
+    assert_eq!(f.guard.read(&part).unwrap(), b"abcdef");
+    let exe = f.guard.path(f.ro, "game.exe").unwrap();
+    assert!(matches!(
+        f.guard.open_append(&exe),
+        Err(FsError::ReadOnlyRoot(_))
+    ));
+
+    let dir = tempfile::tempdir().unwrap();
+    let mut guard = Guard::new();
+    let app = dir.path().join("GMM").join("cache");
+    let id = guard.ensure_root("cache", &app, Access::ReadWrite).unwrap();
+    assert!(app.is_dir());
+    assert_eq!(guard.root_access(id), Some(Access::ReadWrite));
+    assert!(matches!(
+        guard.ensure_root("bad", &dir.path().join(".ssh"), Access::ReadWrite),
+        Err(FsError::Denied(_))
+    ));
+    assert!(!dir.path().join(".ssh").exists());
+}
+
+#[test]
 fn rename_toggles_within_root() {
     let f = fixture();
     let enabled = f.guard.path(f.rw, "GMM/Ellen").unwrap();

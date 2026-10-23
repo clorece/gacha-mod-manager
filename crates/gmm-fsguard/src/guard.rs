@@ -144,6 +144,24 @@ impl Guard {
         Ok(self.id_for(self.roots.len() - 1))
     }
 
+    /// Like [`Guard::register_root`], but creates the directory first if it doesn't exist.
+    /// For GMM's own app folders (cache, data), which may not exist on first run.
+    pub fn ensure_root(
+        &mut self,
+        label: impl Into<String>,
+        path: &Path,
+        access: Access,
+    ) -> Result<RootId, FsError> {
+        if !path.is_absolute() {
+            return Err(FsError::RootNotAbsolute(path.to_path_buf()));
+        }
+        if let Some(name) = denied_component(path) {
+            return Err(FsError::Denied(name));
+        }
+        fs::create_dir_all(path).map_err(|e| FsError::io("create_dir_all", path, e))?;
+        self.register_root(label, path, access)
+    }
+
     pub fn root_label(&self, id: RootId) -> Option<&str> {
         self.root(id).ok().map(|r| r.label.as_str())
     }
@@ -271,6 +289,15 @@ impl Guard {
             .create_new(true)
             .open(&path)
             .map_err(|e| FsError::io("create", path, e))
+    }
+
+    /// Opens an existing file for appending (resuming a partial download).
+    pub fn open_append(&self, p: &ScopedPath) -> Result<File, FsError> {
+        let path = self.resolve_below_root(p, Access::ReadWrite)?;
+        OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .map_err(|e| FsError::io("open", path, e))
     }
 
     /// Writes a whole file via a temporary sibling and a rename, so readers never see a

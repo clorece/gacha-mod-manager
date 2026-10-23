@@ -1,0 +1,72 @@
+{
+  "_idRow": 900001,
+  "_nStatus": "0",
+  "_bIsPrivate": false,
+  "_bIsTrashed": false,
+  "_bIsWithheld": false,
+  "_sName": "Test Outfit A",
+  "_tsDateModified": 1790500000,
+  "_tsDateAdded": 1790000000,
+  "_sProfileUrl": "https://gamebanana.com/mods/900001",
+  "_aPreviewMedia": {
+    "_aImages": [
+      { "_sType": "screenshot", "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods", "_sFile": "aaaa1111.jpg",
+        "_sFile530": "530-90_aaaa1111.jpg", "_wFile530": 530, "_hFile530": 298 },
+      { "_sType": "screenshot", "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods", "_sFile": "cccc3333.jpg" },
+      { "_sType": "screenshot", "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods", "_sFile": "dddd4444.jpg" }
+    ]
+  },
+  "_nUpdatesCount": 2,
+  "_bHasUpdates": true,
+  "_tsDateUpdated": 1790600000,
+  "_nPostCount": 3,
+  "_aTags": [],
+  "_sInitialVisibility": "show",
+  "_sDownloadUrl": "https://gamebanana.com/mods/download/900001",
+  "_nDownloadCount": 789,
+  "_aArchivedFiles": [
+    { "_idRow": 1000001, "_sFile": "outfit_v1.zip", "_nFilesize": 1000, "_tsDateAdded": 1790000000,
+      "_nDownloadCount": 50, "_sDownloadUrl": "https://gamebanana.com/dl/1000001", "_sMd5Checksum": "",
+      "_sAnalysisState": "done", "_sAnalysisResult": "ok", "_sAvState": "done", "_sAvResult": "clean",
+      "_bIsArchived": true, "_bHasContents": true, "_sVersion": "1.0" }
+  ],
+  "_aFiles": [
+    { "_idRow": 1000002, "_sFile": "outfit_v12.zip", "_nFilesize": 2000, "_tsDateAdded": 1790600000,
+      "_nDownloadCount": 700, "_sDownloadUrl": "https://gamebanana.com/dl/1000002",
+      "_sMd5Checksum": "0123456789abcdef0123456789abcdef",
+      "_sAnalysisState": "done", "_sAnalysisResult": "ok", "_sAvState": "done", "_sAvResult": "clean",
+      "_bIsArchived": false, "_bHasContents": true, "_sVersion": "1.2", "_sDescription": "Main file" },
+    { "_idRow": 1000003, "_sFile": "outfit_extras.7z", "_nFilesize": "3000", "_tsDateAdded": 1790650000,
+      "_nDownloadCount": 39, "_sDownloadUrl": "https://gamebanana.com/dl/1000003", "_sMd5Checksum": "",
+      "_sAnalysisState": "pending", "_sAnalysisResult": "", "_sAvState": "pending", "_sAvResult": "",
+      "_bIsArchived": false }
+  ],
+  "_nSubscriberCount": 1,
+  "_aLicenseChecklist": {
+    "yes": ["Download and install this Mod"],
+    "ask": ["Modify and redistribute this Mod"],
+    "no": ["Use this Mod commercially"]
+  },
+  "_bIsObsolete": false,
+  "_nLikeCount": 12,
+  "_nViewCount": 456,
+  "_sVersion": "1.2",
+  "_sText": "<p>A <b>test</b> description.</p><script>alert(1)</script>",
+  "_sLicense": "<p>Test license text</p>",
+  "_aSubmitter": {
+    "_idRow": 5000001, "_sName": "test_author", "_sUserTitle": "Member",
+    "_sAvatarUrl": "https://images.gamebanana.com/img/av/test.png",
+    "_sProfileUrl": "https://gamebanana.com/members/5000001", "_nPoints": 100
+  },
+  "_aGame": { "_idRow": 19567, "_sName": "Zenless Zone Zero", "_sAbbreviation": "ZZZ" },
+  "_aCategory": { "_idRow": 43004, "_sName": "Test Character", "_sModelName": "ModCategory",
+    "_sProfileUrl": "https://gamebanana.com/mods/cats/43004" },
+  "_aSuperCategory": { "_idRow": 30305, "_sName": "Character Skins", "_sModelName": "ModCategory",
+    "_sProfileUrl": "https://gamebanana.com/mods/cats/30305" },
+  "_aCredits": [
+    { "_sGroupName": "Key Authors",
+      "_aAuthors": [ { "_sRole": "textures", "_idRow": 5000001, "_sName": "test_author" } ] },
+    { "_sGroupName": "Special Thanks",
+      "_aAuthors": [ { "_sName": "someone without an account" } ] }
+  ]
+}

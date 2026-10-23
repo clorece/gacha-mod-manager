@@ -142,21 +142,31 @@ multi-select: disable, delete (Recycle Bin), or clear the cached archive only.
 
 ## Catalog flow (GameBanana apiv11)
 
-Game ids: ZZZ = 19567, WuWa = 20357 (verified). Endpoints:
+Game ids: ZZZ = 19567, WuWa = 20357. All endpoints below were verified against the live API
+on 2026-10-22 and are implemented in `crates/gmm-catalog`:
 
 | Purpose | Endpoint |
 |---|---|
-| Game info + root categories | `GET /apiv11/Game/{gameId}/ProfilePage` |
-| Categories | `GET /apiv11/Mod/Categories?_idGameRow={gameId}&_sSort=a_to_z&_bShowEmpty=true` |
-| Browse | `GET /apiv11/Mod/Index?_nPerpage=N&_aFilters[Generic_Game]={gameId}` (+ page/sort/category params **[verify]**) |
-| New feed | `GET /apiv11/Game/{gameId}/Subfeed?_nPage=N&_sSort=new` (filter `_sModelName == "Mod"`) |
-| Mod page | `GET /apiv11/Mod/{id}/ProfilePage` |
+| Root categories | `GET /apiv11/Mod/Categories?_idGameRow={gameId}&_sSort=a_to_z&_bShowEmpty=true` |
+| Subcategories (characters) | `GET /apiv11/Mod/Categories?_idCategoryRow={categoryId}&_sSort=a_to_z&_bShowEmpty=true` |
+| Browse | `GET /apiv11/Mod/Index?_nPage=N&_nPerpage=N&_aFilters[Generic_Game]={gameId}` + optional `_aFilters[Generic_Category]={id}` and `_sSort=` one of `Generic_Newest`, `Generic_LatestUpdated` (only updated mods), `Generic_MostDownloaded`, `Generic_MostLiked`, `Generic_MostViewed`. Unknown sorts → HTTP 400 `INPUT_ERRORS` |
+| Search | `GET /apiv11/Util/Search/Results?_sModelName=Mod&_sOrder=best_match&_idGameRow={gameId}&_sSearchString=…&_nPage=N` (fixed 15 per page) |
+| Mod page | `GET /apiv11/Mod/{id}/ProfilePage` (404 `NO_SUCH_RECORD` if missing) |
 | Files | `GET /apiv11/Mod/{id}/DownloadPage` |
-| Updates/changelog | `GET /apiv11/Mod/{id}/Updates` **[verify]** |
-| Search | `GET /apiv11/Util/Search/Results?...` |
+| Updates/changelog | `GET /apiv11/Mod/{id}/Updates?_nPage=N&_nPerpage=N` (`_aChangeLog[]` of `{text, cat}`) |
 
-Rules: SQLite HTTP cache (list pages for minutes, detail pages for hours), global rate limit of
-about 2 requests/second with backoff on 429/5xx, and an identifying `User-Agent`. Store each mod's
+Downloads: `_sDownloadUrl` (`https://gamebanana.com/dl/<fileId>`) redirects to
+`files.gamebanana.com`, then to a numbered mirror such as `filecache42.gamebanana.com`. Range
+requests work (HTTP 206), so downloads can be paused and resumed. Images live on
+`images.gamebanana.com`, as `_sBaseUrl` + `_sFile` (original) or `_sFile100/220/530/800`
+(scaled, with `_wFile*`/`_hFile*` sizes).
+
+GameBanana's JSON is loosely typed (numbers as strings, `[]` for empty objects), so the client
+decodes every field leniently.
+
+Rules: HTTP cache (in memory for now; SQLite with the database crate) with lists cached for
+minutes and detail pages for an hour; a global rate limit of about 2 requests/second with
+backoff on 429/5xx; and an identifying `User-Agent`. GameBanana sends no rate-limit headers. Store each mod's
 license, never re-host files, respect `_sInitialVisibility` / content ratings (NSFW hidden by
 default), and sanitize `_sText` HTML before display. The full mod page field mapping is in
 [07](07-frontend-design.md).

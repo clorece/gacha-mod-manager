@@ -83,6 +83,9 @@ LGPL or AGPL dependency fails the build. Watch out for:
 - **GPL crates or npm packages:** blocked by the allowlist. Find a permissive alternative.
 - **MPL-2.0 dependencies** are allowed: they stay MPL, and we must not modify their files without
   publishing those changes.
+- **Per-crate exceptions** live in `deny.toml` with a reason. Currently one: `webpki-root-certs`
+  (Mozilla's CA certificate list, `CDLA-Permissive-2.0`, a permissive data license).
+- **Left out for licensing:** 7z BZip2 support (`libbz2-rs-sys`, `bzip2-1.0.6` license).
 
 ## Names and trademarks
 

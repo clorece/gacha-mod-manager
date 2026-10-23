@@ -1,0 +1,27 @@
+[package]
+name = "gmm-cli"
+description = "The `gmm` command line: every backend feature, before it gets a screen"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "gmm"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+dirs.workspace = true
+gmm-archive.workspace = true
+gmm-catalog.workspace = true
+gmm-fsguard.workspace = true
+gmm-net.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["rt"] }
+
+[lints]
+workspace = true

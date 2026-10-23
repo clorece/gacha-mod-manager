@@ -1,0 +1,68 @@
+{
+  "_aMetadata": { "_nRecordCount": 1234, "_bIsComplete": false, "_nPerpage": 2 },
+  "_aRecords": [
+    {
+      "_idRow": 900001,
+      "_sModelName": "Mod",
+      "_sSingularTitle": "Mod",
+      "_sName": "Test Outfit A",
+      "_sProfileUrl": "https://gamebanana.com/mods/900001",
+      "_tsDateAdded": 1790000000,
+      "_tsDateModified": 1790500000,
+      "_bHasFiles": true,
+      "_aTags": [],
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "aaaa1111.jpg",
+            "_sFile100": "100-90_aaaa1111.jpg", "_wFile100": 100, "_hFile100": 56,
+            "_sFile220": "220-90_aaaa1111.jpg", "_wFile220": 220, "_hFile220": 124,
+            "_sFile530": "530-90_aaaa1111.jpg", "_wFile530": 530, "_hFile530": 298
+          },
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "bbbb2222.png"
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_idRow": 5000001, "_sName": "test_author", "_bIsOnline": false, "_bHasRipe": false,
+        "_sProfileUrl": "https://gamebanana.com/members/5000001",
+        "_sAvatarUrl": "https://images.gamebanana.com/img/av/test.png"
+      },
+      "_aGame": { "_idRow": 19567, "_sName": "Zenless Zone Zero" },
+      "_aRootCategory": { "_sName": "Character Skins", "_sProfileUrl": "https://gamebanana.com/mods/cats/30305" },
+      "_aSubCategory": { "_sName": "Test Character", "_sProfileUrl": "https://gamebanana.com/mods/cats/43004" },
+      "_sVersion": "1.2",
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 12,
+      "_nPostCount": 3,
+      "_bWasFeatured": true,
+      "_nViewCount": 456,
+      "_bIsOwnedByAccessor": false
+    },
+    {
+      "_idRow": "900002",
+      "_sModelName": "Mod",
+      "_sName": "Test Outfit B",
+      "_sProfileUrl": "https://gamebanana.com/mods/900002",
+      "_tsDateAdded": 1790000100,
+      "_tsDateModified": 1790000100,
+      "_tsDateUpdated": 1790600000,
+      "_aPreviewMedia": [],
+      "_aSubmitter": { "_idRow": 5000002, "_sName": "other_author" },
+      "_aRootCategory": { "_sName": "Other/Misc" },
+      "_aSubCategory": [],
+      "_sVersion": "",
+      "_sInitialVisibility": "warn",
+      "_bHasContentRatings": true,
+      "_nLikeCount": "0",
+      "_nViewCount": 10
+    }
+  ]
+}

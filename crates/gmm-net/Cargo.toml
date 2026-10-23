@@ -1,0 +1,34 @@
+[package]
+name = "gmm-net"
+description = "The only way GMM talks to the network: host allowlist, rate limiting, downloads"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+# Lets tests talk to a local mock server over plain HTTP. Must never be enabled in a release
+# build (security rule R6); CI checks this.
+test-util = []
+
+[dependencies]
+gmm-fsguard.workspace = true
+hex.workspace = true
+md-5.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+gmm-net = { path = ".", features = ["test-util"] }
+tempfile.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "test-util"] }
+wiremock.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,15 @@
+{
+  "_aMetadata": { "_nRecordCount": 1, "_nPerpage": 10, "_bIsComplete": true },
+  "_aRecords": [
+    {
+      "_idRow": 77001,
+      "_sName": "Patch 3.3 fix",
+      "_tsDateAdded": 1790600000,
+      "_aPreviewMedia": { "_aMetadata": { "_sSnippet": "Fixed hair" } },
+      "_sText": "<p>Fixed hair after the game update.</p>",
+      "_sVersion": "1.2",
+      "_aChangeLog": [ { "text": "Fixed hair", "cat": "Bugfix" }, { "text": "New colour", "cat": "Addition" } ],
+      "_aFileRowIds": [1000002]
+    }
+  ]
+}

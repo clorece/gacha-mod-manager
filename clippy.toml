@@ -30,3 +30,11 @@ disallowed-methods = [
   { path = "std::path::Path::canonicalize", reason = "use gmm-fsguard" },
   { path = "std::process::Command::new", reason = "process launching is restricted (security rule R7)" },
 ]
+
+# Security rule R2: only gmm-net may open network connections.
+disallowed-types = [
+  { path = "reqwest::Client", reason = "use gmm-net (security rule R2)" },
+  { path = "reqwest::ClientBuilder", reason = "use gmm-net (security rule R2)" },
+  { path = "std::net::TcpStream", reason = "use gmm-net (security rule R2)" },
+  { path = "std::net::UdpSocket", reason = "use gmm-net (security rule R2)" },
+]
