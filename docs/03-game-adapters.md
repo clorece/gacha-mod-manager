@@ -11,21 +11,23 @@ mod archive.
 
 ## Adapter contract
 
-A TOML manifest (data), plus an optional Rust hook module, compiled into the binary:
+Implemented in `crates/gmm-adapters`. Each game is a TOML manifest in
+[`crates/gmm-adapters/games/`](../crates/gmm-adapters/games/), compiled into the binary and
+validated when the registry is built (`Registry::builtin()`). Manifests are **data only**:
 
-```rust
-pub trait GameAdapter: Send + Sync {
-    fn manifest(&self) -> &GameManifest;
-    fn detect(&self, ctx: &DetectCtx) -> Vec<GameInstallCandidate>; // default: manifest-driven
-    fn validate_game_folder(&self, dir: &ScopedPath) -> Result<()>;  // default: markers
-    fn classify(&self, tree: &ExtractedTree) -> Classification;      // migoto / unknown, variants
-    fn library_mods(&self) -> &[LibraryModRule];                     // conflict-ignore list
-}
-```
+- Sections: `[game]` (id, names, engine, risk notice), `[gamebanana]` (game id, root
+  categories with a tag and whether subcategories are characters), `[xxmi]` (importer +
+  expected `d3dx.ini` target), `[detect]` (exe names, required children, folder names,
+  `[detect.steam]` appid + sub-path, `[detect.epic]` display names), `[[mod_kind]]`,
+  `[conflicts]`.
+- Unknown fields are rejected, so a typo can't silently switch a rule off. Every path is
+  validated with fsguard's `RelPath` rules. Ids, GameBanana ids, importers and Steam appids
+  must be unique across games.
+- **What a manifest can't do:** add network hosts, filesystem roots, or launch arguments. The
+  XXMI command is always `--nogui --xxmi <importer>`, built in code (rule R7).
 
-Manifest sections: `[game]`, `[gamebanana]`, `[xxmi]` (importer id + expected `d3dx.ini`
-target), `[detect]` (Steam appid + sub-path, launcher config files, Epic names, folder markers),
-`[[mod_kind]]`, `[conflicts]` (ignore rules). See [examples/](examples/).
+Code hooks, for formats a manifest can't express, get added per game when one is needed. None
+is needed for ZZZ or WuWa yet.
 
 ## Game detection (Windows)
 
@@ -49,11 +51,23 @@ install, but logs can contain account details. GMM doesn't need them.
 
 ### Finding XXMI
 1. Default root `%APPDATA%\XXMI Launcher` (observed).
-2. Root recorded in GMM settings (user-picked for portable installs).
-3. MSI uninstall registry entry **[verify]**.
+2. MSI install record (observed): `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\*`
+   entries with `DisplayName = "XXMI Launcher"` carry `InstallLocation` (the root) and
+   `DisplayVersion`. Read-only, and only those two values.
+3. Root recorded in GMM settings (user-picked for portable installs).
 
 A folder counts as an XXMI root when it has `XXMI Launcher Config.json` **and**
-`Resources/Bin/XXMI Launcher.exe` **[verify exe path]**.
+`Resources/Bin/XXMI Launcher.exe` (observed; its version resource says ProductName
+`XXMI Launcher`, CompanyName `SpectrumQT`, FileVersion `2.4.9.0`).
+
+**The exe is not code-signed** (observed), so GMM can't verify it cryptographically. Before
+the first launch GMM shows the exe's path and version and asks the user to confirm. It
+re-asks whenever the path changes, and launches only that exe with fixed arguments (security
+rule R7, threat T5).
+
+**Launch command (observed):** XXMI's own "Add Desktop Shortcut" creates
+`<IMP> Quick Start.lnk` → `Resources\Bin\XXMI Launcher.exe --nogui --xxmi <IMP>`
+(e.g. `--xxmi ZZMI`). GMM's **Launch with XXMI** runs the same command.
 
 ### Per-importer state (computed per game)
 
@@ -64,7 +78,13 @@ A folder counts as an XXMI root when it has `XXMI Launcher Config.json` **and**
 | `ImporterBroken` | Files present but `d3dx.ini` has no `include_recursive = Mods`, or `target` ≠ game exe | "Reinstall <IMP> in XXMI" steps |
 | `GamePathNotSet` | Importer OK, but `game_folder` in XXMI config is empty | "Open XXMI, select <game>, confirm the game folder, launch once" + the folder GMM detected, with a copy button |
 | `PathMismatch` | XXMI's `game_folder` isn't any install GMM found, or fails validation | Warning, both paths shown, fix steps |
+| `LaunchModeMismatch` | Steam install but XXMI's `game_launch` isn't `STEAM` (same for Epic / `EPIC`) | "In XXMI: Settings → General → **Game Launch** → **Steam**" |
 | `Ready` | All checks pass | Mods page enabled, **Launch with XXMI** enabled |
+
+**Why the launch mode check exists (observed 2026-10-23).** XXMI's per-game **Game Launch**
+setting (`Importers.<IMP>.Importer.game_launch`) offers Direct, Steam, Epic Games, Custom and
+Manual. With **Direct** (the default), XXMI starts the game exe itself. Injection succeeds, but
+the **Steam** copies of ZZZ and WuWa then refuse to run ("please launch from Steam") and exit.
 
 Mods can still be **downloaded** in any state where the importer exists. They are just inactive
 until XXMI runs. In `XxmiNotFound` / `ImporterMissing`, installs are queued and placed once the
@@ -74,19 +94,23 @@ Extra info shown per importer (read-only): XXMI DLL version (`d3d11.dll` FileVer
 `1.2.2.0`), importer version (`global $version` in `Core/<IMP>/main.ini`, observed ZZMI `1.50`),
 mod count, and `Mods/` size.
 
-**The dev machine shows two of these states:** ZZZ is in `GamePathNotSet` (ZZMI installed, never
-launched through XXMI), and WuWa is in `ImporterMissing` (no `WWMI/` folder). These become the
-first test fixtures.
+**The dev machine has gone through four of these states:** before setup, ZZZ was
+`GamePathNotSet` and WuWa `ImporterMissing`; now both are `LaunchModeMismatch` (Steam installs,
+Game Launch = Direct). Each becomes a test fixture.
 
 ### Reading the XXMI config safely
 
 `XXMI Launcher Config.json` contains secrets (`Launcher.github_token`, `Launcher.proxy`,
 `Security.user_signature`, `*_signature`). GMM deserializes it into a struct that **declares only**:
 `Launcher.config_version`, and per importer `Importer.game_folder`, `Importer.importer_folder`,
-`Importer.game`. serde drops all other fields. The file is never logged, copied, cached or sent
+`Importer.game`, `Importer.game_launch`. serde drops all other fields. The file is never logged, copied, cached or sent
 anywhere, and GMM never writes to it.
 
-### In-app setup guide (our own wording; exact XXMI button labels **[verify]**)
+### In-app setup guide (our own wording)
+
+Bold names are XXMI's own English labels, taken from its locale files (`Locale/Strings/EN_*.toml`,
+XXMI 2.4.9). How to get to the game selection screen and the settings window is still to be
+confirmed by eye (Phase 0b), and our own screenshots go next to each step.
 
 **Install XXMI**
 1. Open XXMI's releases page (link: `https://github.com/SpectrumQT/XXMI-Launcher/releases`).
@@ -96,12 +120,15 @@ anywhere, and GMM never writes to it.
 
 **Set up a game in XXMI**
 1. Open XXMI Launcher.
-2. Open the importer manager and enable the importer for your game (ZZMI for ZZZ, WWMI for WuWa).
-3. Select the game and press **Install**.
-4. Open the game's settings in XXMI and check that the game folder is right. GMM shows the folder
-   it found, with a copy button.
-5. Launch the game once from XXMI, so it finishes setup and applies the game settings mods need.
-6. Back in GMM, press **Re-check**.
+2. Under **Select Games To Mod:**, tick your game (ZZMI for ZZZ, WWMI for WuWa) and press
+   **Install**.
+3. Open the settings, **General** tab. Check **Game Folder** (or press **Detect
+   Installations**). GMM shows the folder it found, with a copy button.
+4. Same tab: if your game is on Steam, set **Game Launch** to **Steam** (Epic: **Epic Games**).
+5. Press **Start** once, so XXMI finishes setup and applies the game settings mods need.
+6. Optional: **Add Desktop Shortcut** creates an "<importer> Quick Start" shortcut that skips
+   XXMI's window.
+7. Back in GMM, press **Re-check**.
 
 ## ZZZ
 
@@ -141,7 +168,8 @@ XXMI already supports Endfield (EFMI), Star Rail (SRMI), Genshin (GIMI) and HI3 
 
 1. Find the GameBanana game id and root categories.
 2. Record the folder markers, Steam appid/sub-path and launcher sources (observe a real install).
-3. Write `games/<id>.toml` mapping to the importer. Hook code is rarely needed.
+3. Write `crates/gmm-adapters/games/<id>.toml` and add it to `BUILTIN` in `registry.rs`. Hook
+   code is rarely needed.
 4. Add fixtures: a fake install tree, a fake XXMI importer folder in each setup state, and sample
    mods. The shared conformance suite (detect, states, classify, install, toggle, uninstall)
    runs against every adapter automatically.

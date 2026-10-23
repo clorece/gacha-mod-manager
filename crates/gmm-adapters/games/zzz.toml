@@ -1,0 +1,58 @@
+# Zenless Zone Zero. Facts and their sources: docs/03-game-adapters.md.
+# Compiled into GMM; never loaded from disk at runtime (docs/04-security.md, R7).
+
+[game]
+id = "zzz"
+name = "Zenless Zone Zero"
+short_name = "ZZZ"
+engine = "unity"
+risk_notice = "Modding may violate the game's Terms of Service. Use at your own risk."
+
+[gamebanana]
+game_id = 19567
+
+[[gamebanana.root_categories]]
+id = 30305
+name = "Character Skins"
+tag = "character_skin"
+subcategories_are_characters = true
+
+[[gamebanana.root_categories]]
+id = 30702
+name = "Bangboo Skins"
+tag = "companion_skin"
+subcategories_are_characters = true
+
+[[gamebanana.root_categories]]
+id = 30395
+name = "UI"
+tag = "ui"
+
+[[gamebanana.root_categories]]
+id = 29874
+name = "Other/Misc"
+tag = "other"
+
+[xxmi]
+importer = "ZZMI"
+d3dx_target = "ZenlessZoneZero.exe"
+
+[detect]
+exe_names = ["ZenlessZoneZero.exe", "ZenlessZoneZeroBeta.exe"]
+required_children = ["ZenlessZoneZero_Data"]
+folder_names = ["ZenlessZoneZero Game"]
+
+[detect.steam]
+appid = 4162040
+# The Steam copy wraps HoYoPlay; the game itself is nested.
+subpath = "games/ZenlessZoneZero Game"
+
+[detect.epic]
+display_names = ["Zenless Zone Zero"]
+
+[[mod_kind]]
+id = "migoto"
+ini_markers = ["[TextureOverride", "[ShaderOverride"]
+
+[conflicts]
+ignore_namespaces = []

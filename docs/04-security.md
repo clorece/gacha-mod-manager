@@ -41,8 +41,11 @@ does is the failure we design out.
     `Core/<IMP>/main.ini`), XXMI's config file (allowlisted fields only, see below), and the game
     folders (marker files only).
   - **Detection read allowlist (exact files):** Steam `steamapps/libraryfolders.vdf` and
-    `appmanifest_*.acf`, the `SteamPath` registry value, Epic `Manifests/*.item`, the Kuro
-    `kr_starter_game.json`, and the HoYoPlay install record **[verify file]**.
+    `appmanifest_*.acf`, Epic `Manifests/*.item`, the Kuro `kr_starter_game.json`, and the
+    HoYoPlay install record **[verify file]**.
+  - **Registry reads (exact values, read-only):** `HKCU\Software\Valve\Steam\SteamPath`, and for
+    `Uninstall\*` keys whose `DisplayName` is `XXMI Launcher`, only `InstallLocation` and
+    `DisplayVersion`. GMM never writes to the registry.
   - Canonicalize, check the prefix, refuse symlinks/junctions that leave the root. `std::fs` use
     outside `gmm-fsguard` fails CI.
   - **GMM never writes to a game folder.** XXMI owns game settings.

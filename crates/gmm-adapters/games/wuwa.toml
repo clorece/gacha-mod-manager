@@ -1,0 +1,52 @@
+# Wuthering Waves. Facts and their sources: docs/03-game-adapters.md.
+# Compiled into GMM; never loaded from disk at runtime (docs/04-security.md, R7).
+
+[game]
+id = "wuwa"
+name = "Wuthering Waves"
+short_name = "WuWa"
+engine = "unreal4"
+risk_notice = "Modding may violate the game's Terms of Service. Use at your own risk."
+
+[gamebanana]
+game_id = 20357
+
+[[gamebanana.root_categories]]
+id = 29524
+name = "Skins"
+tag = "character_skin"
+subcategories_are_characters = true
+
+[[gamebanana.root_categories]]
+id = 29496
+name = "UI"
+tag = "ui"
+
+[[gamebanana.root_categories]]
+id = 29493
+name = "Other/Misc"
+tag = "other"
+
+[xxmi]
+importer = "WWMI"
+d3dx_target = "Client-Win64-Shipping.exe"
+
+[detect]
+exe_names = ["Wuthering Waves.exe"]
+required_children = ["Client", "Engine", "Client/Binaries/Win64/Client-Win64-Shipping.exe"]
+folder_names = ["Wuthering Waves Game", "Wuthering Waves"]
+
+[detect.steam]
+appid = 3513350
+# The Steam folder is the game folder.
+subpath = ""
+
+[detect.epic]
+display_names = ["Wuthering Waves"]
+
+[[mod_kind]]
+id = "migoto"
+ini_markers = ["[TextureOverride", "[ShaderOverride"]
+
+[conflicts]
+ignore_namespaces = []

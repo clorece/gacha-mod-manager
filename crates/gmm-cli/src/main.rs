@@ -10,8 +10,10 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use clap::{Parser, Subcommand, ValueEnum};
+use gmm_adapters::{GameManifest, Registry};
 use gmm_catalog::{CatalogSource, GameBanana, ListQuery, MemoryCache, SearchQuery, Sort};
 use gmm_net::{Client, NetConfig};
+use serde::Serialize;
 
 #[derive(Parser)]
 #[command(name = "gmm", version, about = "Gacha Mod Manager (command line)")]
@@ -28,6 +30,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// List the supported games.
+    Games,
     /// Browse the GameBanana catalogue.
     #[command(subcommand)]
     Catalog(CatalogCommand),
@@ -45,8 +49,9 @@ enum Command {
 enum CatalogCommand {
     /// List mods for a game.
     List {
-        #[arg(long, value_enum)]
-        game: Game,
+        /// Game id (see `gmm games`).
+        #[arg(long, value_parser = parse_game)]
+        game: &'static GameManifest,
         #[arg(long, default_value_t = 1)]
         page: u32,
         #[arg(long, default_value_t = 20)]
@@ -59,8 +64,8 @@ enum CatalogCommand {
     },
     /// Search mods by name.
     Search {
-        #[arg(long, value_enum)]
-        game: Game,
+        #[arg(long, value_parser = parse_game)]
+        game: &'static GameManifest,
         text: String,
         #[arg(long, default_value_t = 1)]
         page: u32,
@@ -69,27 +74,28 @@ enum CatalogCommand {
     Show { mod_id: u64 },
     /// List a game's categories, or a category's subcategories (characters).
     Categories {
-        #[arg(long, value_enum)]
-        game: Game,
+        #[arg(long, value_parser = parse_game)]
+        game: &'static GameManifest,
         #[arg(long)]
         parent: Option<u64>,
     },
 }
 
-/// Supported games. Until the adapter registry exists, this is the GameBanana id table.
-#[derive(Clone, Copy, ValueEnum)]
-enum Game {
-    Zzz,
-    Wuwa,
+fn parse_game(id: &str) -> Result<&'static GameManifest, String> {
+    let registry = Registry::builtin().map_err(|e| e.to_string())?;
+    registry.get(id).ok_or_else(|| {
+        let known: Vec<_> = registry.games().iter().map(GameManifest::id).collect();
+        format!("unknown game {id:?} (supported: {})", known.join(", "))
+    })
 }
 
-impl Game {
-    fn gamebanana_id(self) -> u64 {
-        match self {
-            Self::Zzz => 19567,
-            Self::Wuwa => 20357,
-        }
-    }
+#[derive(Serialize)]
+struct GameRow<'a> {
+    id: &'a str,
+    name: &'a str,
+    gamebanana_id: u64,
+    xxmi_importer: &'static str,
+    steam_appid: Option<u32>,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -142,9 +148,38 @@ async fn run(cli: Cli) -> Result<(), AnyError> {
     let net = Client::new(NetConfig::production())?;
     let gb = GameBanana::new(net.clone(), Arc::new(MemoryCache::default()));
     match cli.command {
+        Command::Games => games(cli.json),
         Command::Catalog(cmd) => catalog(&gb, cmd, cli.json, cli.show_nsfw).await,
         Command::Fetch { mod_id, file } => fetch::run(&gb, &net, mod_id, file, cli.json).await,
     }
+}
+
+fn games(json: bool) -> Result<(), AnyError> {
+    let rows: Vec<GameRow> = Registry::builtin()?
+        .games()
+        .iter()
+        .map(|g| GameRow {
+            id: g.id(),
+            name: &g.game.name,
+            gamebanana_id: g.gamebanana.game_id,
+            xxmi_importer: g.xxmi.importer.as_str(),
+            steam_appid: g.detect.steam.as_ref().map(|s| s.appid),
+        })
+        .collect();
+    output(json, &rows, || {
+        rows.iter()
+            .map(|r| {
+                format!(
+                    "{:<6} {:<20} GameBanana {:<6} XXMI {}  Steam {}\n",
+                    r.id,
+                    r.name,
+                    r.gamebanana_id,
+                    r.xxmi_importer,
+                    r.steam_appid.map_or("-".to_owned(), |a| a.to_string())
+                )
+            })
+            .collect()
+    })
 }
 
 fn hide_sensitive(page: &mut gmm_catalog::Page<gmm_catalog::ModSummary>, show: bool) -> usize {
@@ -176,7 +211,7 @@ async fn catalog(
                 per_page,
                 sort: sort.into(),
                 category_id: category,
-                ..ListQuery::new(game.gamebanana_id())
+                ..ListQuery::new(game.gamebanana.game_id)
             };
             let mut result = gb.list_mods(&query).await?;
             let hidden = hide_sensitive(&mut result, show_nsfw);
@@ -184,7 +219,7 @@ async fn catalog(
         }
         CatalogCommand::Search { game, text, page } => {
             let query = SearchQuery {
-                game_id: game.gamebanana_id(),
+                game_id: game.gamebanana.game_id,
                 text,
                 page,
             };
@@ -199,7 +234,7 @@ async fn catalog(
         CatalogCommand::Categories { game, parent } => {
             let cats = match parent {
                 Some(id) => gb.subcategories(id).await?,
-                None => gb.categories(game.gamebanana_id()).await?,
+                None => gb.categories(game.gamebanana.game_id).await?,
             };
             output(json, &cats, || format::categories(&cats))
         }

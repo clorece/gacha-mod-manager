@@ -53,7 +53,7 @@ gacha-mod-manager/
 ├─ apps/desktop/              # Tauri app: src/ (React), src-tauri/ (thin command layer)
 ├─ crates/
 │  ├─ gmm-core/               # domain: library, install, toggle, conflicts, storage, jobs, events
-│  ├─ gmm-adapters/           # GameAdapter trait, registry, games/*.toml manifests
+│  ├─ gmm-adapters/           # game manifests (games/*.toml), schema, validation, registry
 │  ├─ gmm-detect/             # Steam/HoYoPlay/Kuro/Epic/manual game detection
 │  ├─ gmm-xxmi/               # XXMI root detection, per-importer setup state, launch command
 │  ├─ gmm-catalog/            # CatalogSource trait, cache; gamebanana/ implementation
@@ -111,6 +111,13 @@ has `include_recursive = Mods`, so nested folders load:
   `Mods/`, so the rename stays on one volume. It starts with `.`, so 3DMigoto ignores it
   **[verify]**; if not, the staging name gets the `DISABLED` prefix.
 - **Uninstall** = move the mod folder to the Recycle Bin and remove the DB row.
+- **Folder names must stay stable (observed 2026-10-23).** 3DMigoto saves each mod's in-game
+  toggle state in `<IMP>/d3dx_user.ini`, keyed by the mod's **path**, e.g.
+  `$\mods\phoenix\resources\phoenix.ini\headband = 0`. Renaming or moving a mod folder,
+  including adding the `DISABLED` prefix, orphans those keys, and 3DMigoto drops orphaned keys
+  the next time it saves. So GMM picks a mod's folder name once at install and never renames
+  it except to toggle it. Profiles snapshot `d3dx_user.ini` (Phase 4) so toggle choices
+  survive a disable/enable cycle.
 
 ## Conflict detection
 

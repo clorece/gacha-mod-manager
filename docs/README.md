@@ -15,8 +15,8 @@ Development happens on Windows (primary target). Linux follows later from the sa
 | [05-roadmap.md](05-roadmap.md) | Phases (backend, then frontend), milestones, exit criteria |
 | [06-licensing-and-provenance.md](06-licensing-and-provenance.md) | Third-party licenses, clean-room rules, our license, release checklist |
 | [07-frontend-design.md](07-frontend-design.md) | Screens: catalogue, mod page, library, conflicts, storage, setup |
-| [examples/](examples/) | Draft adapter manifests for ZZZ and WuWa |
-| [research/](research/) | Prior-art notes and Phase 0 observations. Internal only: keep out of the public repo |
+| [../crates/gmm-adapters/games/](../crates/gmm-adapters/games/) | The game manifests for ZZZ and WuWa |
+| `research/` (local only, git-ignored) | Prior-art notes and Phase 0 observations |
 
 ## The decisions that shape everything
 
