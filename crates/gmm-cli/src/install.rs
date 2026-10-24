@@ -1,26 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! `gmm install`, and the helper every command that writes to `Mods/` uses.
+//! `gmm install`.
 
 use std::path::PathBuf;
 
-use gmm_adapters::{GameManifest, Registry};
+use gmm_adapters::GameManifest;
 use gmm_catalog::GameBanana;
 use gmm_core::{
-    AppDirs, CoreError, InstallEvent, InstallOptions, InstallRequest, VariantChoice, Workspace,
-    conflicts_for, install, install_gate,
+    CoreError, InstallEvent, InstallOptions, InstallRequest, ModsTarget, SetupHints, VariantChoice,
+    conflicts_for, install,
 };
 use gmm_db::Db;
-use gmm_detect::{SystemEnvironment, detect};
-use gmm_fsguard::RootId;
 use gmm_net::Client;
-use gmm_xxmi::{evaluate, find_xxmi};
 use serde::Serialize;
 
+use crate::AnyError;
 use crate::fetch::{game_of, progress};
 use crate::format::bytes;
 use crate::library::describe;
-use crate::{AnyError, with_saved_setup};
 
 pub struct InstallArgs {
     pub mod_id: u64,
@@ -45,7 +42,11 @@ pub async fn run(
         None => game_of(gb, args.mod_id).await?,
     };
 
-    let target = ModsTarget::open(db, game, args.xxmi, args.folders).await?;
+    let hints = SetupHints {
+        xxmi: args.xxmi,
+        folders: args.folders,
+    };
+    let target = ModsTarget::open(db, game, hints).await?;
     let warnings = &target.warnings;
     let request = InstallRequest {
         mod_id: args.mod_id,
@@ -154,41 +155,4 @@ pub async fn run(
         );
     }
     Ok(())
-}
-
-/// A game's `Mods/` folder, registered for writing, after the setup gate.
-pub struct ModsTarget {
-    pub ws: Workspace,
-    pub mods: RootId,
-    pub mods_dir: PathBuf,
-    /// Setup problems that don't stop GMM from writing to `Mods/` (see `install_gate`).
-    pub warnings: Vec<String>,
-}
-
-impl ModsTarget {
-    /// Finds XXMI (the `--xxmi` folder, else the saved one, else automatically) and checks
-    /// the game's setup. Fails when there's no `Mods/` folder to work with.
-    pub async fn open(
-        db: &Db,
-        game: &GameManifest,
-        xxmi_dir: Option<PathBuf>,
-        folders: Vec<(String, PathBuf)>,
-    ) -> Result<Self, AnyError> {
-        let (xxmi_dir, folders) = with_saved_setup(db, xxmi_dir, folders).await?;
-        let env = SystemEnvironment;
-        let detected = detect(Registry::builtin()?, &env, &folders);
-        let xxmi = find_xxmi(&env, xxmi_dir.as_deref());
-        let status = evaluate(game, &detected.installs, xxmi.as_ref());
-        let warnings = install_gate(&status)?;
-        let xxmi = xxmi.ok_or("XXMI Launcher not found")?;
-        let mods_dir = xxmi.mods_dir(game.xxmi.importer);
-        let mut ws = Workspace::open(&AppDirs::system()?.cache)?;
-        let mods = ws.add_mods_root(&mods_dir)?;
-        Ok(Self {
-            ws,
-            mods,
-            mods_dir,
-            warnings,
-        })
-    }
 }

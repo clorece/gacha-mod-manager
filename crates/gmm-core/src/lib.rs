@@ -24,6 +24,7 @@ mod install;
 mod launch;
 mod library;
 mod names;
+mod setup;
 mod storage;
 mod workspace;
 
@@ -43,6 +44,7 @@ pub use library::{
 pub use names::{
     DISABLED_PREFIX, GMM_DIR, SIDECAR_FILE, STAGING_DIR, mod_folder_name, on_disk_name,
 };
+pub use setup::{Machine, ModsTarget, SetupHints, saved_setup};
 pub use storage::{
     CacheStorage, ClearedCache, GameStorage, ModUsage, Size, cache_storage, clear_downloads,
     game_storage,

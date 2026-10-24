@@ -18,6 +18,7 @@ use std::sync::Arc;
 use clap::{Parser, Subcommand, ValueEnum};
 use gmm_adapters::{GameManifest, Registry};
 use gmm_catalog::{CatalogSource, GameBanana, ListQuery, SearchQuery, Sort};
+use gmm_core::SetupHints;
 use gmm_db::Db;
 use gmm_net::{Client, NetConfig};
 use library::Action;
@@ -302,7 +303,7 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
     match cli.command {
         Command::Games => games(cli.json),
         Command::Detect { xxmi, folders } => {
-            let (xxmi, folders) = with_saved_setup(db, xxmi, folders).await?;
+            let (xxmi, folders) = gmm_core::saved_setup(db, SetupHints { xxmi, folders }).await?;
             setup::run_detect(cli.json, xxmi, &folders)
         }
         Command::Status {
@@ -310,7 +311,7 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
             xxmi,
             folders,
         } => {
-            let (xxmi, folders) = with_saved_setup(db, xxmi, folders).await?;
+            let (xxmi, folders) = gmm_core::saved_setup(db, SetupHints { xxmi, folders }).await?;
             setup::run_status(cli.json, game, xxmi, &folders)
         }
         Command::Config(cmd) => config::run(db, cmd, cli.json).await,
@@ -365,7 +366,11 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
             .await
         }
         Command::Launch { game, yes, setup } => {
-            launch::run(db, game, yes, setup.xxmi, setup.folders, cli.json).await
+            let hints = SetupHints {
+                xxmi: setup.xxmi,
+                folders: setup.folders,
+            };
+            launch::run(db, game, yes, hints, cli.json).await
         }
         Command::Conflicts { game, setup } => {
             library::show_conflicts(db, game, setup.xxmi, setup.folders, cli.json).await
@@ -375,27 +380,6 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
             library::apply(db, action, &ids, setup.xxmi, setup.folders, cli.json).await
         }
     }
-}
-
-/// Adds the saved game folders to the ones given on the command line, and falls back to the
-/// saved XXMI folder when `--xxmi` isn't given.
-async fn with_saved_setup(
-    db: &Db,
-    xxmi: Option<PathBuf>,
-    folders: Vec<(String, PathBuf)>,
-) -> Result<(Option<PathBuf>, Vec<(String, PathBuf)>), AnyError> {
-    let xxmi = match xxmi {
-        Some(dir) => Some(dir),
-        None => db.xxmi_root().await?,
-    };
-    let mut all: Vec<(String, PathBuf)> = db
-        .manual_game_folders()
-        .await?
-        .into_iter()
-        .map(|f| (f.game_id, f.folder))
-        .collect();
-    all.extend(folders);
-    Ok((xxmi, all))
 }
 
 fn games(json: bool) -> Result<(), AnyError> {

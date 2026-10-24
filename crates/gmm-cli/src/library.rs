@@ -8,15 +8,14 @@ use std::path::PathBuf;
 
 use gmm_adapters::{GameManifest, Registry};
 use gmm_core::{
-    Conflict, DiskState, RecycleBin, UnmanagedMod, conflicts, conflicts_for, library, on_disk_name,
-    set_enabled, uninstall,
+    Conflict, DiskState, ModsTarget, RecycleBin, SetupHints, UnmanagedMod, conflicts,
+    conflicts_for, library, on_disk_name, set_enabled, uninstall,
 };
 use gmm_db::Db;
 use serde::Serialize;
 
 use crate::AnyError;
 use crate::format::bytes;
-use crate::install::ModsTarget;
 
 #[derive(Serialize)]
 struct ListRow {
@@ -66,7 +65,16 @@ pub async fn list(
             managed: Vec::new(),
             unmanaged: Vec::new(),
         };
-        match ModsTarget::open(db, game, xxmi.clone(), folders.clone()).await {
+        match ModsTarget::open(
+            db,
+            game,
+            SetupHints {
+                xxmi: xxmi.clone(),
+                folders: folders.clone(),
+            },
+        )
+        .await
+        {
             Ok(target) => {
                 let lib = library(db, &target.ws, target.mods, game).await?;
                 entry.mods_dir = Some(target.mods_dir);
@@ -198,7 +206,15 @@ pub async fn apply(
             .get(&row.game_id)
             .ok_or_else(|| format!("mod {id} belongs to an unknown game {:?}", row.game_id))?;
         if !targets.contains_key(game.id()) {
-            let target = ModsTarget::open(db, game, xxmi.clone(), folders.clone()).await?;
+            let target = ModsTarget::open(
+                db,
+                game,
+                SetupHints {
+                    xxmi: xxmi.clone(),
+                    folders: folders.clone(),
+                },
+            )
+            .await?;
             targets.insert(game.id().to_owned(), target);
         }
         let Some(target) = targets.get(game.id()) else {
@@ -287,7 +303,16 @@ pub async fn show_conflicts(
     let mut reports = Vec::new();
     let mut text = String::new();
     for game in games {
-        let target = match ModsTarget::open(db, game, xxmi.clone(), folders.clone()).await {
+        let target = match ModsTarget::open(
+            db,
+            game,
+            SetupHints {
+                xxmi: xxmi.clone(),
+                folders: folders.clone(),
+            },
+        )
+        .await
+        {
             Ok(t) => t,
             Err(e) => {
                 let _ = writeln!(text, "{}: not checked ({e})", game.game.name);
@@ -361,7 +386,16 @@ pub async fn storage(
         not_checked: Vec::new(),
     };
     for game in games {
-        match ModsTarget::open(db, game, xxmi.clone(), folders.clone()).await {
+        match ModsTarget::open(
+            db,
+            game,
+            SetupHints {
+                xxmi: xxmi.clone(),
+                folders: folders.clone(),
+            },
+        )
+        .await
+        {
             Ok(target) => {
                 out.games
                     .push(gmm_core::game_storage(db, &target.ws, target.mods, game).await?);
