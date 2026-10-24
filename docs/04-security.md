@@ -78,10 +78,17 @@ does is the failure we design out.
 - **R7 — Process launching is minimal.** GMM starts exactly one kind of process: the XXMI
   Launcher exe inside a confirmed XXMI root, with fixed arguments (`--nogui --xxmi <IMP>`).
   "Open folder" uses the OS shell to open a directory, never a file. Nothing from a mod archive is
-  ever executed. The only `Command::new` in GMM is in `crates/gmm-xxmi/src/launch.rs` (the one
-  module allowed past the clippy ban); the exe path is fixed relative to the validated root and
-  the arguments come from the importer id in code. `gmm-core::start` refuses an exe the user
-  hasn't confirmed (`gmm launch`, first run).
+  ever executed. All launching is in `crates/gmm-xxmi/src/launch.rs`; the exe path is fixed
+  relative to the validated root and the arguments come from the importer id in code (refused
+  if one would need quoting). `gmm-core::start` refuses an exe the user hasn't confirmed
+  (`gmm launch`, first run). XXMI's launcher requires administrator rights (its manifest says
+  `requireAdministrator`; a plain process start fails with Windows error 740), so on Windows
+  it is started with `ShellExecuteExW` and the default verb, like Explorer starting XXMI's own
+  Quick Start shortcut: Windows shows its UAC prompt, and declining it is reported, not retried.
+  That call is the **only `unsafe` code in GMM**: the workspace sets `unsafe_code = "deny"`,
+  this one module allows it, and CI fails if `allow(unsafe_code)` appears in any other file.
+  Other platforms use `std::process::Command` in the same module (the only place past the
+  clippy ban).
 - **R8 — Recoverable deletes.** Uninstall and storage deletes go through the Recycle Bin
   (`gmm_fsguard::Guard::move_to_trash`, the only caller of the `trash` crate; it applies the
   same read-write-root checks as any write). Unmanaged folders are never deleted without an

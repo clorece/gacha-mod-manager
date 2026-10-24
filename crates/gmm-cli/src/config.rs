@@ -9,7 +9,6 @@ use std::path::{Path, PathBuf};
 use clap::Subcommand;
 use gmm_adapters::Registry;
 use gmm_db::{DB_FILE_NAME, Db};
-use gmm_fsguard::{Access, Guard};
 use serde::Serialize;
 
 use crate::format::bytes;
@@ -42,10 +41,7 @@ fn data_dir() -> Result<PathBuf, AnyError> {
 
 /// Opens (creating on first run) GMM's database.
 pub async fn open_db() -> Result<Db, AnyError> {
-    let mut guard = Guard::new();
-    let data = guard.ensure_root("data", &data_dir()?, Access::ReadWrite)?;
-    let file = guard.path(data, DB_FILE_NAME)?;
-    Ok(Db::open(&guard, &file).await?)
+    Ok(gmm_core::open_db(&gmm_core::AppDirs::system()?).await?)
 }
 
 #[derive(Serialize)]

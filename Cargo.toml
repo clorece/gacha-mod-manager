@@ -67,7 +67,9 @@ wiremock = "0.6"
 opt-level = 2
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+# One reviewed exception: the ShellExecuteExW call in gmm-xxmi/src/launch.rs (CI checks it
+# stays the only `allow(unsafe_code)`).
+unsafe_code = "deny"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }

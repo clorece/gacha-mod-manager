@@ -36,6 +36,16 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq strace
           GMM_PRIVACY_STRACE=1 cargo test -p gmm-cli --test privacy --locked -- --nocapture
+      # The workspace denies unsafe code; the one reviewed exception is the ShellExecuteExW call
+      # that starts XXMI with its administrator prompt (docs/04-security.md, R7).
+      - name: unsafe code only in the reviewed launch call
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          found=$(grep -rl --include='*.rs' 'allow(unsafe_code)' crates $( [ -d apps ] && echo apps ) | sort || true)
+          if [ "$found" != "crates/gmm-xxmi/src/launch.rs" ]; then
+            echo "allow(unsafe_code) found outside gmm-xxmi/src/launch.rs:"; echo "$found"; exit 1
+          fi
       # Security rule R6: the test-only network feature (plain HTTP to localhost) must never
       # reach a shipped binary.
       - name: Shipped binaries never enable gmm-net/test-util

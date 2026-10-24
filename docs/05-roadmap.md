@@ -150,8 +150,10 @@ Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm det
 - [x] `gmm launch <game> [--yes]` (2026-10-23): `gmm-xxmi::launch` (the only process launch),
       `gmm-core::{plan_launch, confirm_exe, start}`. Requires `Ready`; asks once to confirm the
       exact exe path (stored, asked again if it changes). Verified on the dev machine up to the
-      confirmation (WuWa refused as not Ready; ZZZ asks for confirmation). Not run for real yet:
-      that starts the game, so it's part of the exit check below
+      confirmation (WuWa refused as not Ready; ZZZ asks for confirmation). First real run
+      (2026-10-24) failed with Windows error 740: XXMI's exe requires administrator rights. Fixed
+      by starting it through the shell (`ShellExecuteExW`, UAC prompt), the one `unsafe` call
+      in GMM, guarded by a CI check
 - [x] Adapter conformance suite (2026-10-23): `crates/gmm-core/tests/conformance.rs` builds a
       fake machine from each built-in manifest alone (game folder from the markers, XXMI with the
       importer, a hand-installed mod, secret canaries in the config) and runs detect → `Ready` →

@@ -160,3 +160,11 @@ pub(crate) fn remove_stale(guard: &Guard, dir: &ScopedPath, age: Duration) {
         }
     }
 }
+
+/// Opens (creating on first run) GMM's database in the data folder.
+pub async fn open_db(dirs: &AppDirs) -> Result<gmm_db::Db, CoreError> {
+    let mut guard = Guard::new();
+    let data = guard.ensure_root("data", &dirs.data, Access::ReadWrite)?;
+    let file = guard.path(data, gmm_db::DB_FILE_NAME)?;
+    Ok(gmm_db::Db::open(&guard, &file).await?)
+}

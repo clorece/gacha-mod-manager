@@ -49,4 +49,4 @@ pub use storage::{
     CacheStorage, ClearedCache, GameStorage, ModUsage, Size, cache_storage, clear_downloads,
     game_storage,
 };
-pub use workspace::{AppDirs, Workspace};
+pub use workspace::{AppDirs, Workspace, open_db};

@@ -89,7 +89,8 @@ LGPL or AGPL dependency fails the build. Watch out for:
 - **Direct dependencies so far** (all pass `cargo deny`): `zip`, `sevenz-rust2`, `reqwest` +
   `rustls` (ring), `tokio`, `serde`/`serde_json`, `toml`, `url`, `sha2`, `md-5`, `hex`, `clap`,
   `dirs`, `thiserror`, `pelite` (MIT; reads `d3d11.dll`'s version resource), `winreg` (MIT;
-  Windows registry reads), `sqlx` 0.9 (MIT OR Apache-2.0; SQLite only, no macros), which pulls
+  Windows registry reads), `windows-sys` 0.61 (MIT OR Apache-2.0; only for the
+  `ShellExecuteExW` call that starts XXMI), `sqlx` 0.9 (MIT OR Apache-2.0; SQLite only, no macros), which pulls
   in `libsqlite3-sys` (MIT) with SQLite's own C source **bundled**. SQLite itself is in the
   public domain; list it in `THIRD-PARTY-NOTICES` anyway. Building it needs a C compiler
   (the MSVC Build Tools the Rust Windows toolchain already uses). `trash` 5 (MIT; Recycle

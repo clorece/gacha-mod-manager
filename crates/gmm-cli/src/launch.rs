@@ -60,8 +60,9 @@ pub async fn run(
             })
         );
     } else {
+        let process = pid.map(|p| format!(" (process {p})")).unwrap_or_default();
         println!(
-            "started XXMI Launcher (process {pid}); it starts {} with mods.",
+            "started XXMI Launcher{process}; it starts {} with mods.",
             game.game.name
         );
     }

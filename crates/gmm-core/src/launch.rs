@@ -51,8 +51,9 @@ pub async fn confirm_exe(db: &Db, plan: &mut LaunchPlan) -> Result<(), CoreError
     Ok(())
 }
 
-/// Starts XXMI, which then starts the game with mods. Returns the launcher's process id.
-pub fn start(plan: &LaunchPlan) -> Result<u32, CoreError> {
+/// Starts XXMI, which then starts the game with mods. Returns the launcher's process id when
+/// Windows reports one. On Windows the user may first see XXMI's administrator prompt.
+pub fn start(plan: &LaunchPlan) -> Result<Option<u32>, CoreError> {
     if !plan.confirmed {
         return Err(CoreError::ExeNotConfirmed(plan.command.exe.clone()));
     }

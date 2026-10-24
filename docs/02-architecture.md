@@ -258,8 +258,10 @@ its "Add Desktop Shortcut" creates `<IMP> Quick Start.lnk` with exactly these ar
 (observed). `gmm status` prints this command for ready games, and `gmm launch <game>` runs it: only
 when the game is `Ready`, only after re-checking that the exe is a regular file inside the XXMI
 root starting with `MZ`, and only once the user has confirmed that exact path (interactive
-prompt or `--yes`; stored as `xxmi.confirmed_exe`, asked again if the path changes). XXMI then starts the game (through Steam if
-its Game Launch says so) and injects. GMM doesn't watch or touch the game process.
+prompt or `--yes`; stored as `xxmi.confirmed_exe`, asked again if the path changes). XXMI's
+launcher requires administrator rights, so on Windows GMM starts it through the shell
+(`ShellExecuteExW`, as Explorer does for the Quick Start shortcut) and Windows shows its UAC
+prompt. XXMI then starts the game (through Steam if its Game Launch says so) and injects. GMM doesn't watch or touch the game process.
 
 The game page always shows this notice:
 
