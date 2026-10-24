@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+// Each GMM command gets a generated permission (`allow-<command>`); the main window's
+// capability (capabilities/main.json) grants exactly those, nothing from Tauri's plugins.
+// Keep this list, main.rs's `generate_handler!` and the capability in step.
+const COMMANDS: &[&str] = &[
+    "games",
+    "statuses",
+    "catalog_list",
+    "catalog_search",
+    "catalog_mod",
+    "catalog_updates",
+    "catalog_categories",
+    "install",
+    "library",
+    "set_enabled",
+    "uninstall_preview",
+    "uninstall",
+    "conflicts",
+    "storage",
+    "clear_download_cache",
+    "launch_plan",
+    "launch",
+    "settings",
+    "pick_xxmi_folder",
+    "clear_xxmi_folder",
+    "pick_game_folder",
+    "remove_game_folder",
+];
+
+fn main() {
+    tauri_build::try_build(
+        tauri_build::Attributes::new()
+            .app_manifest(tauri_build::AppManifest::new().commands(COMMANDS)),
+    )
+    .unwrap_or_else(|e| panic!("tauri build step failed: {e}"));
+}

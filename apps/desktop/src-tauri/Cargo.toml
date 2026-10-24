@@ -1,0 +1,34 @@
+[package]
+name = "gmm-desktop"
+description = "The GMM desktop app: a Tauri shell over gmm-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+# Developer tools (the webview inspector). Never in a release build (security rule R6).
+dev = ["tauri/devtools"]
+
+[build-dependencies]
+tauri-build.workspace = true
+
+[dependencies]
+gmm-adapters.workspace = true
+gmm-catalog = { workspace = true, features = ["ts"] }
+gmm-core = { workspace = true, features = ["ts"] }
+gmm-db.workspace = true
+gmm-detect.workspace = true
+gmm-net.workspace = true
+gmm-xxmi = { workspace = true, features = ["ts"] }
+serde.workspace = true
+serde_json.workspace = true
+tauri.workspace = true
+tauri-plugin-dialog.workspace = true
+tokio.workspace = true
+ts-rs.workspace = true
+
+[lints]
+workspace = true

@@ -74,8 +74,10 @@ Since no GPL code is used, we can pick any license:
   otherwise, any contribution you submit is dual licensed as above, without any additional terms
   or conditions."
 
-Our dependencies must fit this license. `cargo-deny` and an npm license checker enforce an
-allowlist (MIT, Apache-2.0, BSD-2/3-Clause, ISC, Zlib, MPL-2.0, Unicode-3.0, CC0-1.0). Any GPL,
+Our dependencies must fit this license. `cargo-deny` and an npm license checker
+(`scripts/check-npm-licenses.mjs`, `pnpm run check-licenses` in `apps/desktop`, in CI) enforce
+an allowlist (MIT, Apache-2.0, BSD-2/3-Clause, ISC, Zlib, MPL-2.0, Unicode-3.0, CC0-1.0; the npm
+check also allows 0BSD and BlueOak-1.0.0, common permissive npm licenses). Any GPL,
 LGPL or AGPL dependency fails the build. Watch out for:
 - **`unrar` crate:** uses the freeware *UnRAR license*, which bans using the code to build a RAR
   compressor. Shipping it is fine, but it isn't OSI-approved. Keep RAR support behind a Cargo
@@ -96,6 +98,15 @@ LGPL or AGPL dependency fails the build. Watch out for:
   (the MSVC Build Tools the Rust Windows toolchain already uses). `trash` 5 (MIT; Recycle
   Bin moves, default features off except COM apartment threading, so no `chrono`). `fs4` 1
   (MIT OR Apache-2.0; free disk space only, `sync` feature). Dev-only: `proptest`, `tempfile`, `wiremock`.
+- **Desktop app** (Phase 3, all pass `cargo deny`): `tauri` 2.12 (Apache-2.0 OR MIT; default
+  features minus `dynamic-acl` and `dbus`), `tauri-build` 2.7, `tauri-plugin-dialog` 2.8
+  (Apache-2.0 OR MIT; Rust-side folder pickers only), `ts-rs` 12 (MIT; behind each crate's `ts`
+  feature, generates the TypeScript types). On Linux Tauri brings gtk-rs 0.18; its build-time
+  `proc-macro-error` is flagged unmaintained (RUSTSEC-2024-0370, not a vulnerability) and
+  ignored in `deny.toml` with that reason. npm (44 packages, all on the allowlist): `react`,
+  `react-dom`, `@tauri-apps/api` (runtime); `vite`, `@vitejs/plugin-react`, `tailwindcss`,
+  `@tailwindcss/vite`, `typescript`, `@biomejs/biome`, `@tauri-apps/cli`, `@types/react*`
+  (build/dev only).
 - **Facts about other software** come from observing it on the dev machine (file layouts,
   config keys, locale strings), recorded in our own words in `docs/03-game-adapters.md`. The
   HoYoPlay `gamedata.dat` handling, for example, is based only on what the file visibly
@@ -131,7 +142,7 @@ LGPL or AGPL dependency fails the build. Watch out for:
 
 - [x] License chosen: MIT OR Apache-2.0
 - [ ] `LICENSE-MIT`, `LICENSE-APACHE`, crate/package metadata and SPDX headers in place
-- [ ] `cargo deny check licenses` and the npm license check pass
+- [ ] `cargo deny check licenses` and the npm license check pass (both in CI since Phase 3)
 - [ ] `THIRD-PARTY-NOTICES` generated and shown in Settings → About
 - [ ] No assets, strings or code from other projects (spot-check by searching distinctive strings)
 - [ ] Name cleared; disclaimer in README and About

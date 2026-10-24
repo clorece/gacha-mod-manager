@@ -21,6 +21,7 @@ use crate::workspace::Workspace;
 
 /// Where a managed mod's folder is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum DiskState {
     Enabled,
@@ -39,6 +40,7 @@ pub struct ManagedMod {
 
 /// A folder (or loose `.ini`) in `Mods/` that GMM didn't install.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct UnmanagedMod {
     pub name: String,
     /// Relative to `Mods/`, with `/`: `Phoenix`, or `GMM/Something` for a folder inside GMM's
@@ -159,6 +161,7 @@ async fn managed_row(db: &Db, game: &GameManifest, id: i64) -> Result<InstalledM
 
 /// Outcome of [`set_enabled`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ToggleOutcome {
     pub id: i64,
     pub folder_name: String,
@@ -227,6 +230,7 @@ impl Trash for RecycleBin {
 
 /// Outcome of [`uninstall`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct UninstallOutcome {
     pub id: i64,
     pub folder_name: String,
@@ -317,6 +321,7 @@ pub fn one_unmanaged<'a>(
 
 /// Outcome of [`set_unmanaged_enabled`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct UnmanagedToggle {
     /// Relative to `Mods/`, before and after.
     pub from: String,
@@ -338,9 +343,48 @@ pub async fn set_unmanaged_enabled(
     query: &str,
     enabled: bool,
 ) -> Result<UnmanagedToggle, CoreError> {
-    let guard = ws.guard();
     let lib = library(db, ws, mods, game).await?;
     let entry = one_unmanaged(&lib, game, query)?;
+    rename_unmanaged(ws, mods, entry, enabled)
+}
+
+/// [`set_unmanaged_enabled`] for the exact path from the listing (what the app passes), so
+/// a top-level `Dup` and `GMM/Dup` are never confused.
+pub async fn set_unmanaged_enabled_at(
+    db: &Db,
+    ws: &Workspace,
+    mods: RootId,
+    game: &GameManifest,
+    path: &str,
+    enabled: bool,
+) -> Result<UnmanagedToggle, CoreError> {
+    let lib = library(db, ws, mods, game).await?;
+    let entry = listed_unmanaged(&lib, game, path)?;
+    rename_unmanaged(ws, mods, entry, enabled)
+}
+
+/// The unmanaged mod listed at exactly `path` (relative to `Mods/`, as [`library`] gives it).
+pub fn listed_unmanaged<'a>(
+    lib: &'a Library,
+    game: &GameManifest,
+    path: &str,
+) -> Result<&'a UnmanagedMod, CoreError> {
+    lib.unmanaged
+        .iter()
+        .find(|u| u.path == path)
+        .ok_or_else(|| CoreError::NoSuchUnmanaged {
+            query: path.to_owned(),
+            game: game.game.name.clone(),
+        })
+}
+
+fn rename_unmanaged(
+    ws: &Workspace,
+    mods: RootId,
+    entry: &UnmanagedMod,
+    enabled: bool,
+) -> Result<UnmanagedToggle, CoreError> {
+    let guard = ws.guard();
     if entry.enabled == enabled {
         return Ok(UnmanagedToggle {
             from: entry.path.clone(),
@@ -393,14 +437,7 @@ pub async fn uninstall_unmanaged(
     let guard = ws.guard();
     let lib = library(db, ws, mods, game).await?;
     // Only an exact path from the listing: the confirmation showed this path, nothing looser.
-    let entry = lib
-        .unmanaged
-        .iter()
-        .find(|u| u.path == path)
-        .ok_or_else(|| CoreError::NoSuchUnmanaged {
-            query: path.to_owned(),
-            game: game.game.name.clone(),
-        })?;
+    let entry = listed_unmanaged(&lib, game, path)?;
     trash.trash(guard, &guard.path(mods, &entry.path)?)?;
     Ok(entry.path.clone())
 }

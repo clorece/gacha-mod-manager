@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! GMM's features, built from the lower crates. The CLI and (later) the app's commands are
-//! thin layers over this crate.
+//! GMM's features, built from the lower crates. The CLI and the app's commands are thin
+//! layers over this crate.
 //!
 //! Installing a mod (docs/02-architecture.md, "Install flow"):
 //!
@@ -20,6 +20,7 @@ mod analyze;
 mod conflicts;
 mod error;
 mod fetch;
+mod images;
 mod install;
 mod launch;
 mod library;
@@ -34,6 +35,7 @@ pub use conflicts::{
 };
 pub use error::CoreError;
 pub use fetch::{FetchEvent, FetchedArchive, MAX_DOWNLOAD_BYTES, choose_file, fetch_archive};
+pub use images::{CachedImage, IMAGE_HOST, ImageCache, MAX_IMAGE_CACHE_BYTES};
 pub use install::{
     InstallEvent, InstallOptions, InstallReport, InstallRequest, InstalledFolder, ModMeta, Sidecar,
     VariantChoice, install, install_analyzed, install_gate,
@@ -41,8 +43,8 @@ pub use install::{
 pub use launch::{LaunchPlan, confirm_exe, plan_launch, start};
 pub use library::{
     DiskState, Library, ManagedMod, RecycleBin, ToggleOutcome, Trash, UninstallOutcome,
-    UnmanagedMod, UnmanagedToggle, find_unmanaged, library, one_unmanaged, set_enabled,
-    set_unmanaged_enabled, uninstall, uninstall_unmanaged,
+    UnmanagedMod, UnmanagedToggle, find_unmanaged, library, listed_unmanaged, one_unmanaged,
+    set_enabled, set_unmanaged_enabled, set_unmanaged_enabled_at, uninstall, uninstall_unmanaged,
 };
 pub use names::{
     DISABLED_PREFIX, GMM_DIR, SIDECAR_FILE, STAGING_DIR, mod_folder_name, on_disk_name,

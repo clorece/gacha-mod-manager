@@ -1,8 +1,8 @@
 # 07 — Frontend design
 
 The UI is built in Phase 3, after the backend works from the CLI. Every screen reads from typed
-Tauri commands (TS types generated from Rust with `specta` or `ts-rs`). The UI never builds a
-path or a URL to the outside world.
+Tauri commands (TS types generated from the Rust types with `ts-rs` into
+`apps/desktop/src/bindings.ts`). The UI never builds a path or a URL to the outside world.
 
 ## App shell
 

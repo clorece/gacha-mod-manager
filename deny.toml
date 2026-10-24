@@ -6,6 +6,13 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
+# Each ignored advisory needs a reason and a plan.
+ignore = [
+  # Unmaintained (not a vulnerability). A build-time proc macro of gtk-rs 0.18, which Tauri 2
+  # uses for its window on Linux; no runtime code ships from it. Revisit when Tauri moves off
+  # gtk-rs 0.18.
+  { id = "RUSTSEC-2024-0370", reason = "build-time only, via Tauri's Linux gtk-rs 0.18" },
+]
 
 [licenses]
 version = 2

@@ -78,8 +78,8 @@ The install pipeline relies on these. Confirmed by you in game:
 - [x] Cargo workspace, pinned toolchain, rustfmt/clippy config, `justfile`
 - [x] CI on Windows + Linux: fmt, clippy `-D warnings`, tests; `cargo-deny` (licenses, bans,
       advisories, sources)
-- [ ] pnpm + Tauri app shell; `pnpm audit` and npm license checks in CI (moved to Phase 3,
-      "Start here")
+- [x] pnpm + Tauri app shell; `pnpm audit` and npm license checks in CI (done in Phase 3,
+      2026-10-24)
 - [x] `gmm-fsguard` (ScopedPath, RelPath, roots, denylist, junction/symlink escape checks) +
       `disallowed_methods` lints (verified to fire outside fsguard)
 - [x] `gmm-net`: host allowlist (incl. every redirect hop), rate limiting, retries/backoff,
@@ -197,34 +197,61 @@ conflict reported, and see it in storage. Privacy harnesses green.
 Spec: [07-frontend-design.md](07-frontend-design.md). Every screen sits on a `gmm-core` call the
 CLI already makes, so this phase adds presentation, not features.
 
-**Start here** (suggested order):
-- [ ] App shell in `apps/desktop/`: Tauri 2 (its Rust side depends on `gmm-core`), Vite + React
-      + TypeScript + Tailwind, pnpm (this machine has Node 24 and npm; pnpm via corepack). The
-      main window's capability lists only GMM's own commands (no `fs`, `shell`, `http`
-      plugins); CSP from [04](04-security.md); devtools only behind a `dev` feature (R6).
-      CI: `pnpm install --frozen-lockfile`, typecheck, lint, `pnpm audit`, npm license check;
-      the Phase 1 item below moves here
-- [ ] Command layer: one Tauri command per CLI action, taking ids, never paths (R5): games,
-      status, catalog list/search/show/categories, install (progress as events, variant and
-      blocked-file prompts as structured errors: `CoreError::ChooseVariant` / `Blocked`),
-      library, enable/disable (with `conflicts_for`), uninstall, conflicts, storage, launch
-      (plan → confirm → start), config. Folder pickers are opened from Rust and the result is
-      validated there. TS types generated from the Rust types (`ts-rs` or `specta`)
-- [ ] `gmmimg://` protocol: images fetched through `gmm-net` into `cache/images/` with a size
-      cap; the webview never touches the network
-- [ ] Then the screens, in this order:
-- [ ] Design tokens, app shell, game rail, XXMI state pill, downloads tray
-- [ ] Setup/onboarding cards + setup guide stepper (driven by `gmm-xxmi`'s states and steps)
+**Start here** ✅ done 2026-10-24:
+- [x] App shell in `apps/desktop/`: Tauri 2.12 (`gmm-desktop`, a workspace member that depends
+      on `gmm-core`), Vite 8 + React 19 + TypeScript 7 + Tailwind 4, pnpm 12 via corepack (pnpm
+      workspace at the repo root, lockfile `pnpm-lock.yaml`), Biome for lint and format. The
+      main window's capability lists only GMM's 22 commands (not even `core:default`); CSP
+      from [04](04-security.md) plus `http://gmmimg.localhost` for WebView2; a navigation
+      guard keeps the webview on GMM's own pages; devtools only with `--features dev` (R6).
+      CI: a `frontend` job (`pnpm install --frozen-lockfile`, typecheck, lint, `pnpm audit`,
+      `pnpm run check-licenses`, `pnpm build`); the Rust job installs WebKitGTK on Linux and
+      checks that `tauri/devtools` and `gmm-net/test-util` stay out of the shipped graph.
+      Verified: `pnpm tauri dev` and a release build run on the dev machine and show ZZZ and
+      WuWa `Ready` with the real Mods folders
+- [x] Command layer (`apps/desktop/src-tauri/src/commands.rs`): `games`, `statuses`,
+      `catalog_list|search|mod|updates|categories`, `install` (progress over a Tauri
+      `Channel`; `choose_variant` / `blocked` as structured `CmdError`s), `library`,
+      `set_enabled` (refuses with `conflicts` unless `anyway`), `uninstall_preview` +
+      `uninstall`, `conflicts`, `storage`, `clear_download_cache`, `launch_plan` + `launch`,
+      `settings`, `pick_xxmi_folder`, `clear_xxmi_folder`, `pick_game_folder`,
+      `remove_game_folder`. Mods are named by `ModKey` (GMM id, or the exact listed path of a
+      hand-installed mod: new `gmm_core::set_unmanaged_enabled_at` / `listed_unmanaged`).
+      Folder pickers open from Rust (`tauri-plugin-dialog`, no webview permission) and are
+      validated. TS types generated with `ts-rs` into `src/bindings.ts` (a test fails when
+      stale; `just bindings` regenerates). Checked by hand in the app: catalogue, library,
+      hostile ids and keys refused. Not yet exercised from the UI: `install`, `uninstall`,
+      `storage`, `settings` (no screens yet)
+- [x] `gmmimg` protocol: `gmm_core::ImageCache` (keys = SHA-256 of `images.gamebanana.com`
+      URLs handed out by catalogue commands; fetched through `gmm-net` with its own 8/s rate
+      limit; JPEG/PNG/WebP/GIF only; `cache/images/`, 512 MiB cap, oldest pruned first).
+      Verified in a release build: catalogue images load, outside images and fetches are blocked
+
+**Screens** (in this order):
+- [ ] Design tokens, app shell, game rail, XXMI state pill, downloads tray. Done so far: dark
+      tokens in `styles.css`, the shell (`App.tsx`: game rail with a "needs setup" dot, top
+      bar, state pill, Launch with XXMI with the exe confirmation dialog). Next: the
+      Browse/Library/Storage/Settings navigation from [07](07-frontend-design.md), the
+      downloads tray on the `install` channel (cancel/pause need a cancel hook in
+      `gmm-core::install`), light theme, shadcn/ui primitives (dialog, menu, toast)
+- [ ] Setup/onboarding cards + setup guide stepper (driven by `gmm-xxmi`'s states and steps).
+      Done so far: `SetupCard` (game / XXMI / importer rows, next steps, re-check, folder
+      pickers). Next: highlight the failing row per `SetupState`, the stepper with your
+      screenshots, the XXMI releases link (system browser after a confirmation, through a
+      new command)
 - [ ] Catalogue: virtualized grid, filters (category, character, sort, NSFW), banner cards,
       state badges
 - [ ] Mod page: hero banner + slideshow + lightbox, header/stats/license, Description (sanitized),
       Files (file picker, archived files), Credits, Updates
 - [ ] Variant picker dialog
-- [ ] Library: list/grid, toggles, filters, unmanaged tab, actions menu
+- [ ] Library: list/grid, toggles, filters, unmanaged tab, actions menu. Done so far: one list
+      of managed and hand-installed mods with toggles and the "Enable anyway" conflict prompt
 - [ ] Conflict dialog + conflict filter
 - [ ] Storage screen: segment bar, table, multi-select disable/delete/clear cache
 - [ ] Settings + About (notices, disclaimer)
-- [ ] Component tests, XSS corpus, fixture-based snapshots
+- [ ] Component tests, XSS corpus, fixture-based snapshots (needs a test runner: Vitest)
+- [ ] IPC fuzz harness (hostile args to every command, from [04](04-security.md)); so far
+      checked by hand
 
 Exit: everything from Phase 2 is reachable in the UI for ZZZ and WuWa, with designed loading,
 empty and error states.

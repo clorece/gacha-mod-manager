@@ -15,8 +15,13 @@ uninstalling and listing mods (GMM's and hand-installed ones), conflict detectio
 accounting, `gmm launch` (with XXMI's administrator prompt), the adapter conformance suite and
 the egress / file-access privacy harnesses (in CI, with strace on Linux). The exit check was
 done in game: a GameBanana mod installed with `gmm install`, started with `gmm launch zzz`,
-toggled, a conflict reported, storage listed. Everything works from the `gmm` command line;
-there is no app window yet.
+toggled, a conflict reported, storage listed.
+
+**Phase 3 started** (2026-10-24): its "Start here" list is done. There is an app window
+(`apps/desktop`, Tauri 2 + React): 22 commands covering every CLI action, TypeScript types
+generated from the Rust types, the `gmmimg` image protocol, a locked-down capability and CSP,
+and a first shell (game rail, XXMI state pill, setup card, mod list with toggles, Launch with
+XXMI). Run it with `corepack pnpm tauri dev` in `apps/desktop` (or `just app-dev`).
 
 | Crate | What it does |
 |---|---|
@@ -29,7 +34,8 @@ there is no app window yet.
 | `gmm-xxmi` | Reads XXMI's setup (allowlisted config fields only) and works out each game's setup state |
 | `gmm-migoto` | Reads 3DMigoto mod `.ini` files: override hashes, what they replace, namespaces, key bindings |
 | `gmm-db` | SQLite database (`%APPDATA%\GMM\gmm.db`): settings, manual game folders, installed mods, download cache, GameBanana response cache |
-| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`), the library (list with disk state, unmanaged mods, enable/disable, uninstall to the Recycle Bin), conflict detection, storage accounting, launching through XXMI (with exe confirmation), app folders |
+| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`), the library (list with disk state, unmanaged mods, enable/disable, uninstall to the Recycle Bin), conflict detection, storage accounting, launching through XXMI (with exe confirmation), app folders, the image cache behind `gmmimg` |
+| `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, one command per CLI action (ids only), the `gmmimg` protocol, navigation guard; the React UI is in `apps/desktop/src` |
 | `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm list`, `gmm enable/disable/uninstall`, `gmm conflicts`, `gmm storage`, `gmm launch`, `gmm detect`, `gmm status`, `gmm config` |
 
 On the dev machine, `gmm status` reports ZZZ `Ready` (HoYoPlay install) and WuWa
@@ -38,8 +44,9 @@ On the dev machine, `gmm status` reports ZZZ `Ready` (HoYoPlay install) and WuWa
 **Waiting on you:** screenshots of each XXMI setup step, for the app's setup guide (whenever
 convenient).
 
-**Next:** Phase 3, the app (Tauri shell, command layer, image protocol,
-then the screens). See "Start here" under Phase 3 in the roadmap.
+**Next:** the Phase 3 screens, in the roadmap's order: navigation and the downloads tray,
+the setup stepper, then Browse (catalogue), the mod page, the variant picker, the full
+library, conflicts, storage, settings. See "Screens" under Phase 3 in the roadmap.
 
 ## Docs
 

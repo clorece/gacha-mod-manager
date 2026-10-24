@@ -30,6 +30,7 @@ const MAX_FILES_PER_MOD: usize = 20_000;
 
 /// A mod in a conflict report.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ModRef {
     /// Installed by GMM (id from `gmm list`).
@@ -49,6 +50,7 @@ impl ModRef {
 
 /// Two mods that replace the same things.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Conflict {
     pub a: ModRef,
     pub b: ModRef,
@@ -57,6 +59,7 @@ pub struct Conflict {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ConflictReport {
     pub game: String,
     /// Enabled mods whose ini files were read.

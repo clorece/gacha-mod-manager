@@ -21,6 +21,7 @@ const MAX_WALK_ENTRIES: usize = 500_000;
 
 /// Size of a folder tree, without following links.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Size {
     pub bytes: u64,
     pub files: u64,
@@ -37,6 +38,7 @@ impl Size {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ModUsage {
     pub mod_ref: ModRef,
     pub enabled: bool,
@@ -45,6 +47,7 @@ pub struct ModUsage {
 
 /// One game's `Mods/` folder.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct GameStorage {
     pub game: String,
     /// Largest first.
@@ -60,6 +63,7 @@ pub struct GameStorage {
 
 /// GMM's cache folder.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct CacheStorage {
     /// Archives in `downloads/` (including half-finished downloads).
     pub downloads: Size,
@@ -171,6 +175,7 @@ pub async fn cache_storage(db: &Db, ws: &Workspace) -> Result<CacheStorage, Core
 
 /// Outcome of [`clear_downloads`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ClearedCache {
     pub archives: u64,
     pub bytes: u64,

@@ -3,8 +3,9 @@
 A desktop app for finding, downloading and organizing GameBanana mods for gacha games, using
 [XXMI](https://github.com/SpectrumQT/XXMI-Launcher) as the mod loader.
 
-**Status:** early development, command line only (the backend phase is complete; the app
-window comes next). The backend can browse GameBanana, download
+**Status:** early development. The backend is complete and works from the `gmm` command line;
+the app window has started (a first shell over every command; most screens are still to
+come). The backend can browse GameBanana, download
 and safely extract mods, find your games and XXMI, check your mod setup (`gmm status`), remember
 your settings (`gmm config`), and install mods into XXMI's Mods folder (`gmm install`).
 It can also switch mods on and off, uninstall them (to the Recycle Bin), spot mods that
@@ -24,6 +25,12 @@ cargo run -p gmm-cli -- status
 
 ```bash
 cargo run -p gmm-cli -- catalog list --game zzz --sort downloads
+```
+
+The app window needs Node 24 too (pnpm comes through corepack):
+
+```bash
+cd apps/desktop && corepack pnpm install && corepack pnpm tauri dev
 ```
 
 ## Mods load through XXMI

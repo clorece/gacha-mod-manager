@@ -83,4 +83,9 @@ pub enum CoreError {
     ModFolderMissing(String),
     #[error("both {0:?} and its DISABLED copy exist in the Mods folder; remove one by hand first")]
     ModFolderAmbiguous(String),
+    /// An image key GMM never handed out (see [`crate::ImageCache`]).
+    #[error("unknown image")]
+    UnknownImage,
+    #[error("GameBanana didn't send an image: {0}")]
+    NotAnImage(String),
 }

@@ -1,0 +1,363 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// Generated from the Rust types by apps/desktop/src-tauri/src/bindings.rs. Don't edit;
+// run `GMM_UPDATE_BINDINGS=1 cargo test -p gmm-desktop bindings` instead.
+
+export type CmdError = { "kind": "choose_variant", message: string, variants: Array<string>, } | { "kind": "blocked", message: string, files: Array<string>, } | { "kind": "conflicts", message: string, conflicts: Array<Conflict>, } | { "kind": "not_ready", message: string, } | { "kind": "other", message: string, };
+
+export type GameInfo = { id: string, name: string, short_name: string, importer: string, gamebanana_id: number, };
+
+export type CatalogQuery = { game: string, 
+/**
+ * 1-based.
+ */
+page: number, per_page: number, sort: Sort, 
+/**
+ * Root category or subcategory (character).
+ */
+category: number | null, show_nsfw: boolean, };
+
+export type CatalogPage = { page: Page<ModSummary>, hidden: number, };
+
+export type ModRow = { id: number, name: string, 
+/**
+ * The folder's name on disk right now (with `DISABLED ` when off).
+ */
+folder: string, enabled: boolean, disk: DiskState, variant: string | null, gb_mod_id: number | null, version: string | null, size_bytes: number, installed_at: number, };
+
+export type LibraryView = { game: string, 
+/**
+ * Why the Mods folder couldn't be read (XXMI or the importer missing), if it couldn't.
+ */
+problem: string | null, managed: Array<ModRow>, unmanaged: Array<UnmanagedMod>, };
+
+export type ModKey = { "type": "managed", id: number, } | { "type": "unmanaged", path: string, };
+
+export type VariantPick = { "type": "only" } | { "type": "named", names: Array<string>, } | { "type": "all" };
+
+export type InstallArgs = { mod_id: number, 
+/**
+ * Defaults to the newest file GameBanana scanned as clean.
+ */
+file_id: number | null, variants: VariantPick, 
+/**
+ * Install without the blocked files (after the user saw them listed).
+ */
+skip_blocked: boolean, };
+
+export type InstallProgress = { "type": "using_cache" } | { "type": "downloading", size: number, } | { "type": "progress", downloaded: number, total: number | null, } | { "type": "extracting" } | { "type": "installing", folder: string, };
+
+export type InstallResult = { report: InstallReport, 
+/**
+ * Setup problems that don't stop installing but stop mods from loading.
+ */
+setup_warnings: Array<string>, 
+/**
+ * Mods already on that the new ones clash with (both stay on).
+ */
+conflicts: Array<Conflict>, };
+
+export type Toggled = { key: ModKey, enabled: boolean, 
+/**
+ * False when the mod already was in that state.
+ */
+changed: boolean, };
+
+export type UninstallItem = { key: ModKey, name: string, 
+/**
+ * Full path, for the user to check.
+ */
+folder: string, 
+/**
+ * Counted for hand-installed mods only.
+ */
+files: number | null, bytes: number, 
+/**
+ * The size is at least this (the walk stopped early).
+ */
+truncated: boolean, 
+/**
+ * Not installed by GMM: the user's own files.
+ */
+hand_installed: boolean, };
+
+export type Uninstalled = { key: ModKey, 
+/**
+ * False when the folder was already gone and only GMM's record was removed.
+ */
+trashed: boolean, };
+
+export type GameStorageView = { game: string, problem: string | null, storage: GameStorage | null, };
+
+export type StorageView = { games: Array<GameStorageView>, cache: CacheStorage, };
+
+export type LaunchInfo = { exe: string, args: Array<string>, 
+/**
+ * Whether the user already confirmed this exact exe.
+ */
+confirmed: boolean, };
+
+export type Launched = { pid: number | null, };
+
+export type FolderRow = { game: string, folder: string, };
+
+export type Settings = { database: string, 
+/**
+ * The XXMI folder the user picked, or `None` when it's found automatically.
+ */
+xxmi_root: string | null, confirmed_xxmi_exe: string | null, manual_folders: Array<FolderRow>, http_cache_entries: number, http_cache_bytes: number, download_cache_entries: number, download_cache_bytes: number, };
+
+export type GameStatus = { game_id: string, game_name: string, state: SetupState, 
+/**
+ * One sentence for the user.
+ */
+summary: string, 
+/**
+ * What to do next, in order. Empty when ready.
+ */
+steps: Array<string>, 
+/**
+ * Extra information that doesn't block anything.
+ */
+notes: Array<string>, detected_installs: Array<GameInstall>, xxmi_root: string | null, xxmi_version: string | null, importer: string, importer_info: ImporterInfo | null, 
+/**
+ * The game folder XXMI is configured with.
+ */
+xxmi_game_folder: string | null, 
+/**
+ * Which detected install that folder is, if any.
+ */
+xxmi_game_folder_source: InstallSource | null, 
+/**
+ * XXMI's "Game Launch" setting, raw (`DIRECT`, `STEAM`, ...).
+ */
+game_launch: string | null, launch_count: number | null, 
+/**
+ * Executable and arguments GMM would run to start the game with mods (only when ready).
+ */
+launch_command: Array<string> | null, };
+
+export type SetupState = "xxmi_not_found" | "importer_missing" | "importer_broken" | "game_path_not_set" | "path_mismatch" | "launch_mode_mismatch" | "ready";
+
+export type ImporterInfo = { folder_exists: boolean, 
+/**
+ * Critical files that are missing (relative to the importer folder).
+ */
+missing_files: Array<string>, 
+/**
+ * `target = ...` from `d3dx.ini`.
+ */
+d3dx_target: string | null, 
+/**
+ * Whether `d3dx.ini` loads mods from `Mods/` (`include_recursive = Mods`).
+ */
+d3dx_loads_mods: boolean, 
+/**
+ * `global $version` from `Core/<IMP>/main.ini`.
+ */
+importer_version: string | null, 
+/**
+ * File version of the XXMI DLL (`d3d11.dll`).
+ */
+dll_version: string | null, mods: ModsSummary, };
+
+export type ModsSummary = { 
+/**
+ * Top-level folders in `Mods/` (each is usually one mod).
+ */
+enabled: number, 
+/**
+ * Top-level folders whose name starts with `DISABLED`.
+ */
+disabled: number, total_bytes: number, 
+/**
+ * True when the walk stopped early.
+ */
+truncated: boolean, };
+
+export type GameInstall = { game_id: string, source: InstallSource, 
+/**
+ * Canonical path of the folder holding the game exe.
+ */
+folder: string, steam_appid: number | null, };
+
+export type InstallSource = "steam" | "ho_yo_play" | "epic" | "manual";
+
+export type Page<T> = { items: Array<T>, 
+/**
+ * Total matching records across all pages.
+ */
+total: number, page: number, per_page: number, is_last: boolean, };
+
+export type Sort = "default" | "newest" | "recently_updated" | "most_downloaded" | "most_liked" | "most_viewed";
+
+export type Visibility = "show" | "warn" | "hide" | { "other": string };
+
+export type Member = { id: number, name: string, avatar_url: string | null, profile_url: string | null, };
+
+export type CategoryRef = { 
+/**
+ * Absent when GameBanana only gives a name.
+ */
+id: number | null, name: string, };
+
+export type ImageSize = { width: number, height: number, };
+
+export type ImageVariant = { url: string, size: ImageSize, };
+
+export type Image = { 
+/**
+ * Full-size original.
+ */
+url: string, 
+/**
+ * Scaled copies, smallest first.
+ */
+variants: Array<ImageVariant>, };
+
+export type ModStats = { likes: number, views: number, posts: number, 
+/**
+ * Only on the mod page, not in listings.
+ */
+downloads: number | null, };
+
+export type ModSummary = { id: number, 
+/**
+ * GameBanana game id (`_aGame`), when the response includes it (mod pages do;
+ * observed 2026-10-23).
+ */
+game_id: number | null, name: string, submitter: Member, root_category: CategoryRef | null, 
+/**
+ * For skins this is the character.
+ */
+category: CategoryRef | null, version: string | null, date_added: number, date_modified: number, date_updated: number | null, images: Array<Image>, stats: ModStats, featured: boolean, obsolete: boolean, visibility: Visibility, has_content_ratings: boolean, profile_url: string, };
+
+export type ModFile = { id: number, name: string, size: number, date_added: number, download_count: number, download_url: string, 
+/**
+ * Often empty on GameBanana.
+ */
+md5: string | null, version: string | null, description: string | null, 
+/**
+ * GameBanana's preliminary analysis, e.g. "ok".
+ */
+analysis_result: string | null, 
+/**
+ * GameBanana's antivirus result, e.g. "clean".
+ */
+av_result: string | null, archived: boolean, };
+
+export type ModFiles = { files: Array<ModFile>, archived_files: Array<ModFile>, };
+
+export type LicenseChecklist = { yes: Array<string>, ask: Array<string>, no: Array<string>, };
+
+export type Credit = { name: string, role: string | null, member_id: number | null, };
+
+export type CreditGroup = { name: string, authors: Array<Credit>, };
+
+export type ModProfile = { summary: ModSummary, 
+/**
+ * Untrusted HTML; sanitize before display.
+ */
+description_html: string, 
+/**
+ * Untrusted HTML; sanitize before display.
+ */
+license_html: string, license: LicenseChecklist, credits: Array<CreditGroup>, files: ModFiles, updates_count: number, is_trashed: boolean, is_withheld: boolean, };
+
+export type ChangeEntry = { text: string, 
+/**
+ * e.g. "Addition", "Bugfix".
+ */
+category: string, };
+
+export type ModUpdate = { id: number, title: string, version: string | null, date_added: number, changelog: Array<ChangeEntry>, 
+/**
+ * Untrusted HTML; sanitize before display.
+ */
+text_html: string, file_ids: Array<number>, };
+
+export type Category = { id: number, name: string, item_count: number, subcategory_count: number, icon_url: string | null, obsolete: boolean, };
+
+export type DiskState = "enabled" | "disabled" | "missing" | "ambiguous";
+
+export type UnmanagedMod = { name: string, 
+/**
+ * Relative to `Mods/`, with `/`: `Phoenix`, or `GMM/Something` for a folder inside GMM's
+ * own folder that the database doesn't know.
+ */
+path: string, enabled: boolean, is_dir: boolean, };
+
+export type ModRef = { "type": "managed", id: number, folder: string, } | { "type": "unmanaged", path: string, };
+
+export type Conflict = { a: ModRef, b: ModRef, 
+/**
+ * The hashes both replace, sorted.
+ */
+hashes: Array<string>, };
+
+export type ConflictReport = { game: string, 
+/**
+ * Enabled mods whose ini files were read.
+ */
+mods_checked: number, conflicts: Array<Conflict>, 
+/**
+ * Mods skipped as shared libraries (by namespace).
+ */
+libraries: Array<ModRef>, 
+/**
+ * Problems that make the report less complete (unreadable files, very large mods).
+ */
+notes: Array<string>, };
+
+export type Size = { bytes: number, files: number, 
+/**
+ * The walk stopped early; the real size is larger.
+ */
+truncated: boolean, };
+
+export type ModUsage = { mod_ref: ModRef, enabled: boolean, size: Size, };
+
+export type GameStorage = { game: string, 
+/**
+ * Largest first.
+ */
+managed: Array<ModUsage>, unmanaged: Array<ModUsage>, managed_total: Size, unmanaged_total: Size, 
+/**
+ * Loose files in `Mods/` and leftovers in GMM's staging folder.
+ */
+other: Size, 
+/**
+ * Free space on the drive that holds `Mods/`.
+ */
+free_bytes: number | null, };
+
+export type CacheStorage = { 
+/**
+ * Archives in `downloads/` (including half-finished downloads).
+ */
+downloads: Size, 
+/**
+ * Leftover extraction folders (normally empty).
+ */
+extract: Size, 
+/**
+ * GameBanana responses kept in the database.
+ */
+http_entries: number, http_bytes: number, free_bytes: number | null, };
+
+export type ClearedCache = { archives: number, bytes: number, };
+
+export type InstalledFolder = { 
+/**
+ * Database id.
+ */
+id: number, folder_name: string, variant: string | null, files: number, bytes: number, 
+/**
+ * Blocked files that were left out (only with [`InstallOptions::skip_blocked`]).
+ */
+skipped: Array<string>, 
+/**
+ * Scan warnings for this folder, as `path: reason`.
+ */
+warnings: Array<string>, };
+
+export type InstallReport = { game: string, mod_id: number, mod_name: string, file_id: number, file_name: string, archive_sha256: string, from_cache: boolean, installed: Array<InstalledFolder>, };

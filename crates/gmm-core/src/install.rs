@@ -110,6 +110,7 @@ pub struct Sidecar {
 
 /// One mod folder that was installed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct InstalledFolder {
     /// Database id.
     pub id: i64,
@@ -125,6 +126,7 @@ pub struct InstalledFolder {
 
 /// Outcome of [`install`].
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct InstallReport {
     pub game: String,
     pub mod_id: u64,

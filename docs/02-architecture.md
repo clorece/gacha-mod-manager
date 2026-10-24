@@ -6,12 +6,13 @@
 |---|---|---|
 | Shell | Tauri 2 | Small native app; WebView2 on Windows, WebKitGTK on Linux; capability-based IPC; NSIS/MSI installers |
 | Core logic | Rust workspace | All file, archive, network and process work lives here |
-| UI | React + TypeScript + Vite, Tailwind + shadcn/ui, TanStack Query/Virtual, Zustand, Embla (carousel) | Widely used, well documented |
+| UI | React 19 + TypeScript + Vite, Tailwind 4 (in use); shadcn/ui, TanStack Query/Virtual, Embla (carousel) as the screens need them | Widely used, well documented |
+| UI ↔ Rust types | `ts-rs`: `apps/desktop/src/bindings.ts` is generated from the Rust types | The two can't drift; a test fails when the file is stale |
 | Local DB | SQLite via `sqlx`, migrations in repo | One file in the app data dir |
 | Archives | `zip`, `sevenz-rust2`, `unrar` (feature-gated), wrapped by our `gmm-archive` crate | All extraction goes through one hardened path |
 | HTTP | `reqwest` (rustls), wrapped by our `gmm-net` crate | One place to enforce the host allowlist |
 | Recycle Bin | `trash` crate | Deletes are recoverable |
-| Tooling | pnpm, cargo workspace, `just` task runner | |
+| Tooling | pnpm (via corepack), Biome (lint + format), cargo workspace, `just` task runner | |
 
 The **`gmm` CLI** is built from the same core crates. Every backend feature ships in the CLI first
 (Phases 1–2). The UI (Phase 3) only presents what the CLI can already do.
@@ -53,7 +54,8 @@ flowchart LR
 
 ```
 gacha-mod-manager/
-├─ apps/desktop/              # Tauri app: src/ (React), src-tauri/ (thin command layer)   (Phase 1/3)
+├─ apps/desktop/              # ✅ the app: src/ (React), src-tauri/ (gmm-desktop: Tauri shell,
+│                             #    command layer, gmmimg protocol); bindings.ts is generated
 ├─ crates/
 │  ├─ gmm-fsguard/            # ✅ ScopedPath, RelPath, root registry, denylist
 │  ├─ gmm-net/                # ✅ allowlisted HTTP, rate limiting, resumable verified downloads
@@ -66,12 +68,13 @@ gacha-mod-manager/
 │  ├─ gmm-db/                 # ✅ SQLite + migrations: settings, installed mods, caches
 │  ├─ gmm-cli/                # ✅ `gmm` binary
 │  ├─ gmm-core/               # ✅ install pipeline, library (list, toggle, uninstall),
-│  │                          #    conflicts, app folders; storage comes next (Phase 2)
+│  │                          #    conflicts, storage, launch, app folders, image cache
 │  └─ gmm-migoto/             # ✅ 3DMigoto .ini parser: overrides, hashes, namespaces, keybinds
-├─ packages/ui/               # shared React components                                      (Phase 3)
 ├─ docs/                      # these docs (docs/research/ is local only)
 ├─ CLAUDE.md                  # working agreements (doc updates per phase, commits, code rules)
 ├─ LICENSE-MIT, LICENSE-APACHE, README.md, CONTRIBUTING.md
+├─ scripts/check-npm-licenses.mjs  # npm license policy check (same allowlist as deny.toml)
+├─ package.json, pnpm-workspace.yaml, pnpm-lock.yaml  # pnpm workspace (apps/*)
 └─ deny.toml, clippy.toml, rust-toolchain.toml, rustfmt.toml, justfile
 ```
 
@@ -228,8 +231,59 @@ default), and sanitize `_sText` HTML before display. The full mod page field map
 [07](07-frontend-design.md).
 
 **Images** go through a Rust-side cache served to the webview via a custom protocol
-(`gmmimg://<hash>`). The webview never contacts the internet. Images are cached on disk with a
-size cap, and nothing that identifies the user is sent to image hosts.
+(`gmmimg`), implemented in `gmm_core::ImageCache` and registered in the app's `main.rs`. The
+webview never contacts the internet and never names a URL: when a catalogue command returns
+data, every image URL (preview images and their scaled variants, avatars, category icons) is
+registered with the cache and replaced by `http://gmmimg.localhost/<key>` (Windows/WebView2)
+or `gmmimg://localhost/<key>` (elsewhere), where the key is the URL's SHA-256. Only HTTPS
+URLs on `images.gamebanana.com` get a key; others are dropped. On first request the image is
+fetched through `gmm-net` (its own client with its own rate limit, 8/s with bursts of 16, so a
+page of thumbnails doesn't hold up API calls; 8 MiB per image), kept as
+`cache/images/<key>`, and served only if its first bytes are JPEG, PNG, WebP or GIF (with
+`X-Content-Type-Options: nosniff`). An unknown key gets a 404; keys cached by an earlier run
+are still served. The cache is capped at 512 MiB, and the oldest images go first. Images
+inside description HTML are not rewritten yet (the CSP blocks them); the mod page screen
+will sanitize and rewrite that HTML.
+
+## Desktop app (`apps/desktop`)
+
+`gmm-desktop` (`apps/desktop/src-tauri`, a workspace member) is a Tauri 2 shell with one
+command per CLI action, all in `src/commands.rs`: `games`, `statuses`, `catalog_list`,
+`catalog_search`, `catalog_mod`, `catalog_updates`, `catalog_categories`, `install`,
+`library`, `set_enabled`, `uninstall_preview`, `uninstall`, `conflicts`, `storage`,
+`clear_download_cache`, `launch_plan`, `launch`, `settings`, `pick_xxmi_folder`,
+`clear_xxmi_folder`, `pick_game_folder`, `remove_game_folder`. Each calls the same
+`gmm-core` functions as the CLI.
+
+- **Arguments are ids**: game ids, GameBanana ids, GMM mod ids, and `ModKey`
+  (`{type: "managed", id}` or `{type: "unmanaged", path}`, where `path` must exactly match an
+  entry of a fresh library listing: `gmm_core::set_unmanaged_enabled_at`,
+  `listed_unmanaged`). Folder pickers open from Rust (`tauri-plugin-dialog`, Rust side only)
+  and the result is validated (`gmm_xxmi::open_xxmi`, `gmm_detect::resolve_game_folder`)
+  before it's saved. `remove_game_folder` takes a folder `settings` listed and only matches
+  it against stored rows.
+- **Errors** are a tagged `CmdError`: `choose_variant` (with the variant names) and
+  `blocked` (with the file names) from `install`, `conflicts` from `set_enabled` (with the
+  conflicts; call again with `anyway`), `not_ready`, and `other`.
+- **Install progress** goes over a Tauri `Channel` passed to `install` (no event
+  permissions needed).
+- **Launch** is two steps: `launch_plan` shows the exe and whether it was confirmed;
+  `launch(game, confirm)` records the confirmation and starts XXMI.
+- **Uninstall** is two steps: `uninstall_preview` returns each folder's full path (and size,
+  file count for hand-installed mods) for the confirmation dialog; `uninstall` then moves
+  exactly those to the Recycle Bin.
+- **Types**: everything that crosses the bridge derives `ts_rs::TS` behind each crate's
+  `ts` feature (`gmm-catalog`, `gmm-detect`, `gmm-xxmi`, `gmm-core`), and
+  `src-tauri/src/bindings.rs` writes them into `src/bindings.ts` (64-bit integers as
+  `number`). `src/api.ts` wraps `invoke` with those types.
+- **Frontend**: `App.tsx` (game rail, top bar with the XXMI state pill and Launch with XXMI),
+  `components/SetupCard.tsx` (state, steps, folder pickers), `components/Library.tsx` (mods
+  with toggles and the conflict prompt), `components/LaunchButton.tsx` (exe confirmation).
+- The app uses `AppDirs::system()` like the CLI (so `GMM_HOME` works for both), one shared
+  `Db`, one API `gmm_net::Client` and the image cache's own client.
+
+Security wiring (capability, CSP, navigation guard, devtools) is in
+[04](04-security.md#catalogue--ui-hardening).
 
 ## Install flow
 
@@ -319,7 +373,8 @@ queries the raw response cache can't answer.
 | Caches (downloads, images, HTTP) | `%LOCALAPPDATA%\GMM\cache\` |
 | Logs (local only, home path redacted) | `%LOCALAPPDATA%\GMM\logs\` |
 
-On Linux these map to the XDG equivalents (`dirs` in the CLI; Tauri's path API in the app).
+On Linux these map to the XDG equivalents (`dirs`, through `gmm_core::AppDirs`, in both the
+CLI and the app).
 If `GMM_HOME` names an absolute folder, the database goes to `GMM_HOME/data/` and the cache to
 `GMM_HOME/cache/` instead (portable use; the privacy harness relies on it). Logs don't exist yet.
 

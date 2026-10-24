@@ -3,9 +3,10 @@
 //! GMM's catalogue model. Timestamps are Unix seconds. Field meanings are mapped from
 //! GameBanana in `gamebanana.rs`; see also the field table in docs/07-frontend-design.md.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum Sort {
     /// The catalogue's default order.
@@ -51,6 +52,7 @@ pub struct SearchQuery {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Page<T> {
     pub items: Vec<T>,
     /// Total matching records across all pages.
@@ -62,6 +64,7 @@ pub struct Page<T> {
 
 /// How GameBanana wants a mod shown before the user opts in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum Visibility {
     Show,
@@ -88,6 +91,7 @@ impl Visibility {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Member {
     pub id: u64,
     pub name: String,
@@ -96,6 +100,7 @@ pub struct Member {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct CategoryRef {
     /// Absent when GameBanana only gives a name.
     pub id: Option<u64>,
@@ -103,12 +108,14 @@ pub struct CategoryRef {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ImageSize {
     pub width: u32,
     pub height: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ImageVariant {
     pub url: String,
     pub size: ImageSize,
@@ -117,6 +124,7 @@ pub struct ImageVariant {
 /// A preview image. The first image of a mod is its banner (catalogue card and mod page
 /// hero); the rest form the slideshow.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Image {
     /// Full-size original.
     pub url: String,
@@ -135,6 +143,7 @@ impl Image {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ModStats {
     pub likes: u64,
     pub views: u64,
@@ -145,6 +154,7 @@ pub struct ModStats {
 
 /// One card in the catalogue grid.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ModSummary {
     pub id: u64,
     /// GameBanana game id (`_aGame`), when the response includes it (mod pages do;
@@ -175,6 +185,7 @@ impl ModSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ModFile {
     pub id: u64,
     pub name: String,
@@ -201,6 +212,7 @@ impl ModFile {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ModFiles {
     pub files: Vec<ModFile>,
     pub archived_files: Vec<ModFile>,
@@ -217,6 +229,7 @@ impl ModFiles {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct LicenseChecklist {
     pub yes: Vec<String>,
     pub ask: Vec<String>,
@@ -224,6 +237,7 @@ pub struct LicenseChecklist {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Credit {
     pub name: String,
     pub role: Option<String>,
@@ -231,6 +245,7 @@ pub struct Credit {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct CreditGroup {
     pub name: String,
     pub authors: Vec<Credit>,
@@ -238,6 +253,7 @@ pub struct CreditGroup {
 
 /// Everything on a mod page.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ModProfile {
     pub summary: ModSummary,
     /// Untrusted HTML; sanitize before display.
@@ -260,6 +276,7 @@ impl ModProfile {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ChangeEntry {
     pub text: String,
     /// e.g. "Addition", "Bugfix".
@@ -267,6 +284,7 @@ pub struct ChangeEntry {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ModUpdate {
     pub id: u64,
     pub title: String,
@@ -279,6 +297,7 @@ pub struct ModUpdate {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Category {
     pub id: u64,
     pub name: String,

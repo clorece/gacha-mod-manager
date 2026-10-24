@@ -1,0 +1,30 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "The main window may call GMM's own commands and nothing else: no core:default, no plugin permissions (docs/04-security.md, R5). Keep in step with build.rs.",
+  "windows": ["main"],
+  "permissions": [
+    "allow-games",
+    "allow-statuses",
+    "allow-catalog-list",
+    "allow-catalog-search",
+    "allow-catalog-mod",
+    "allow-catalog-updates",
+    "allow-catalog-categories",
+    "allow-install",
+    "allow-library",
+    "allow-set-enabled",
+    "allow-uninstall-preview",
+    "allow-uninstall",
+    "allow-conflicts",
+    "allow-storage",
+    "allow-clear-download-cache",
+    "allow-launch-plan",
+    "allow-launch",
+    "allow-settings",
+    "allow-pick-xxmi-folder",
+    "allow-clear-xxmi-folder",
+    "allow-pick-game-folder",
+    "allow-remove-game-folder"
+  ]
+}

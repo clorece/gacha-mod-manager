@@ -8,6 +8,10 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[features]
+# TypeScript types for the desktop app (ts-rs).
+ts = ["dep:ts-rs", "gmm-catalog/ts", "gmm-xxmi/ts"]
+
 [dependencies]
 dirs.workspace = true
 gmm-adapters.workspace = true
@@ -24,6 +28,7 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
+ts-rs = { workspace = true, optional = true }
 
 [dev-dependencies]
 gmm-net = { workspace = true, features = ["test-util"] }

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*"]
+members = ["crates/*", "apps/desktop/src-tauri"]
 
 [workspace.package]
 version = "0.1.0"
@@ -34,6 +34,13 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"
+# The desktop app (apps/desktop/src-tauri). No plugin is exposed to the webview; the dialog
+# plugin is only called from Rust for folder pickers (security rule R5).
+tauri = { version = "2.12", default-features = false, features = ["wry", "compression", "common-controls-v6", "x11"] }
+tauri-build = { version = "2.7", default-features = false }
+tauri-plugin-dialog = "2.8"
+# TypeScript types for the app, generated from the Rust types behind each crate's `ts` feature.
+ts-rs = { version = "12", default-features = false, features = ["serde-compat", "no-serde-warnings"] }
 # SQLite with the bundled C library (no system SQLite needed). No `macros` (no compile-time
 # DB access) and no `sqlite-load-extension` (GMM never loads SQLite extensions).
 sqlx = { version = "0.9", default-features = false, features = ["sqlite-bundled", "runtime-tokio", "migrate"] }

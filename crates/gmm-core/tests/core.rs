@@ -1063,6 +1063,26 @@ async fn hand_installed_mods_can_be_switched_and_uninstalled() {
         Err(CoreError::AmbiguousUnmanaged { .. })
     ));
 
+    // The app passes the exact listed path, which names one of them (and nothing looser).
+    let top = gmm_core::set_unmanaged_enabled_at(&f.db, &f.ws, f.mods, zzz(), "Dup", false)
+        .await
+        .unwrap();
+    assert_eq!(
+        (top.from.as_str(), top.to.as_str()),
+        ("Dup", "DISABLED Dup")
+    );
+    assert!(f.gmm().join("Dup/m.ini").exists());
+    for loose in ["dup", "DISABLED dup", "Dup"] {
+        assert!(matches!(
+            gmm_core::set_unmanaged_enabled_at(&f.db, &f.ws, f.mods, zzz(), loose, true).await,
+            Err(CoreError::NoSuchUnmanaged { .. })
+        ));
+    }
+    gmm_core::set_unmanaged_enabled_at(&f.db, &f.ws, f.mods, zzz(), "DISABLED Dup", true)
+        .await
+        .unwrap();
+    assert!(f.mods_dir.join("Dup/m.ini").exists());
+
     // Off and on with XXMI's prefix.
     let off =
         gmm_core::set_unmanaged_enabled(&f.db, &f.ws, f.mods, zzz(), "Phoenix_duplicate", false)

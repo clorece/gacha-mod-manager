@@ -8,12 +8,17 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[features]
+# TypeScript types for the desktop app (ts-rs).
+ts = ["dep:ts-rs"]
+
 [dependencies]
 dirs.workspace = true
 gmm-adapters.workspace = true
 gmm-fsguard.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+ts-rs = { workspace = true, optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winreg.workspace = true

@@ -8,6 +8,10 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[features]
+# TypeScript types for the desktop app (ts-rs).
+ts = ["dep:ts-rs", "gmm-detect/ts"]
+
 [dependencies]
 gmm-adapters.workspace = true
 gmm-detect.workspace = true
@@ -15,6 +19,7 @@ gmm-fsguard.workspace = true
 pelite.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+ts-rs = { workspace = true, optional = true }
 
 # Starting XXMI through the Windows shell so its administrator prompt can appear (launch.rs).
 [target.'cfg(windows)'.dependencies]

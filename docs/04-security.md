@@ -32,8 +32,9 @@ does is the failure we design out.
   `objects.githubusercontent.com` get added only when GMM's own updater is built (Phase 5).
   A test-only feature that allows plain HTTP to `127.0.0.1` (for mock servers) is checked in CI
   never to reach a shipped binary. The webview makes **no** network
-  requests: CSP `connect-src ipc: http://ipc.localhost`, and images arrive via the `gmmimg://`
-  protocol served from the Rust cache.
+  requests: CSP `connect-src ipc: http://ipc.localhost`, and images arrive via the `gmmimg`
+  protocol served from the Rust cache (`gmm_core::ImageCache`: only HTTPS URLs on
+  `images.gamebanana.com` that a command handed out as opaque keys, fetched through `gmm-net`).
 - **R3 — Filesystem scope.** All I/O goes through `gmm-fsguard::ScopedPath`.
   - **Read/write:** GMM's app dirs (`%APPDATA%\GMM`, `%LOCALAPPDATA%\GMM`, or `GMM_HOME` when
     that environment variable names an absolute folder), and `<XXMI>/<IMP>/Mods/` for each
@@ -71,8 +72,12 @@ does is the failure we design out.
     config is parsed into a struct that only declares the allowed fields, and the raw file is
     never logged, cached or copied.
 - **R5 — The webview names nothing on disk.** IPC commands take opaque ids. The only paths that
-  come from the UI are native folder-picker results, and Rust validates them before registering
-  them as roots.
+  enter are native folder-picker results, opened from Rust (`tauri-plugin-dialog`'s Rust API;
+  the webview has no dialog permission), and Rust validates them before saving them. Two
+  arguments look like paths but are only compared, never opened: an unmanaged mod's `path`
+  (must equal an entry of a fresh library listing exactly) and the folder given to
+  `remove_game_folder` (must equal a stored row). Image URLs never reach the webview either:
+  it gets `gmmimg` keys.
 - **R6 — No debug or automation bridges in release.** Devtools and test hooks sit behind a `dev`
   feature that release CI asserts is off.
 - **R7 — Process launching is minimal.** GMM starts exactly one kind of process: the XXMI
@@ -129,12 +134,35 @@ does is the failure we design out.
 
 ## Catalogue / UI hardening
 
-- `_sText` and `_sLicense` HTML is sanitized with DOMPurify (strict allowlist: no `style`, no
-  iframes, no forms, no event handlers). Links open in the system browser after a confirmation.
-- Tauri capabilities: the main window gets only our own commands. No `fs`, `shell` or `http`
-  plugin permissions are exposed to JS.
-- CSP: `default-src 'self'; img-src 'self' gmmimg: data:; connect-src ipc: http://ipc.localhost;
-  script-src 'self'; object-src 'none'; frame-src 'none'`.
+- `_sText` and `_sLicense` HTML will be sanitized with DOMPurify (strict allowlist: no
+  `style`, no iframes, no forms, no event handlers) when the mod page is built. Links will
+  open in the system browser after a confirmation. Biome's `noDangerouslySetInnerHtml` is an
+  error until then.
+- **Capability** (`apps/desktop/src-tauri/capabilities/main.json`): the main window gets
+  exactly GMM's own commands (`allow-<command>`, generated from the list in `build.rs`), and
+  nothing else: not `core:default`, no event, window, `fs`, `shell`, `http` or `dialog`
+  permissions. Checked in the running app (2026-10-24): `plugin:dialog|open` and
+  `plugin:event|listen` are refused. Install progress uses a Tauri `Channel`, whose data
+  fetch Tauri exempts from the ACL. `tauri-plugin-dialog` brings `tauri-plugin-fs` in as a
+  crate dependency, but no fs permission is granted.
+- **CSP** (`tauri.conf.json`): `default-src 'self'; img-src 'self' gmmimg:
+  http://gmmimg.localhost data:; style-src 'self'; connect-src ipc: http://ipc.localhost;
+  script-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'`,
+  plus `freezePrototype`. `http://gmmimg.localhost` is how WebView2 addresses the custom
+  protocol. Checked in a release build (2026-10-24): a `fetch` to gamebanana.com, an image
+  from images.gamebanana.com and an injected inline script are all blocked; `gmmimg` images
+  load. The CSP only applies to pages Tauri serves, so `tauri dev` (Vite's server) runs
+  without it; `devCsp` is set for when Tauri applies it. Check CSP changes with a release
+  build.
+- **Navigation guard** (`main.rs`): the webview may only show GMM's own pages
+  (`http://tauri.localhost` / `tauri://localhost`, and the Vite server in debug builds). Any
+  other navigation, such as a link in a mod description, is refused. Checked: clicking a
+  gamebanana.com link leaves the window where it was.
+- **Devtools** only with `--features dev` (`tauri/devtools`); CI fails if `tauri/devtools`
+  is enabled without it (R6). Note that WebView2 itself accepts a remote-debugging port from
+  the `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` environment variable in any build; that needs
+  control of the user's environment, which is outside the threat model.
+- No inline `style` attributes in the UI (`style-src 'self'`); use Tailwind classes.
 
 ## Test harnesses, grown phase by phase
 
@@ -142,12 +170,14 @@ does is the failure we design out.
 |---|---|---|
 | 1 | Malicious archive corpus (`crates/gmm-archive/tests/corpus.rs`, archives built in code) incl. Windows-specific tricks; randomized corruption tests (`tests/robustness.rs`) | Extractor rejects each case, never panics, never writes outside its root |
 | 1 | Property tests (✅ done): `RelPath`, archive corruption, VDF parser and (Phase 2) the migoto ini parser never panic. `cargo-fuzz` targets (extractor, migoto ini parser, VDF/ACF, GB JSON, XXMI config) as a nightly job: ⏳ | No panics or escapes |
-| 1 | Lint gates (✅ done): clippy `disallowed_methods` (`std::fs`, `Command::new`) and `disallowed_types` (HTTP clients, raw sockets, `winreg::RegKey`) outside their crates; `cargo-deny`. ⏳ `cargo-audit`, `pnpm audit` | R1–R3, R7 can't be bypassed silently |
+| 1 | Lint gates (✅ done): clippy `disallowed_methods` (`std::fs`, `Command::new`) and `disallowed_types` (HTTP clients, raw sockets, `winreg::RegKey`) outside their crates, including the desktop crate; `cargo-deny` (advisories included); Phase 3: `pnpm audit` and the npm license check (`scripts/check-npm-licenses.mjs`) in CI | R1–R3, R7 can't be bypassed silently |
 | 0b | **XXMI config secret test** (✅ done): fixture configs with canary `github_token`, proxy password and signatures; asserts they never appear in parsed config, `GameStatus` JSON or `Debug`, and parse errors don't echo content. Phase 2: the conformance suite checks the DB file, cache and mod folders too. ⏳ logs and IPC output when those exist | R4 |
 | 0b | Detection on a fake machine (✅ done): Steam libraries, HoYoPlay data with a default path for an uninstalled game, Epic manifest, hostile `installdir` (`..\..\Windows`), planted `loginusers.vdf` canary | R3/R4, correct detection |
 | 2 | **Egress harness** (✅ done, `crates/gmm-cli/tests/privacy.rs`): the real `gmm` binary runs every network command behind an in-test proxy that logs and refuses each request. Every `CONNECT` target must pass `Allowlist::production()` on port 443, at least one must be seen, and local commands (detect, status, config, list, conflicts, storage, launch) must make none. On Linux CI each `gmm` process also runs under `strace`, and any IPv4/IPv6 connection that isn't loopback (traffic bypassing the proxy) fails the run. ⏳ a Windows equivalent of the bypass check (firewall rule) | R2 |
 | 2 | **File-access harness** (✅ done, same test): a fake profile with canary files (Steam `loginusers.vdf`, `config.vdf`, `userdata/`, a game `Player.log`, a browser `logins.json`, `~/.ssh/id_rsa`) and secrets in XXMI's config; GMM's folders redirected with `GMM_HOME`. Asserts nothing in the profile outside `Mods/` changed and no canary content reached GMM's files. Under `strace` (Linux CI) it also fails if any canary is opened or stat-ed, or any write lands outside `GMM_HOME` and `Mods/`. ⏳ Process Monitor on Windows | R3/R4 |
-| 2 | IPC fuzz: hostile args to every Tauri command | R5 |
+| 2→3 | IPC fuzz: hostile args to every Tauri command. ⏳ Not automated yet; checked by hand in the running app (2026-10-24): an unknown game id (`../../etc`), an unmanaged key `../XXMI Launcher Config.json`, an image key GMM never issued, and plugin commands are all refused | R5 |
+| 3 | Image cache tests (✅ done, `gmm-core/src/images.rs`): only `images.gamebanana.com` HTTPS URLs get keys; bad keys, SVG/HTML bodies and HTTP errors are refused and nothing is written; cache survives restarts; oldest images pruned at the cap | R2, R5 |
+| 3 | `bindings_are_current` (✅ done, `gmm-desktop`): the TypeScript types match the Rust types | Bridge types can't drift |
 | 2 | Adapter conformance suite on fixtures (✅ done: per-state fixtures in 0b; `gmm-core/tests/conformance.rs` runs detect → install → toggle → conflicts → storage → uninstall per game, asserts no file outside `Mods/` changed and no XXMI config canary reached GMM's database, cache or mod folders) | Correct detection, no writes outside `Mods/`, R4 for the database |
 | 3 | XSS corpus through the description renderer | T3 |
 | 4 | Hostile deep-link URLs | T6 |

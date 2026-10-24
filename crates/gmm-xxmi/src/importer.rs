@@ -20,6 +20,7 @@ const GMM_DIR: &str = "GMM";
 const GMM_STAGING_DIR: &str = "DISABLED .staging";
 
 #[derive(Debug, Clone, Default, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ImporterInfo {
     pub folder_exists: bool,
     /// Critical files that are missing (relative to the importer folder).
@@ -36,6 +37,7 @@ pub struct ImporterInfo {
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ModsSummary {
     /// Top-level folders in `Mods/` (each is usually one mod).
     pub enabled: usize,

@@ -24,6 +24,7 @@ pub use markers::{is_game_folder, resolve_game_folder};
 
 /// Where an install was found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum InstallSource {
     Steam,
@@ -45,6 +46,7 @@ impl InstallSource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct GameInstall {
     pub game_id: String,
     pub source: InstallSource,

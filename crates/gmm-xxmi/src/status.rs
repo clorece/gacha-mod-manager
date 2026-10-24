@@ -16,6 +16,7 @@ use crate::importer::{ImporterInfo, inspect_importer};
 const XXMI_RELEASES: &str = "https://github.com/SpectrumQT/XXMI-Launcher/releases";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum SetupState {
     XxmiNotFound,
@@ -42,6 +43,7 @@ impl SetupState {
 }
 
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct GameStatus {
     pub game_id: String,
     pub game_name: String,
