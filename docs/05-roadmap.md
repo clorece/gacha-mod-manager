@@ -143,8 +143,11 @@ Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm det
       `clear_downloads`), `Guard::available_space` (new `fs4` dependency). CLI: `gmm storage
       [--game] [--clear-downloads]`. Verified on the real setup: Phoenix 123.4 MiB, 369.9 GiB
       free, cache 22.7 MiB of downloads
-- [ ] `gmm launch`: run the confirmed XXMI exe with `--nogui --xxmi <IMP>` (first launch asks
-      the user to confirm the exe path; R7)
+- [x] `gmm launch <game> [--yes]` (2026-10-23): `gmm-xxmi::launch` (the only process launch),
+      `gmm-core::{plan_launch, confirm_exe, start}`. Requires `Ready`; asks once to confirm the
+      exact exe path (stored, asked again if it changes). Verified on the dev machine up to the
+      confirmation (WuWa refused as not Ready; ZZZ asks for confirmation). Not run for real yet:
+      that starts the game, so it's part of the exit check below
 - [ ] Adapter conformance suite: one fixture install per game, run through detect → status →
       install → toggle → uninstall
 - [ ] CLI: `gmm install`, `gmm list`, `gmm enable|disable`, `gmm uninstall`, `gmm conflicts`,

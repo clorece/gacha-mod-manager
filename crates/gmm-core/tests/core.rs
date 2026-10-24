@@ -932,3 +932,86 @@ async fn storage_measures_mods_cache_and_free_space() {
         "installed mods stay"
     );
 }
+
+// ---- launch ------------------------------------------------------------------------------
+
+fn fake_xxmi(root: &Path) -> gmm_xxmi::XxmiInstall {
+    fs::create_dir_all(root.join("Resources/Bin")).unwrap();
+    fs::write(root.join("Resources/Bin/XXMI Launcher.exe"), b"MZ\x90\x00").unwrap();
+    fs::write(root.join("XXMI Launcher Config.json"), b"{}").unwrap();
+    gmm_xxmi::open_xxmi(root).unwrap()
+}
+
+fn status(state: gmm_xxmi::SetupState) -> gmm_xxmi::GameStatus {
+    gmm_xxmi::GameStatus {
+        game_id: "zzz".to_owned(),
+        game_name: "Zenless Zone Zero".to_owned(),
+        state,
+        summary: "test".to_owned(),
+        steps: Vec::new(),
+        notes: Vec::new(),
+        detected_installs: Vec::new(),
+        xxmi_root: None,
+        xxmi_version: None,
+        importer: "ZZMI".to_owned(),
+        importer_info: None,
+        xxmi_game_folder: None,
+        xxmi_game_folder_source: None,
+        game_launch: None,
+        launch_count: None,
+        launch_command: None,
+    }
+}
+
+#[tokio::test]
+async fn launch_needs_ready_and_a_confirmed_exe() {
+    use gmm_xxmi::SetupState;
+    let tmp = tempfile::tempdir().unwrap();
+    let xxmi = fake_xxmi(&tmp.path().join("XXMI Launcher"));
+    let db = Db::open_in_memory().await.unwrap();
+
+    assert!(matches!(
+        gmm_core::plan_launch(&db, &xxmi, &status(SetupState::LaunchModeMismatch), zzz()).await,
+        Err(CoreError::NotReady { .. })
+    ));
+
+    let mut plan = gmm_core::plan_launch(&db, &xxmi, &status(SetupState::Ready), zzz())
+        .await
+        .unwrap();
+    assert!(
+        plan.command
+            .exe
+            .ends_with("Resources/Bin/XXMI Launcher.exe")
+    );
+    assert_eq!(plan.command.args, ["--nogui", "--xxmi", "ZZMI"]);
+    assert!(!plan.confirmed);
+    assert!(matches!(
+        gmm_core::start(&plan),
+        Err(CoreError::ExeNotConfirmed(_))
+    ));
+
+    gmm_core::confirm_exe(&db, &mut plan).await.unwrap();
+    let again = gmm_core::plan_launch(&db, &xxmi, &status(SetupState::Ready), zzz())
+        .await
+        .unwrap();
+    assert!(again.confirmed, "remembered");
+
+    // A different XXMI folder must be confirmed again.
+    let other = fake_xxmi(&tmp.path().join("Portable XXMI"));
+    let moved = gmm_core::plan_launch(&db, &other, &status(SetupState::Ready), zzz())
+        .await
+        .unwrap();
+    assert!(!moved.confirmed);
+
+    // Something that isn't a program anymore is refused before anything runs.
+    fs::write(
+        tmp.path()
+            .join("XXMI Launcher/Resources/Bin/XXMI Launcher.exe"),
+        b"#!/bin/sh",
+    )
+    .unwrap();
+    assert!(matches!(
+        gmm_core::plan_launch(&db, &xxmi, &status(SetupState::Ready), zzz()).await,
+        Err(CoreError::Launch(_))
+    ));
+}

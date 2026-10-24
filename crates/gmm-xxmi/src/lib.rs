@@ -15,9 +15,11 @@
 mod config;
 mod find;
 mod importer;
+mod launch;
 mod status;
 
 pub use config::{ImporterConfig, XxmiConfig};
 pub use find::{XxmiInstall, find_xxmi, open_xxmi};
 pub use importer::{ImporterInfo, ModsSummary, inspect_importer};
+pub use launch::{LaunchCommand, launch, launch_command};
 pub use status::{GameStatus, SetupState, evaluate};

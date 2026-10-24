@@ -255,8 +255,10 @@ pick GB file (newest clean one, or --file) ─► _sAvResult must be "clean"
 GMM shows the game's XXMI state on its page. When it's `Ready`, **Launch with XXMI** runs
 `<XXMI>/Resources/Bin/XXMI Launcher.exe --nogui --xxmi <IMP>`. That's XXMI's own command line:
 its "Add Desktop Shortcut" creates `<IMP> Quick Start.lnk` with exactly these arguments
-(observed). `gmm status` already prints this command for ready games; `gmm launch` (Phase 2)
-will run it after the user confirms the exe once. XXMI then starts the game (through Steam if
+(observed). `gmm status` prints this command for ready games, and `gmm launch <game>` runs it: only
+when the game is `Ready`, only after re-checking that the exe is a regular file inside the XXMI
+root starting with `MZ`, and only once the user has confirmed that exact path (interactive
+prompt or `--yes`; stored as `xxmi.confirmed_exe`, asked again if the path changes). XXMI then starts the game (through Steam if
 its Game Launch says so) and injects. GMM doesn't watch or touch the game process.
 
 The game page always shows this notice:

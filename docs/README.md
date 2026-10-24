@@ -11,7 +11,7 @@ Development happens on Windows (primary target). Linux follows later from the sa
 
 **Done:** Phase 0 (discovery), Phase 0b (setup check), the parts of Phase 1 that Phase 2
 needs, and the first Phase 2 items: the local database, the install pipeline, toggling,
-uninstalling and listing mods, conflict detection, and storage accounting. Everything
+uninstalling and listing mods, conflict detection, storage accounting and `gmm launch`. Everything
 works from the `gmm` command line; there is no app window yet.
 
 | Crate | What it does |
@@ -25,16 +25,20 @@ works from the `gmm` command line; there is no app window yet.
 | `gmm-xxmi` | Reads XXMI's setup (allowlisted config fields only) and works out each game's setup state |
 | `gmm-migoto` | Reads 3DMigoto mod `.ini` files: override hashes, what they replace, namespaces, key bindings |
 | `gmm-db` | SQLite database (`%APPDATA%\GMM\gmm.db`): settings, manual game folders, installed mods, download cache, GameBanana response cache |
-| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`), the library (list with disk state, unmanaged mods, enable/disable, uninstall to the Recycle Bin), conflict detection, storage accounting, app folders |
-| `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm list`, `gmm enable/disable/uninstall`, `gmm conflicts`, `gmm storage`, `gmm detect`, `gmm status`, `gmm config` |
+| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`), the library (list with disk state, unmanaged mods, enable/disable, uninstall to the Recycle Bin), conflict detection, storage accounting, launching through XXMI (with exe confirmation), app folders |
+| `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm list`, `gmm enable/disable/uninstall`, `gmm conflicts`, `gmm storage`, `gmm launch`, `gmm detect`, `gmm status`, `gmm config` |
 
 On the dev machine, `gmm status` reports ZZZ `Ready` (HoYoPlay install) and WuWa
 `LaunchModeMismatch` (Steam install, XXMI's Game Launch still on Direct).
 
 **Waiting on you:** the in-game checks in [05-roadmap.md](05-roadmap.md) under "Before Phase 2"
-(WuWa launch setting, `DISABLED` rename, nested `Mods/GMM/` folder, Quick Start shortcut).
+(WuWa launch setting, `DISABLED` rename, nested `Mods/GMM/` folder, Quick Start shortcut), and
+the Phase 2 exit check: `gmm install <a ZZZ mod>`, `gmm launch zzz` (confirm the exe once), see
+it in game, `gmm disable`, `gmm conflicts`, `gmm storage`. Nothing has been installed into your
+real `ZZMIMods` yet; all install tests used a throwaway XXMI folder.
 
-**Next:** `gmm launch`, then the adapter conformance suite and the privacy harnesses. See "Start here" in the roadmap.
+**Next:** the adapter conformance suite and the privacy harnesses, then the Phase 2 exit
+check in game (needs you). See "Start here" in the roadmap.
 
 ## Docs
 

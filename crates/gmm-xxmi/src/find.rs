@@ -11,7 +11,7 @@ use serde::Serialize;
 use crate::config::XxmiConfig;
 
 const CONFIG_FILE: &str = "XXMI Launcher Config.json";
-const LAUNCHER_EXE: &str = "Resources/Bin/XXMI Launcher.exe";
+pub(crate) const LAUNCHER_EXE: &str = "Resources/Bin/XXMI Launcher.exe";
 const MAX_CONFIG_BYTES: u64 = 4 * 1024 * 1024;
 
 /// A validated XXMI Launcher folder.

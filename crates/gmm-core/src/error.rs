@@ -44,7 +44,7 @@ pub enum CoreError {
         expected: u64,
         found: u64,
     },
-    #[error("can't install for {game} yet: {reason}")]
+    #[error("{game} isn't set up for mods yet: {reason}")]
     NotReady { game: String, reason: String },
 
     #[error(
@@ -69,6 +69,10 @@ pub enum CoreError {
     AlreadyInstalled { game: String, folder: String },
     #[error("{folder:?} already exists in the Mods folder but GMM didn't install it")]
     FolderTaken { folder: String },
+    #[error("{0}")]
+    Launch(String),
+    #[error("the XXMI Launcher exe hasn't been confirmed yet: {}", .0.display())]
+    ExeNotConfirmed(std::path::PathBuf),
     #[error("no mod {id} installed for {game} (see `gmm list`)")]
     NoSuchMod { id: i64, game: String },
     #[error("the folder of {0:?} is gone from the Mods folder (deleted or moved outside GMM)")]

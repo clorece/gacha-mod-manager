@@ -7,6 +7,7 @@ mod config;
 mod fetch;
 mod format;
 mod install;
+mod launch;
 mod library;
 mod setup;
 
@@ -149,6 +150,18 @@ enum Command {
         /// Move every cached download to the Recycle Bin (installed mods stay).
         #[arg(long)]
         clear_downloads: bool,
+        #[command(flatten)]
+        setup: SetupArgs,
+    },
+    /// Start a game with mods: runs XXMI Launcher with `--nogui --xxmi <importer>`, like its
+    /// Quick Start shortcut. The first time, you confirm the launcher's path.
+    Launch {
+        /// The game (see `gmm games`).
+        #[arg(value_parser = parse_game)]
+        game: &'static GameManifest,
+        /// Confirm the XXMI Launcher path without asking (first launch, or after it moved).
+        #[arg(long)]
+        yes: bool,
         #[command(flatten)]
         setup: SetupArgs,
     },
@@ -350,6 +363,9 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
                 cli.json,
             )
             .await
+        }
+        Command::Launch { game, yes, setup } => {
+            launch::run(db, game, yes, setup.xxmi, setup.folders, cli.json).await
         }
         Command::Conflicts { game, setup } => {
             library::show_conflicts(db, game, setup.xxmi, setup.folders, cli.json).await

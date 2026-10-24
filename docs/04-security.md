@@ -77,7 +77,10 @@ does is the failure we design out.
 - **R7 — Process launching is minimal.** GMM starts exactly one kind of process: the XXMI
   Launcher exe inside a confirmed XXMI root, with fixed arguments (`--nogui --xxmi <IMP>`).
   "Open folder" uses the OS shell to open a directory, never a file. Nothing from a mod archive is
-  ever executed.
+  ever executed. The only `Command::new` in GMM is in `crates/gmm-xxmi/src/launch.rs` (the one
+  module allowed past the clippy ban); the exe path is fixed relative to the validated root and
+  the arguments come from the importer id in code. `gmm-core::start` refuses an exe the user
+  hasn't confirmed (`gmm launch`, first run).
 - **R8 — Recoverable deletes.** Uninstall and storage deletes go through the Recycle Bin
   (`gmm_fsguard::Guard::move_to_trash`, the only caller of the `trash` crate; it applies the
   same read-write-root checks as any write). Unmanaged folders are never deleted without an

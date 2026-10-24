@@ -7,7 +7,8 @@ A desktop app for finding, downloading and organizing GameBanana mods for gacha 
 and safely extract mods, find your games and XXMI, check your mod setup (`gmm status`), remember
 your settings (`gmm config`), and install mods into XXMI's Mods folder (`gmm install`).
 It can also switch mods on and off, uninstall them (to the Recycle Bin), spot mods that
-conflict (`gmm conflicts`), and show disk use (`gmm storage`). Launching through XXMI is next.
+conflict (`gmm conflicts`), show disk use (`gmm storage`), and start a game with mods
+through XXMI (`gmm launch`).
 Progress and plans: [docs/README.md](docs/README.md).
 
 First games: Zenless Zone Zero and Wuthering Waves.

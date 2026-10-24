@@ -21,6 +21,7 @@ mod conflicts;
 mod error;
 mod fetch;
 mod install;
+mod launch;
 mod library;
 mod names;
 mod storage;
@@ -34,6 +35,7 @@ pub use install::{
     InstallEvent, InstallOptions, InstallReport, InstallRequest, InstalledFolder, ModMeta, Sidecar,
     VariantChoice, install, install_analyzed, install_gate,
 };
+pub use launch::{LaunchPlan, confirm_exe, plan_launch, start};
 pub use library::{
     DiskState, Library, ManagedMod, RecycleBin, ToggleOutcome, Trash, UninstallOutcome,
     UnmanagedMod, library, set_enabled, uninstall,
