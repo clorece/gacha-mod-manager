@@ -804,6 +804,7 @@ dependencies = [
  "gmm-archive",
  "gmm-catalog",
  "gmm-db",
+ "gmm-detect",
  "gmm-fsguard",
  "gmm-migoto",
  "gmm-net",

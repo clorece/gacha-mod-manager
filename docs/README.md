@@ -35,9 +35,9 @@ On the dev machine, `gmm status` reports ZZZ `Ready` (HoYoPlay install) and WuWa
 (WuWa launch setting, `DISABLED` rename, nested `Mods/GMM/` folder, Quick Start shortcut), and
 the Phase 2 exit check: `gmm install <a ZZZ mod>`, `gmm launch zzz` (confirm the exe once), see
 it in game, `gmm disable`, `gmm conflicts`, `gmm storage`. Nothing has been installed into your
-real `ZZMIMods` yet; all install tests used a throwaway XXMI folder.
+real `ZZMI\Mods` yet; all install tests used a throwaway XXMI folder.
 
-**Next:** the adapter conformance suite and the privacy harnesses, then the Phase 2 exit
+**Next:** the egress and file-access harnesses (the last Phase 2 item), then the Phase 2 exit
 check in game (needs you). See "Start here" in the roadmap.
 
 ## Docs

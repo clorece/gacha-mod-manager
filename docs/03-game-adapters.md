@@ -206,8 +206,10 @@ XXMI already supports Endfield (EFMI), Star Rail (SRMI), Genshin (GIMI) and HI3 
 3. Write `crates/gmm-adapters/games/<id>.toml` and add it to `BUILTIN` in `registry.rs`. Hook
    code is rarely needed.
 4. Add fixtures: a fake install tree, a fake XXMI importer folder in each setup state, and sample
-   mods. The shared conformance suite (detect, states, classify, install, toggle, uninstall)
-   runs against every adapter automatically.
+   mods. The shared conformance suite (`crates/gmm-core/tests/conformance.rs`: detect, setup
+   state, classify, install, toggle, conflicts, storage, uninstall, no writes outside `Mods/`)
+   runs against every built-in manifest automatically, building its fake install from the
+   manifest's own markers.
 5. Review the new paths (they become filesystem roots).
 
 Observed: Endfield is in the dev machine's Steam library (appid 4732690, not installed yet), so

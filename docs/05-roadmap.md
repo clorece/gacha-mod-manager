@@ -148,9 +148,14 @@ Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm det
       exact exe path (stored, asked again if it changes). Verified on the dev machine up to the
       confirmation (WuWa refused as not Ready; ZZZ asks for confirmation). Not run for real yet:
       that starts the game, so it's part of the exit check below
-- [ ] Adapter conformance suite: one fixture install per game, run through detect → status →
-      install → toggle → uninstall
-- [ ] CLI: `gmm install`, `gmm list`, `gmm enable|disable`, `gmm uninstall`, `gmm conflicts`,
+- [x] Adapter conformance suite (2026-10-23): `crates/gmm-core/tests/conformance.rs` builds a
+      fake machine from each built-in manifest alone (game folder from the markers, XXMI with the
+      importer, a hand-installed mod, secret canaries in the config) and runs detect → `Ready` →
+      install → toggle (XXMI's mod counts follow) → conflicts → storage → uninstall. It also
+      asserts that nothing outside `Mods/` changed (size and mtime of every other file and
+      folder) and that no canary reached GMM's database, cache or the mod folder. Passes for ZZZ
+      and WuWa
+- [x] CLI: `gmm install`, `gmm list`, `gmm enable|disable`, `gmm uninstall`, `gmm conflicts`,
       `gmm storage`, `gmm launch`
 - [ ] Egress + file-access harnesses in CI
 
