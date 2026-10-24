@@ -57,17 +57,20 @@ how to fix it. Read-only.
       fix: set "Game Launch" to "Steam"
 - [ ] WuWa after you switch Game Launch to Steam → `Ready` (needs you)
 
-## Before Phase 2 — in-game checks (needs you at the game)
+## Before Phase 2 — in-game checks ✅ done 2026-10-24 (except screenshots)
 
-The install pipeline relies on these. Run `gmm status` afterwards; it shows mod counts.
+The install pipeline relies on these. Confirmed by you in game:
 
-- [ ] WuWa: set "Game Launch" to "Steam", start it once through XXMI (first start applies the
-      settings WWMI needs), confirm `gmm status` says `Ready`
-- [ ] Rename `ZZMI\Mods\Phoenix` to `DISABLED Phoenix`: gone in game
-- [ ] Move it to `ZZMI\Mods\GMM\Phoenix\`: still loads (nested folder)
-- [ ] An empty `ZZMI\Mods\GMM\.staging\` folder causes no errors
-- [ ] The desktop **ZZMI Quick Start** shortcut (`--nogui --xxmi ZZMI`) starts ZZZ with mods
-- [ ] One WuWa mod shows in game
+- [x] Rename `ZZMI\Mods\Phoenix` to `DISABLED Phoenix`: gone in game
+- [x] Move it to `ZZMI\Mods\GMM\Phoenix\`: still loads (nested folder). Left there; `gmm list`
+      shows it as `GMM/Phoenix`, not installed by GMM
+- [x] The desktop **ZZMI Quick Start** shortcut (`--nogui --xxmi ZZMI`) starts ZZZ with mods
+- [x] One WuWa mod shows in game. Observed: XXMI started the **Steam** copy of WuWa twice with
+      "Game Launch" still on **Direct**, and mods worked. So "Steam copies need Game Launch =
+      Steam" (learned from ZZZ's Steam copy, which wraps HoYoPlay) doesn't hold for WuWa, and
+      `gmm status` wrongly reports WuWa as `LaunchModeMismatch`
+- Dropped: the empty `Mods\GMM\.staging\` check. GMM stages under `DISABLED .staging`, which
+  XXMI skips by its own `exclude_recursive = DISABLED*` rule
 - [ ] Screenshots of each XXMI step for the setup guide
 
 ## Phase 1 — Backend foundations
