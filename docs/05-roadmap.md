@@ -75,7 +75,8 @@ The install pipeline relies on these. Run `gmm status` afterwards; it shows mod 
 - [x] Cargo workspace, pinned toolchain, rustfmt/clippy config, `justfile`
 - [x] CI on Windows + Linux: fmt, clippy `-D warnings`, tests; `cargo-deny` (licenses, bans,
       advisories, sources)
-- [ ] pnpm + Tauri app shell; `pnpm audit` and npm license checks in CI
+- [ ] pnpm + Tauri app shell; `pnpm audit` and npm license checks in CI (moved to Phase 3,
+      "Start here")
 - [x] `gmm-fsguard` (ScopedPath, RelPath, roots, denylist, junction/symlink escape checks) +
       `disallowed_methods` lints (verified to fire outside fsguard)
 - [x] `gmm-net`: host allowlist (incl. every redirect hop), rate limiting, retries/backoff,
@@ -94,7 +95,7 @@ The install pipeline relies on these. Run `gmm status` afterwards; it shows mod 
 Exit: the CLI browses both catalogues and prints a full mod page. Archive harness green. ✅ met
 (the open items above don't block Phase 2).
 
-## Phase 2 — Backend features (in progress)
+## Phase 2 — Backend features (backend done 2026-10-23; exit check waiting on you)
 
 Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm detect`,
 `gmm status`, per-state fixtures.
@@ -167,10 +168,36 @@ Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm det
 Exit: from the CLI alone, install a ZZZ mod, see it in game via `gmm launch`, toggle it, see a
 conflict reported, and see it in storage. Privacy harnesses green.
 
+**Exit check (needs you at the game):**
+- [ ] `gmm install <a ZZZ mod id>` into your real `ZZMI\Mods` (first real install; until now
+      every install went into a throwaway XXMI folder)
+- [ ] `gmm launch zzz`, confirm the exe once; the mod shows in game
+- [ ] `gmm disable <id>`; after XXMI reloads mods (or a restart) it's gone; `gmm enable <id>`
+- [ ] Two mods for the same character on: `gmm conflicts` reports them, `gmm enable` refuses
+- [ ] `gmm storage` lists the mod
+- [x] Privacy harnesses green in CI (egress + file access, strace on Linux)
+
 ## Phase 3 — Frontend
 
-Spec: [07-frontend-design.md](07-frontend-design.md).
+Spec: [07-frontend-design.md](07-frontend-design.md). Every screen sits on a `gmm-core` call the
+CLI already makes, so this phase adds presentation, not features.
 
+**Start here** (suggested order):
+- [ ] App shell in `apps/desktop/`: Tauri 2 (its Rust side depends on `gmm-core`), Vite + React
+      + TypeScript + Tailwind, pnpm (this machine has Node 24 and npm; pnpm via corepack). The
+      main window's capability lists only GMM's own commands (no `fs`, `shell`, `http`
+      plugins); CSP from [04](04-security.md); devtools only behind a `dev` feature (R6).
+      CI: `pnpm install --frozen-lockfile`, typecheck, lint, `pnpm audit`, npm license check;
+      the Phase 1 item below moves here
+- [ ] Command layer: one Tauri command per CLI action, taking ids, never paths (R5): games,
+      status, catalog list/search/show/categories, install (progress as events, variant and
+      blocked-file prompts as structured errors: `CoreError::ChooseVariant` / `Blocked`),
+      library, enable/disable (with `conflicts_for`), uninstall, conflicts, storage, launch
+      (plan → confirm → start), config. Folder pickers are opened from Rust and the result is
+      validated there. TS types generated from the Rust types (`ts-rs` or `specta`)
+- [ ] `gmmimg://` protocol: images fetched through `gmm-net` into `cache/images/` with a size
+      cap; the webview never touches the network
+- [ ] Then the screens, in this order:
 - [ ] Design tokens, app shell, game rail, XXMI state pill, downloads tray
 - [ ] Setup/onboarding cards + setup guide stepper (driven by `gmm-xxmi`'s states and steps)
 - [ ] Catalogue: virtualized grid, filters (category, character, sort, NSFW), banner cards,

@@ -10,9 +10,10 @@ Development happens on Windows (primary target). Linux follows later from the sa
 ## Where we are (2026-10-23)
 
 **Done:** Phase 0 (discovery), Phase 0b (setup check), the parts of Phase 1 that Phase 2
-needs, and the first Phase 2 items: the local database, the install pipeline, toggling,
-uninstalling and listing mods, conflict detection, storage accounting and `gmm launch`. Everything
-works from the `gmm` command line; there is no app window yet.
+needs, and every Phase 2 backend item: the local database, the install pipeline, toggling,
+uninstalling and listing mods, conflict detection, storage accounting, `gmm launch`, the adapter
+conformance suite and the egress / file-access privacy harnesses (in CI, with strace on Linux).
+Everything works from the `gmm` command line; there is no app window yet.
 
 | Crate | What it does |
 |---|---|
@@ -37,8 +38,8 @@ the Phase 2 exit check: `gmm install <a ZZZ mod>`, `gmm launch zzz` (confirm the
 it in game, `gmm disable`, `gmm conflicts`, `gmm storage`. Nothing has been installed into your
 real `ZZMI\Mods` yet; all install tests used a throwaway XXMI folder.
 
-**Next:** the egress and file-access harnesses (the last Phase 2 item), then the Phase 2 exit
-check in game (needs you). See "Start here" in the roadmap.
+**Next:** Phase 3, the app (Tauri shell, command layer, image protocol, then the screens). See
+"Start here" under Phase 3 in the roadmap. The Phase 2 exit check above can happen any time.
 
 ## Docs
 
