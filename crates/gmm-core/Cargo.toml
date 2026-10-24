@@ -15,6 +15,7 @@ gmm-archive.workspace = true
 gmm-catalog.workspace = true
 gmm-db.workspace = true
 gmm-fsguard.workspace = true
+gmm-migoto.workspace = true
 gmm-net.workspace = true
 gmm-xxmi.workspace = true
 hex.workspace = true

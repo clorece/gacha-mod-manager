@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The install pipeline on a fake XXMI importer folder in a temp dir. Archives are built in
-//! code; GameBanana is a mock server for the end-to-end tests.
+//! gmm-core on a fake XXMI importer folder in a temp dir: install pipeline, library, conflicts.
+//! Archives are built in code; GameBanana is a mock server for the end-to-end tests.
 
 #![allow(clippy::disallowed_methods, clippy::unwrap_used)]
 
@@ -701,4 +701,167 @@ async fn missing_folders_are_reported_not_guessed() {
     assert!(!out.trashed, "only the record is removed");
     assert!(trash.0.lock().unwrap().is_empty());
     assert_eq!(f.db.installed_mod(id).await.unwrap(), None);
+}
+
+// ---- conflicts ---------------------------------------------------------------------------
+
+fn ini_for(hash: &str, extra: &str) -> Vec<u8> {
+    format!("[TextureOverrideBody]\nhash = {hash}\n{extra}\n").into_bytes()
+}
+
+async fn install_named(f: &Fixture, name: &str, id: u64, files: &[(&str, &[u8])]) -> i64 {
+    let a = f.analyze(files);
+    let out = install_analyzed(
+        &f.db,
+        &f.ws,
+        f.mods,
+        zzz(),
+        &meta(name, id),
+        &a,
+        &InstallOptions::default(),
+        |_| {},
+    )
+    .await
+    .unwrap();
+    a.cleanup(&f.ws);
+    out[0].id
+}
+
+#[tokio::test]
+async fn conflicts_between_enabled_mods() {
+    let f = Fixture::new().await;
+    let a = install_named(
+        &f,
+        "Outfit A",
+        1,
+        &[("m.ini", &ini_for("aaaa1111", "ib = R"))],
+    )
+    .await;
+    let b = install_named(
+        &f,
+        "Outfit B",
+        2,
+        &[("x/m.ini", &ini_for("AAAA1111", "ps-t0 = R"))],
+    )
+    .await;
+    // Same hash but it only watches: not a conflict.
+    install_named(
+        &f,
+        "Watcher",
+        3,
+        &[("m.ini", &ini_for("aaaa1111", "$x = 1"))],
+    )
+    .await;
+    // A hand-installed mod replacing the same thing.
+    fs::create_dir_all(f.mods_dir.join("Manual")).unwrap();
+    fs::write(
+        f.mods_dir.join("Manual/m.ini"),
+        ini_for("aaaa1111", "vb0 = R"),
+    )
+    .unwrap();
+    // Disabled things are never read.
+    fs::create_dir_all(f.mods_dir.join("DISABLED Old")).unwrap();
+    fs::write(
+        f.mods_dir.join("DISABLED Old/m.ini"),
+        ini_for("aaaa1111", "ib = R"),
+    )
+    .unwrap();
+
+    let report = gmm_core::conflicts(&f.db, &f.ws, f.mods, zzz())
+        .await
+        .unwrap();
+    assert_eq!(report.mods_checked, 4);
+    let pairs: Vec<(String, String)> = report
+        .conflicts
+        .iter()
+        .map(|c| (c.a.label(), c.b.label()))
+        .collect();
+    assert_eq!(
+        pairs,
+        [
+            (
+                format!("#{a} Outfit A [gb-1]"),
+                format!("#{b} Outfit B [gb-2]")
+            ),
+            (
+                format!("#{a} Outfit A [gb-1]"),
+                "Manual (not installed by GMM)".to_owned()
+            ),
+            (
+                format!("#{b} Outfit B [gb-2]"),
+                "Manual (not installed by GMM)".to_owned()
+            ),
+        ]
+    );
+    assert_eq!(report.conflicts[0].hashes, ["aaaa1111"]);
+
+    // Disabling B removes its conflicts; checking B before enabling it shows them again.
+    gmm_core::set_enabled(&f.db, &f.ws, f.mods, zzz(), b, false)
+        .await
+        .unwrap();
+    let report = gmm_core::conflicts(&f.db, &f.ws, f.mods, zzz())
+        .await
+        .unwrap();
+    assert_eq!(report.conflicts.len(), 1);
+    let before = gmm_core::conflicts_for(&f.db, &f.ws, f.mods, zzz(), b)
+        .await
+        .unwrap();
+    assert_eq!(before.conflicts.len(), 2, "with A and with Manual");
+    assert!(
+        before
+            .conflicts
+            .iter()
+            .all(|c| c.a.label().contains("Outfit B") || c.b.label().contains("Outfit B"))
+    );
+}
+
+#[tokio::test]
+async fn different_parts_and_libraries_dont_conflict() {
+    let f = Fixture::new().await;
+    install_named(
+        &f,
+        "Top",
+        1,
+        &[(
+            "m.ini",
+            &ini_for("bbbb2222", "match_first_index = 0\nib = R"),
+        )],
+    )
+    .await;
+    install_named(
+        &f,
+        "Bottom",
+        2,
+        &[(
+            "m.ini",
+            &ini_for("bbbb2222", "match_first_index = 9000\nib = R"),
+        )],
+    )
+    .await;
+    let report = gmm_core::conflicts(&f.db, &f.ws, f.mods, zzz())
+        .await
+        .unwrap();
+    assert!(report.conflicts.is_empty(), "{:?}", report.conflicts);
+
+    // A manifest that lists a shared library namespace.
+    let toml = include_str!("../../gmm-adapters/games/zzz.toml").replace(
+        "ignore_namespaces = []",
+        r"ignore_namespaces = ['Shared\Lib']",
+    );
+    let registry = Registry::from_sources(&[("zzz.toml", &toml)]).unwrap();
+    let game = registry.get("zzz").unwrap();
+    fs::create_dir_all(f.mods_dir.join("Lib")).unwrap();
+    fs::write(
+        f.mods_dir.join("Lib/lib.ini"),
+        format!(
+            "namespace = shared\\lib\n{}",
+            String::from_utf8(ini_for("bbbb2222", "ib = R")).unwrap()
+        ),
+    )
+    .unwrap();
+    let report = gmm_core::conflicts(&f.db, &f.ws, f.mods, game)
+        .await
+        .unwrap();
+    assert!(report.conflicts.is_empty(), "{:?}", report.conflicts);
+    assert_eq!(report.libraries.len(), 1);
 }

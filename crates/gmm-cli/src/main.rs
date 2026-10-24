@@ -115,10 +115,14 @@ enum Command {
         #[command(flatten)]
         setup: SetupArgs,
     },
-    /// Switch mods on (ids from `gmm list`).
+    /// Switch mods on (ids from `gmm list`). Refuses when a mod would conflict with one
+    /// that's already on, unless --anyway.
     Enable {
         #[arg(required = true)]
         ids: Vec<i64>,
+        /// Enable even if it conflicts with another enabled mod.
+        #[arg(long)]
+        anyway: bool,
         #[command(flatten)]
         setup: SetupArgs,
     },
@@ -126,6 +130,14 @@ enum Command {
     Disable {
         #[arg(required = true)]
         ids: Vec<i64>,
+        #[command(flatten)]
+        setup: SetupArgs,
+    },
+    /// Show enabled mods that replace the same things (managed and hand-installed).
+    Conflicts {
+        /// Only this game (see `gmm games`).
+        #[arg(long, value_parser = parse_game)]
+        game: Option<&'static GameManifest>,
         #[command(flatten)]
         setup: SetupArgs,
     },
@@ -305,27 +317,16 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
         Command::List { game, setup } => {
             library::list(db, game, setup.xxmi, setup.folders, cli.json).await
         }
-        Command::Enable { ids, setup } => {
-            library::apply(
-                db,
-                Action::Enable,
-                &ids,
-                setup.xxmi,
-                setup.folders,
-                cli.json,
-            )
-            .await
+        Command::Enable { ids, anyway, setup } => {
+            let action = Action::Enable { anyway };
+            library::apply(db, action, &ids, setup.xxmi, setup.folders, cli.json).await
         }
         Command::Disable { ids, setup } => {
-            library::apply(
-                db,
-                Action::Disable,
-                &ids,
-                setup.xxmi,
-                setup.folders,
-                cli.json,
-            )
-            .await
+            let action = Action::Disable;
+            library::apply(db, action, &ids, setup.xxmi, setup.folders, cli.json).await
+        }
+        Command::Conflicts { game, setup } => {
+            library::show_conflicts(db, game, setup.xxmi, setup.folders, cli.json).await
         }
         Command::Uninstall { ids, setup } => {
             let action = Action::Uninstall;

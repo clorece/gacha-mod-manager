@@ -795,6 +795,7 @@ dependencies = [
  "gmm-catalog",
  "gmm-db",
  "gmm-fsguard",
+ "gmm-migoto",
  "gmm-net",
  "gmm-xxmi",
  "hex",
@@ -842,6 +843,14 @@ dependencies = [
  "tempfile",
  "thiserror",
  "trash",
+]
+
+[[package]]
+name = "gmm-migoto"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "serde",
 ]
 
 [[package]]

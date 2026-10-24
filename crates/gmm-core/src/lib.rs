@@ -17,6 +17,7 @@
 //! decides from a game's setup state whether installing makes sense yet.
 
 mod analyze;
+mod conflicts;
 mod error;
 mod fetch;
 mod install;
@@ -25,6 +26,7 @@ mod names;
 mod workspace;
 
 pub use analyze::{Analysis, Variant, analyze};
+pub use conflicts::{Conflict, ConflictReport, ModRef, conflicts, conflicts_for};
 pub use error::CoreError;
 pub use fetch::{FetchEvent, FetchedArchive, MAX_DOWNLOAD_BYTES, choose_file, fetch_archive};
 pub use install::{

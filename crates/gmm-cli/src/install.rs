@@ -8,7 +8,7 @@ use gmm_adapters::{GameManifest, Registry};
 use gmm_catalog::GameBanana;
 use gmm_core::{
     AppDirs, CoreError, InstallEvent, InstallOptions, InstallRequest, VariantChoice, Workspace,
-    install, install_gate,
+    conflicts_for, install, install_gate,
 };
 use gmm_db::Db;
 use gmm_detect::{SystemEnvironment, detect};
@@ -19,6 +19,7 @@ use serde::Serialize;
 
 use crate::fetch::{game_of, progress};
 use crate::format::bytes;
+use crate::library::describe;
 use crate::{AnyError, with_saved_setup};
 
 pub struct InstallArgs {
@@ -98,16 +99,26 @@ pub async fn run(
         Err(e) => return Err(e.into()),
     };
 
+    // New mods start enabled; say right away if they clash with something already on.
+    let mut clashes = Vec::new();
+    for folder in &report.installed {
+        let found = conflicts_for(db, &target.ws, target.mods, game, folder.id).await?;
+        clashes.extend(found.conflicts);
+    }
+    clashes.dedup();
+
     if json {
         #[derive(Serialize)]
         struct Out<'a> {
             #[serde(flatten)]
             report: &'a gmm_core::InstallReport,
             setup_warnings: &'a [String],
+            conflicts: &'a [gmm_core::Conflict],
         }
         let out = Out {
             report: &report,
             setup_warnings: warnings,
+            conflicts: &clashes,
         };
         println!("{}", serde_json::to_string_pretty(&out)?);
         return Ok(());
@@ -126,6 +137,12 @@ pub async fn run(
         for warning in &folder.warnings {
             println!("  warning: {warning}");
         }
+    }
+    for c in &clashes {
+        println!("conflict: {}", describe(c));
+    }
+    if !clashes.is_empty() {
+        println!("Both stay on; switch one off with `gmm disable <id>`.");
     }
     for warning in warnings {
         println!("note: {warning}");

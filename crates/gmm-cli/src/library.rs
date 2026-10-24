@@ -8,7 +8,8 @@ use std::path::PathBuf;
 
 use gmm_adapters::{GameManifest, Registry};
 use gmm_core::{
-    DiskState, RecycleBin, UnmanagedMod, library, on_disk_name, set_enabled, uninstall,
+    Conflict, DiskState, RecycleBin, UnmanagedMod, conflicts, conflicts_for, library, on_disk_name,
+    set_enabled, uninstall,
 };
 use gmm_db::Db;
 use serde::Serialize;
@@ -168,7 +169,10 @@ fn row(m: gmm_db::InstalledMod, disk: &str) -> ListRow {
 /// What `enable`, `disable` and `uninstall` do to each mod.
 #[derive(Clone, Copy)]
 pub enum Action {
-    Enable,
+    /// `anyway`: enable even if it conflicts with another enabled mod.
+    Enable {
+        anyway: bool,
+    },
     Disable,
     Uninstall,
 }
@@ -201,8 +205,22 @@ pub async fn apply(
             continue;
         };
         let value = match action {
-            Action::Enable | Action::Disable => {
-                let on = matches!(action, Action::Enable);
+            Action::Enable { .. } | Action::Disable => {
+                let on = matches!(action, Action::Enable { .. });
+                if let Action::Enable { anyway: false } = action
+                    && !row.enabled
+                {
+                    let report = conflicts_for(db, &target.ws, target.mods, game, id).await?;
+                    if !report.conflicts.is_empty() {
+                        let lines: Vec<String> = report.conflicts.iter().map(describe).collect();
+                        return Err(format!(
+                            "enabling #{id} would conflict with mods that are already on:\n  \
+                             {}\nDisable the other one first, or add --anyway.",
+                            lines.join("\n  ")
+                        )
+                        .into());
+                    }
+                }
                 let t = set_enabled(db, &target.ws, target.mods, game, id, on).await?;
                 if !json {
                     let verb = if on { "enabled" } else { "disabled" };
@@ -233,6 +251,72 @@ pub async fn apply(
     }
     if json {
         println!("{}", serde_json::to_string_pretty(&results)?);
+    }
+    Ok(())
+}
+
+/// `A  <->  B  (3 shared: 0fc8027f, 9040e2c4, ...)`
+pub fn describe(c: &Conflict) -> String {
+    let shown: Vec<&str> = c.hashes.iter().take(4).map(String::as_str).collect();
+    let more = if c.hashes.len() > shown.len() {
+        ", ..."
+    } else {
+        ""
+    };
+    format!(
+        "{}  <->  {}  ({} shared: {}{more})",
+        c.a.label(),
+        c.b.label(),
+        c.hashes.len(),
+        shown.join(", ")
+    )
+}
+
+/// `gmm conflicts`: every conflict between enabled mods, per game.
+pub async fn show_conflicts(
+    db: &Db,
+    game: Option<&'static GameManifest>,
+    xxmi: Option<PathBuf>,
+    folders: Vec<(String, PathBuf)>,
+    json: bool,
+) -> Result<(), AnyError> {
+    let games: Vec<&GameManifest> = match game {
+        Some(g) => vec![g],
+        None => Registry::builtin()?.games().iter().collect(),
+    };
+    let mut reports = Vec::new();
+    let mut text = String::new();
+    for game in games {
+        let target = match ModsTarget::open(db, game, xxmi.clone(), folders.clone()).await {
+            Ok(t) => t,
+            Err(e) => {
+                let _ = writeln!(text, "{}: not checked ({e})", game.game.name);
+                continue;
+            }
+        };
+        let report = conflicts(db, &target.ws, target.mods, game).await?;
+        let _ = writeln!(
+            text,
+            "{}: {} enabled mod(s) checked, {} conflict(s)",
+            game.game.name,
+            report.mods_checked,
+            report.conflicts.len()
+        );
+        for c in &report.conflicts {
+            let _ = writeln!(text, "  {}", describe(c));
+        }
+        for lib in &report.libraries {
+            let _ = writeln!(text, "  library (ignored): {}", lib.label());
+        }
+        for note in &report.notes {
+            let _ = writeln!(text, "  note: {note}");
+        }
+        reports.push(report);
+    }
+    if json {
+        println!("{}", serde_json::to_string_pretty(&reports)?);
+    } else {
+        print!("{text}");
     }
     Ok(())
 }

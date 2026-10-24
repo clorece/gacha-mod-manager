@@ -65,9 +65,9 @@ gacha-mod-manager/
 │  ├─ gmm-xxmi/               # ✅ XXMI root + allowlisted config read, importer checks, setup states
 │  ├─ gmm-db/                 # ✅ SQLite + migrations: settings, installed mods, caches
 │  ├─ gmm-cli/                # ✅ `gmm` binary
-│  ├─ gmm-core/               # ✅ install pipeline, library (list, toggle, uninstall), app
-│  │                          #    folders; conflicts and storage come next (Phase 2)
-│  └─ gmm-migoto/             # 3DMigoto .ini parser: sections, hashes, namespaces, keybinds (Phase 2)
+│  ├─ gmm-core/               # ✅ install pipeline, library (list, toggle, uninstall),
+│  │                          #    conflicts, app folders; storage comes next (Phase 2)
+│  └─ gmm-migoto/             # ✅ 3DMigoto .ini parser: overrides, hashes, namespaces, keybinds
 ├─ packages/ui/               # shared React components                                      (Phase 3)
 ├─ docs/                      # these docs (docs/research/ is local only)
 ├─ CLAUDE.md                  # working agreements (doc updates per phase, commits, code rules)
@@ -148,24 +148,36 @@ has `include_recursive = Mods`, so nested folders load:
 
 ## Conflict detection
 
-3DMigoto mods conflict when two enabled mods override the same resource. `gmm-migoto` parses every
-`.ini` in each enabled mod (managed or not) and indexes:
+Implemented: `crates/gmm-migoto` (parser) and `gmm-core::conflicts` (`gmm conflicts`, the check in
+`gmm enable`, and the warning after `gmm install`).
 
-- `[TextureOverride*]` / `[ShaderOverride*]` sections → `hash` values, plus whether they replace
-  geometry (`ib`/`vb*`) or textures (`ps-t*`)
-- `namespace` declarations
-- `[Key*]` sections (for the keybind viewer later)
+3DMigoto mods conflict when two enabled mods override the same resource. `gmm-migoto` parses every
+`.ini` in each enabled mod (managed or not; files and folders named `DISABLED*` are skipped, as
+3DMigoto does) and keeps:
+
+- `[TextureOverride*]` / `[ShaderOverride*]` sections with a `hash` (lowercased), their
+  `match_first_index`, and whether they replace geometry (`ib`, `vb<n>`, `handling`,
+  `override_vertex_count`, `override_byte_stride`, `draw*`) or textures (`ps-t<n>`, `vs-t<n>`
+  and the other stages' texture slots). Sections that only watch a hash (set a variable, run a
+  command list) replace nothing and never conflict
+- the top-level `namespace` declaration
+- `[Key*]` sections (`key`, `back`, `type`; for the keybind viewer later)
+
+The parser never fails (junk lines are skipped, input is capped at 4 MiB) and is
+property-tested for panics. `if`/`elif`/`endif` are ignored: a key counts wherever it appears in
+its section. Two overrides overlap when the hash matches and either has no
+`match_first_index` or both have the same one (ZZZ mods often split one buffer into parts).
 
 Severity:
 
 | Level | Rule | UI |
 |---|---|---|
-| **Conflict** | Two enabled mods override the same hash with geometry/texture replacement | Blocking dialog on enable: "Disable X and enable Y" / "Enable anyway" / "Cancel" |
-| **Warning** | Same GameBanana character (subcategory), but no shared hashes | Badge only |
-| **Ignored** | Hashes from shared library mods (ZZMI ships SlotFix, TTLib, HP bar under `Core/`; Mods-folder libraries listed per adapter) | Never shown |
+| **Conflict** | Two enabled mods override the same hash with geometry/texture replacement | CLI: `gmm enable` refuses unless `--anyway`; `gmm install` warns (the new mod stays on). UI: blocking dialog on enable: "Disable X and enable Y" / "Enable anyway" / "Cancel" |
+| **Warning** | Same GameBanana character (subcategory), but no shared hashes | Badge only. ⏳ Not built yet: needs the mod's category stored at install |
+| **Ignored** | Shared library mods: ZZMI ships SlotFix, TTLib, HP bar under `Core/`, which is outside `Mods/` and never read; Mods-folder libraries are matched by `namespace` against the manifest's `[conflicts] ignore_namespaces` (empty for ZZZ and WuWa so far) | Listed as "library (ignored)" |
 
-The index is rebuilt incrementally (one mod at a time) and cached in SQLite keyed by mod folder
-+ mtime. Conflicts are advisory: GMM never edits a mod's ini.
+The index is rebuilt on every check (fast enough for the CLI; caching it in SQLite keyed by mod
+folder + mtime is a later optimisation). Conflicts are advisory: GMM never edits a mod's ini.
 
 ## Storage accounting
 

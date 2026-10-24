@@ -132,7 +132,13 @@ Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm det
       `gmm list` of the real setup (Phoenix shown as unmanaged). An interrupted install left
       only a staging leftover, no mod and no record. Known: SQLite may reuse the id of the
       most recently deleted mod
-- [ ] `gmm-migoto` ini parser + conflict index + severity rules + library-mod ignore list
+- [x] Conflicts (2026-10-23): new crate `gmm-migoto` (tolerant parser: override hashes,
+      `match_first_index`, geometry/texture replacement, namespace, key bindings; property
+      tests) and `gmm-core::conflicts` (`conflicts`, `conflicts_for`). Library mods ignored by
+      namespace via the manifest. CLI: `gmm conflicts`, `gmm enable` refuses a conflicting mod
+      unless `--anyway`, `gmm install` warns. Verified: the real Belle mod and an unmanaged copy
+      of it conflict on 20 hashes; the real setup (Phoenix alone) has none. Deferred: the
+      "same character" warning tier (needs the category stored at install) and caching the index
 - [ ] Storage accounting (per mod, per game, cache, drive free space)
 - [ ] `gmm launch`: run the confirmed XXMI exe with `--nogui --xxmi <IMP>` (first launch asks
       the user to confirm the exe path; R7)
