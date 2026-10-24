@@ -65,8 +65,8 @@ gacha-mod-manager/
 │  ├─ gmm-xxmi/               # ✅ XXMI root + allowlisted config read, importer checks, setup states
 │  ├─ gmm-db/                 # ✅ SQLite + migrations: settings, installed mods, caches
 │  ├─ gmm-cli/                # ✅ `gmm` binary
-│  ├─ gmm-core/               # ✅ install pipeline (fetch, analyze, install), app folders;
-│  │                          #    toggle, conflicts, storage come next (Phase 2)
+│  ├─ gmm-core/               # ✅ install pipeline, library (list, toggle, uninstall), app
+│  │                          #    folders; conflicts and storage come next (Phase 2)
 │  └─ gmm-migoto/             # 3DMigoto .ini parser: sections, hashes, namespaces, keybinds (Phase 2)
 ├─ packages/ui/               # shared React components                                      (Phase 3)
 ├─ docs/                      # these docs (docs/research/ is local only)
@@ -133,7 +133,11 @@ has `include_recursive = Mods`, so nested folders load:
   `DISABLED` or `.` is dropped, the name is capped at 80 characters and validated like any path
   component. GMM never overwrites: a name already in the DB, or an existing folder (enabled or
   `DISABLED`) GMM didn't install, stops the install.
-- **Uninstall** = move the mod folder to the Recycle Bin and remove the DB row.
+- **Uninstall** = move the mod folder to the Recycle Bin (`Guard::move_to_trash`, `trash`
+  crate) and remove the DB row. The archive stays in the download cache.
+- **The disk is the truth for on/off.** `gmm list` compares each DB row with `Mods/GMM/`:
+  a folder renamed by hand updates the row; a folder that's gone is shown as missing (and
+  uninstalling it only removes the record); both names present is refused as ambiguous.
 - **Folder names must stay stable (observed 2026-10-23).** 3DMigoto saves each mod's in-game
   toggle state in `<IMP>/d3dx_user.ini`, keyed by the mod's **path**, e.g.
   `$\mods\phoenix\resources\phoenix.ini\headband = 0`. Renaming or moving a mod folder,

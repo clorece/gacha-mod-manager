@@ -43,6 +43,9 @@ url = "2"
 winreg = "0.56"
 # 7z: pure-Rust decoders only. Features are chosen per crate.
 sevenz-rust2 = { version = "0.24", default-features = false }
+# Recycle Bin moves (security rule R8). Only gmm-fsguard uses it. No chrono (that's for
+# listing the bin, which GMM doesn't do).
+trash = { version = "5", default-features = false, features = ["coinit_apartmentthreaded"] }
 thiserror = "2"
 # zip: pure-Rust decoders only (no C zlib/bzip2/zstd).
 zip = { version = "9", default-features = false, features = [

@@ -69,4 +69,10 @@ pub enum CoreError {
     AlreadyInstalled { game: String, folder: String },
     #[error("{folder:?} already exists in the Mods folder but GMM didn't install it")]
     FolderTaken { folder: String },
+    #[error("no mod {id} installed for {game} (see `gmm list`)")]
+    NoSuchMod { id: i64, game: String },
+    #[error("the folder of {0:?} is gone from the Mods folder (deleted or moved outside GMM)")]
+    ModFolderMissing(String),
+    #[error("both {0:?} and its DISABLED copy exist in the Mods folder; remove one by hand first")]
+    ModFolderAmbiguous(String),
 }

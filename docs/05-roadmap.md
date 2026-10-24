@@ -120,8 +120,18 @@ Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm det
       Not yet done: installing into your real `ZZMI\Mods` and checking it in game (that's the
       Phase 2 exit check, with `gmm launch`). Known gap: `installed_mods` doesn't record which
       XXMI root a mod went into; `gmm list` reconciles with disk in the next item
-- [ ] Enable/disable (`DISABLED ` prefix rename), uninstall (Recycle Bin via `trash`),
-      unmanaged-mod listing
+- [x] Enable/disable, uninstall, unmanaged listing (2026-10-23): `gmm-core::library`
+      (`library`, `set_enabled`, `uninstall` with a `Trash` trait; `RecycleBin` in the app).
+      The disk is the truth for on/off: hand renames update the DB; a vanished folder is
+      reported `missing` and uninstall then only removes the record; both names present is
+      `ambiguous` and refused. Unmanaged = folders and loose `.ini` files in `Mods/`, plus
+      unknown folders inside `Mods/GMM/`; listed only, never touched. `Guard::move_to_trash`
+      (new `trash` dependency, in fsguard). CLI: `gmm list` (per game, with disk state and
+      unmanaged mods), `gmm enable|disable|uninstall <id>...`. Verified in a throwaway XXMI
+      folder (install, disable, enable, uninstall to the real Recycle Bin) and as a read-only
+      `gmm list` of the real setup (Phoenix shown as unmanaged). An interrupted install left
+      only a staging leftover, no mod and no record. Known: SQLite may reuse the id of the
+      most recently deleted mod
 - [ ] `gmm-migoto` ini parser + conflict index + severity rules + library-mod ignore list
 - [ ] Storage accounting (per mod, per game, cache, drive free space)
 - [ ] `gmm launch`: run the confirmed XXMI exe with `--nogui --xxmi <IMP>` (first launch asks

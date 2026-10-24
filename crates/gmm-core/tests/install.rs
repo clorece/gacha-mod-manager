@@ -563,3 +563,142 @@ async fn stale_temporary_files_are_swept_on_open() {
     assert!(!old.exists(), "older than an hour: removed");
     assert!(extract.join("current.bin").exists(), "recent: kept");
 }
+
+// ---- library: list, toggle, uninstall ---------------------------------------------------
+
+/// Deletes instead of using the real Recycle Bin, and remembers what it was asked to do.
+#[derive(Default)]
+struct FakeTrash(std::sync::Mutex<Vec<String>>);
+
+impl gmm_core::Trash for FakeTrash {
+    fn trash(&self, guard: &gmm_fsguard::Guard, path: &ScopedPath) -> Result<(), CoreError> {
+        self.0.lock().unwrap().push(path.rel().to_string());
+        guard.remove_dir_all(path)?;
+        Ok(())
+    }
+}
+
+async fn installed_one(f: &Fixture) -> i64 {
+    let a = f.analyze(&[("Mod/m.ini", INI)]);
+    let id = f.install(&a, InstallOptions::default()).await.unwrap()[0].id;
+    a.cleanup(&f.ws);
+    id
+}
+
+#[tokio::test]
+async fn toggle_renames_with_the_disabled_prefix() {
+    let f = Fixture::new().await;
+    let id = installed_one(&f).await;
+    let on = f.gmm().join("Ellen - Maid [gb-652373]");
+    let off = f.gmm().join("DISABLED Ellen - Maid [gb-652373]");
+
+    let t = gmm_core::set_enabled(&f.db, &f.ws, f.mods, zzz(), id, false)
+        .await
+        .unwrap();
+    assert!(t.changed && !t.enabled);
+    assert!(!on.exists() && off.join("m.ini").exists());
+    assert!(!f.db.installed_mod(id).await.unwrap().unwrap().enabled);
+
+    let again = gmm_core::set_enabled(&f.db, &f.ws, f.mods, zzz(), id, false)
+        .await
+        .unwrap();
+    assert!(!again.changed);
+
+    gmm_core::set_enabled(&f.db, &f.ws, f.mods, zzz(), id, true)
+        .await
+        .unwrap();
+    assert!(on.join("m.ini").exists() && !off.exists());
+    assert!(f.db.installed_mod(id).await.unwrap().unwrap().enabled);
+
+    let wuwa = Registry::builtin().unwrap().get("wuwa").unwrap();
+    assert!(matches!(
+        gmm_core::set_enabled(&f.db, &f.ws, f.mods, wuwa, id, false).await,
+        Err(CoreError::NoSuchMod { .. })
+    ));
+}
+
+#[tokio::test]
+async fn library_follows_the_disk_and_lists_unmanaged_mods() {
+    let f = Fixture::new().await;
+    let id = installed_one(&f).await;
+    // Renamed by hand, outside GMM.
+    fs::rename(
+        f.gmm().join("Ellen - Maid [gb-652373]"),
+        f.gmm().join("DISABLED Ellen - Maid [gb-652373]"),
+    )
+    .unwrap();
+    fs::create_dir_all(f.mods_dir.join("Phoenix")).unwrap();
+    fs::create_dir_all(f.mods_dir.join("DISABLED Old Outfit")).unwrap();
+    fs::write(f.mods_dir.join("loose.ini"), INI).unwrap();
+    fs::write(f.mods_dir.join("readme.txt"), b"x").unwrap();
+    fs::create_dir_all(f.gmm().join("Stranger")).unwrap();
+    fs::create_dir_all(f.gmm().join("DISABLED .staging").join("leftover")).unwrap();
+
+    let lib = gmm_core::library(&f.db, &f.ws, f.mods, zzz())
+        .await
+        .unwrap();
+    assert_eq!(lib.managed.len(), 1);
+    assert_eq!(lib.managed[0].disk, gmm_core::DiskState::Disabled);
+    assert!(!lib.managed[0].row.enabled);
+    assert!(
+        !f.db.installed_mod(id).await.unwrap().unwrap().enabled,
+        "database corrected"
+    );
+    let unmanaged: Vec<(&str, bool)> = lib
+        .unmanaged
+        .iter()
+        .map(|u| (u.path.as_str(), u.enabled))
+        .collect();
+    assert_eq!(
+        unmanaged,
+        [
+            ("DISABLED Old Outfit", false),
+            ("Phoenix", true),
+            ("loose.ini", true),
+            ("GMM/Stranger", true),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn uninstall_trashes_the_folder_and_forgets_the_mod() {
+    let f = Fixture::new().await;
+    let id = installed_one(&f).await;
+    gmm_core::set_enabled(&f.db, &f.ws, f.mods, zzz(), id, false)
+        .await
+        .unwrap();
+    let trash = FakeTrash::default();
+    let out = gmm_core::uninstall(&f.db, &f.ws, f.mods, zzz(), id, &trash)
+        .await
+        .unwrap();
+    assert!(out.trashed);
+    assert_eq!(
+        *trash.0.lock().unwrap(),
+        ["GMM/DISABLED Ellen - Maid [gb-652373]"]
+    );
+    assert_eq!(f.db.installed_mod(id).await.unwrap(), None);
+    assert!(f.tree().is_empty());
+}
+
+#[tokio::test]
+async fn missing_folders_are_reported_not_guessed() {
+    let f = Fixture::new().await;
+    let id = installed_one(&f).await;
+    fs::remove_dir_all(f.gmm().join("Ellen - Maid [gb-652373]")).unwrap();
+
+    let lib = gmm_core::library(&f.db, &f.ws, f.mods, zzz())
+        .await
+        .unwrap();
+    assert_eq!(lib.managed[0].disk, gmm_core::DiskState::Missing);
+    assert!(matches!(
+        gmm_core::set_enabled(&f.db, &f.ws, f.mods, zzz(), id, false).await,
+        Err(CoreError::ModFolderMissing(_))
+    ));
+    let trash = FakeTrash::default();
+    let out = gmm_core::uninstall(&f.db, &f.ws, f.mods, zzz(), id, &trash)
+        .await
+        .unwrap();
+    assert!(!out.trashed, "only the record is removed");
+    assert!(trash.0.lock().unwrap().is_empty());
+    assert_eq!(f.db.installed_mod(id).await.unwrap(), None);
+}

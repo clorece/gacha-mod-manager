@@ -20,6 +20,7 @@ mod analyze;
 mod error;
 mod fetch;
 mod install;
+mod library;
 mod names;
 mod workspace;
 
@@ -29,6 +30,10 @@ pub use fetch::{FetchEvent, FetchedArchive, MAX_DOWNLOAD_BYTES, choose_file, fet
 pub use install::{
     InstallEvent, InstallOptions, InstallReport, InstallRequest, InstalledFolder, ModMeta, Sidecar,
     VariantChoice, install, install_analyzed, install_gate,
+};
+pub use library::{
+    DiskState, Library, ManagedMod, RecycleBin, ToggleOutcome, Trash, UninstallOutcome,
+    UnmanagedMod, library, set_enabled, uninstall,
 };
 pub use names::{
     DISABLED_PREFIX, GMM_DIR, SIDECAR_FILE, STAGING_DIR, mod_folder_name, on_disk_name,

@@ -78,8 +78,10 @@ does is the failure we design out.
   Launcher exe inside a confirmed XXMI root, with fixed arguments (`--nogui --xxmi <IMP>`).
   "Open folder" uses the OS shell to open a directory, never a file. Nothing from a mod archive is
   ever executed.
-- **R8 — Recoverable deletes.** Uninstall and storage deletes go through the Recycle Bin.
-  Unmanaged folders are never deleted without an explicit, itemized confirmation.
+- **R8 — Recoverable deletes.** Uninstall and storage deletes go through the Recycle Bin
+  (`gmm_fsguard::Guard::move_to_trash`, the only caller of the `trash` crate; it applies the
+  same read-write-root checks as any write). Unmanaged folders are never deleted without an
+  explicit, itemized confirmation; today GMM has no command that deletes one at all.
 
 ## Archive hardening (gmm-archive)
 

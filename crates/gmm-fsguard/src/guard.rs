@@ -347,6 +347,16 @@ impl Guard {
         fs::remove_dir_all(&path).map_err(|e| FsError::io("remove_dir_all", path, e))
     }
 
+    /// Moves a file or folder to the Recycle Bin (the trash on Linux), so the user can get it
+    /// back. This is how GMM deletes anything the user asked to delete (security rule R8).
+    pub fn move_to_trash(&self, p: &ScopedPath) -> Result<(), FsError> {
+        let path = self.resolve_below_root(p, Access::ReadWrite)?;
+        trash::delete(&path).map_err(|e| FsError::Trash {
+            path,
+            message: e.to_string(),
+        })
+    }
+
     /// The checked absolute path of a file in a read-write root, for a library that must open
     /// the file itself (SQLite opens its database, journal and WAL files by name). Only use it
     /// to hand the path straight to that library; the guard can't see what happens next.

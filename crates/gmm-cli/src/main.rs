@@ -7,6 +7,7 @@ mod config;
 mod fetch;
 mod format;
 mod install;
+mod library;
 mod setup;
 
 use std::path::PathBuf;
@@ -18,6 +19,7 @@ use gmm_adapters::{GameManifest, Registry};
 use gmm_catalog::{CatalogSource, GameBanana, ListQuery, SearchQuery, Sort};
 use gmm_db::Db;
 use gmm_net::{Client, NetConfig};
+use library::Action;
 use serde::Serialize;
 
 #[derive(Parser)]
@@ -104,12 +106,49 @@ enum Command {
         #[arg(long = "folder", value_parser = setup::parse_folder)]
         folders: Vec<(String, PathBuf)>,
     },
-    /// List the mods GMM installed.
+    /// List each game's mods: the ones GMM installed (checked against the disk) and the
+    /// ones it didn't.
     List {
         /// Only this game (see `gmm games`).
         #[arg(long, value_parser = parse_game)]
         game: Option<&'static GameManifest>,
+        #[command(flatten)]
+        setup: SetupArgs,
     },
+    /// Switch mods on (ids from `gmm list`).
+    Enable {
+        #[arg(required = true)]
+        ids: Vec<i64>,
+        #[command(flatten)]
+        setup: SetupArgs,
+    },
+    /// Switch mods off: XXMI skips folders named `DISABLED ...` (ids from `gmm list`).
+    Disable {
+        #[arg(required = true)]
+        ids: Vec<i64>,
+        #[command(flatten)]
+        setup: SetupArgs,
+    },
+    /// Move mods to the Recycle Bin and forget them (ids from `gmm list`). The downloaded
+    /// archive stays in the cache.
+    Uninstall {
+        #[arg(required = true)]
+        ids: Vec<i64>,
+        #[command(flatten)]
+        setup: SetupArgs,
+    },
+}
+
+/// Where to find XXMI and the games, when detection needs help.
+#[derive(clap::Args, Clone, Default)]
+struct SetupArgs {
+    /// XXMI Launcher folder, if it isn't found automatically (portable install). Overrides
+    /// `gmm config set-xxmi` for this run.
+    #[arg(long)]
+    xxmi: Option<PathBuf>,
+    /// Extra game folder to check, as GAME=FOLDER. Can be repeated.
+    #[arg(long = "folder", value_parser = setup::parse_folder)]
+    folders: Vec<(String, PathBuf)>,
 }
 
 #[derive(Subcommand)]
@@ -263,7 +302,35 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
             };
             install::run(&gb, &net, db, args, cli.json).await
         }
-        Command::List { game } => install::list(db, game, cli.json).await,
+        Command::List { game, setup } => {
+            library::list(db, game, setup.xxmi, setup.folders, cli.json).await
+        }
+        Command::Enable { ids, setup } => {
+            library::apply(
+                db,
+                Action::Enable,
+                &ids,
+                setup.xxmi,
+                setup.folders,
+                cli.json,
+            )
+            .await
+        }
+        Command::Disable { ids, setup } => {
+            library::apply(
+                db,
+                Action::Disable,
+                &ids,
+                setup.xxmi,
+                setup.folders,
+                cli.json,
+            )
+            .await
+        }
+        Command::Uninstall { ids, setup } => {
+            let action = Action::Uninstall;
+            library::apply(db, action, &ids, setup.xxmi, setup.folders, cli.json).await
+        }
     }
 }
 
