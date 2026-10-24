@@ -37,9 +37,7 @@ pub enum ConfigCommand {
 
 /// `%APPDATA%\GMM` on Windows, the XDG data folder elsewhere.
 fn data_dir() -> Result<PathBuf, AnyError> {
-    Ok(dirs::data_dir()
-        .ok_or("could not find the app data folder")?
-        .join("GMM"))
+    Ok(gmm_core::AppDirs::system()?.data)
 }
 
 /// Opens (creating on first run) GMM's database.

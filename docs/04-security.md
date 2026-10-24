@@ -86,8 +86,9 @@ does is the failure we design out.
 - Detect the format from magic bytes, never the extension. Supported: zip, 7z (pure-Rust
   decoders only; 7z BZip2 is left out for licensing). Encrypted archives are rejected.
 - Validate **every** entry's metadata before writing anything (two passes).
-- Extract into a fresh temp dir under the app cache, then stage under `Mods/GMM/.staging/`.
-  On any error the destination is removed.
+- Extract into a fresh temp dir under the app cache (`cache/extract/<id>`), then copy the
+  chosen mod into `Mods/GMM/DISABLED .staging/<id>/` and rename it into place. On any error
+  the destination is removed.
 - Reject absolute paths, `..`, drive letters, NUL bytes, reserved Windows names (`CON`, `NUL`,
   `COM1`…), alternate data streams (`:`), and anything that normalizes outside the root.
 - Reject symlinks, reparse points and special files inside archives, and names that collide
@@ -99,8 +100,11 @@ does is the failure we design out.
   that lie about sizes are still caught. Nested archives are not auto-extracted.
 - **Policy scan:**
   - Block by default: `.exe .dll .bat .cmd .ps1 .vbs .js .wsf .sh .scr .msi .jar .com .lnk .reg`.
-    The user can override per mod with a named-file warning. Overridden files are kept out of
-    `Mods/` (stored next to the cache), never run.
+    The user can override per mod (`gmm install --skip-blocked`, after the blocked files are
+    listed by name). Overridden files are left out of `Mods/`: they stay only inside the
+    cached archive and are never extracted anywhere GMM loads from, and never run. Only
+    blocked files inside the chosen mod folder count; an installer `.exe` next to the mod
+    folder in the archive is simply not copied.
   - Warn: `d3dx.ini` / `d3d11.dll` inside a mod (XXMI also flags rogue `d3dx.ini`), `.ini`
     references outside the mod folder (`..\`), unusually large files.
   - Scan report stored with the mod and shown on its library entry.

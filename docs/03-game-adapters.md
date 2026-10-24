@@ -20,6 +20,12 @@ validated when the registry is built (`Registry::builtin()`). Manifests are **da
   expected `d3dx.ini` target), `[detect]` (exe names, required children, folder names,
   `[detect.steam]` appid + sub-path, `[detect.epic]` display names), `[[mod_kind]]`,
   `[conflicts]`.
+- `[[mod_kind]]` drives install classification (`gmm-core`'s `analyze`): a folder in the
+  archive is a mod root when it directly holds an `.ini` containing one of `ini_markers`
+  (matched case-insensitively) and no folder above it does. `.ini` files 3DMigoto skips
+  (a `DISABLED*` file or folder name) and `d3dx.ini`/`d3dx_user.ini` don't count. Several
+  roots in one archive are variants. Both games use `migoto` with `[TextureOverride` and
+  `[ShaderOverride`.
 - Unknown fields are rejected, so a typo can't silently switch a rule off. Every path is
   validated with fsguard's `RelPath` rules. Ids, GameBanana ids, importers and Steam appids
   must be unique across games.

@@ -13,6 +13,7 @@ repository = "https://github.com/clorece/gacha-mod-manager"
 gmm-adapters = { path = "crates/gmm-adapters" }
 gmm-archive = { path = "crates/gmm-archive" }
 gmm-catalog = { path = "crates/gmm-catalog" }
+gmm-core = { path = "crates/gmm-core" }
 gmm-db = { path = "crates/gmm-db" }
 gmm-detect = { path = "crates/gmm-detect" }
 gmm-fsguard = { path = "crates/gmm-fsguard" }

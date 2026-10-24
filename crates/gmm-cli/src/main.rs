@@ -6,6 +6,7 @@
 mod config;
 mod fetch;
 mod format;
+mod install;
 mod setup;
 
 use std::path::PathBuf;
@@ -67,13 +68,47 @@ enum Command {
     /// What GMM remembers between runs: game folders, the XXMI folder.
     #[command(subcommand)]
     Config(config::ConfigCommand),
-    /// Download a mod into GMM's cache, extract it safely and print the scan report.
-    /// Nothing is installed into XXMI yet.
+    /// Download a mod into GMM's cache, extract it safely and print what's inside (scan
+    /// report, variants). Nothing is installed.
     Fetch {
         mod_id: u64,
         /// File id from `gmm catalog show`. Defaults to the newest clean file.
         #[arg(long)]
         file: Option<u64>,
+    },
+    /// Download a mod and install it into XXMI's Mods folder (under `Mods/GMM/`).
+    Install {
+        mod_id: u64,
+        /// File id from `gmm catalog show`. Defaults to the newest clean file.
+        #[arg(long)]
+        file: Option<u64>,
+        /// The game, if GameBanana doesn't say (normally detected from the mod page).
+        #[arg(long, value_parser = parse_game)]
+        game: Option<&'static GameManifest>,
+        /// Which variant to install when the archive holds several, by number or name
+        /// (see `gmm fetch`). Can be repeated; each becomes its own mod folder.
+        #[arg(long = "variant")]
+        variants: Vec<String>,
+        /// Install every variant in the archive, each as its own mod folder.
+        #[arg(long, conflicts_with = "variants")]
+        all_variants: bool,
+        /// Install even though the mod contains executables or scripts; those files are left
+        /// out (they stay only in the cached archive and are never run).
+        #[arg(long)]
+        skip_blocked: bool,
+        /// XXMI Launcher folder, if it isn't found automatically (portable install). Overrides
+        /// `gmm config set-xxmi` for this run.
+        #[arg(long)]
+        xxmi: Option<PathBuf>,
+        /// Extra game folder to check, as GAME=FOLDER. Can be repeated.
+        #[arg(long = "folder", value_parser = setup::parse_folder)]
+        folders: Vec<(String, PathBuf)>,
+    },
+    /// List the mods GMM installed.
+    List {
+        /// Only this game (see `gmm games`).
+        #[arg(long, value_parser = parse_game)]
+        game: Option<&'static GameManifest>,
     },
 }
 
@@ -206,6 +241,29 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
         Command::Config(cmd) => config::run(db, cmd, cli.json).await,
         Command::Catalog(cmd) => catalog(&gb, cmd, cli.json, cli.show_nsfw).await,
         Command::Fetch { mod_id, file } => fetch::run(&gb, &net, db, mod_id, file, cli.json).await,
+        Command::Install {
+            mod_id,
+            file,
+            game,
+            variants,
+            all_variants,
+            skip_blocked,
+            xxmi,
+            folders,
+        } => {
+            let args = install::InstallArgs {
+                mod_id,
+                file,
+                game,
+                variants,
+                all_variants,
+                skip_blocked,
+                xxmi,
+                folders,
+            };
+            install::run(&gb, &net, db, args, cli.json).await
+        }
+        Command::List { game } => install::list(db, game, cli.json).await,
     }
 }
 

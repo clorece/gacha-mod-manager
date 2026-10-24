@@ -14,10 +14,10 @@ path = "src/main.rs"
 
 [dependencies]
 clap.workspace = true
-dirs.workspace = true
 gmm-adapters.workspace = true
 gmm-archive.workspace = true
 gmm-catalog.workspace = true
+gmm-core.workspace = true
 gmm-db.workspace = true
 gmm-detect.workspace = true
 gmm-fsguard.workspace = true

@@ -459,6 +459,8 @@ struct RawRecord {
     root_category: RawCategoryRef,
     #[serde(rename = "_aSubCategory", deserialize_with = "de_lenient")]
     sub_category: RawCategoryRef,
+    #[serde(rename = "_aGame", deserialize_with = "de_lenient")]
+    game: RawCategoryRef,
     #[serde(rename = "_sVersion", deserialize_with = "de_string")]
     version: String,
     #[serde(rename = "_bIsObsolete", deserialize_with = "de_bool")]
@@ -481,6 +483,7 @@ impl RawRecord {
     fn into_summary(self) -> ModSummary {
         ModSummary {
             id: self.id,
+            game_id: self.game.id,
             name: self.name,
             submitter: self.submitter.into_member(),
             root_category: self.root_category.into_ref(),

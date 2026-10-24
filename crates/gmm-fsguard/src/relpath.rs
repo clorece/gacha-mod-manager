@@ -81,6 +81,19 @@ impl RelPath {
         Self { components }
     }
 
+    /// True if `prefix` is this path or one of its ancestors (whole components only).
+    pub fn starts_with(&self, prefix: &Self) -> bool {
+        self.components.starts_with(&prefix.components)
+    }
+
+    /// This path relative to `prefix`, if `prefix` is this path or an ancestor of it.
+    pub fn strip_prefix(&self, prefix: &Self) -> Option<Self> {
+        let rest = self.components.strip_prefix(prefix.components.as_slice())?;
+        Some(Self {
+            components: rest.to_vec(),
+        })
+    }
+
     /// Path relative to the root, using the platform separator.
     pub fn to_path_buf(&self) -> PathBuf {
         self.components.iter().collect()

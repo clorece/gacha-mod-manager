@@ -3,6 +3,7 @@
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use gmm_adapters::Importer;
 use gmm_detect::Environment;
 use gmm_fsguard::{Access, Guard, RootId};
 use serde::Serialize;
@@ -33,6 +34,12 @@ pub struct XxmiInstall {
 impl XxmiInstall {
     pub fn launcher_version(&self) -> Option<&str> {
         self.config.config_version.as_deref()
+    }
+
+    /// `<root>/<IMP>/Mods`: the folder XXMI loads mods from, and the only place inside XXMI
+    /// that GMM writes to (security rule R3).
+    pub fn mods_dir(&self, importer: Importer) -> PathBuf {
+        self.root.join(importer.as_str()).join("Mods")
     }
 }
 

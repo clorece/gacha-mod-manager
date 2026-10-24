@@ -771,10 +771,10 @@ name = "gmm-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
- "dirs",
  "gmm-adapters",
  "gmm-archive",
  "gmm-catalog",
+ "gmm-core",
  "gmm-db",
  "gmm-detect",
  "gmm-fsguard",
@@ -783,6 +783,29 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "gmm-core"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "gmm-adapters",
+ "gmm-archive",
+ "gmm-catalog",
+ "gmm-db",
+ "gmm-fsguard",
+ "gmm-net",
+ "gmm-xxmi",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "wiremock",
+ "zip",
 ]
 
 [[package]]

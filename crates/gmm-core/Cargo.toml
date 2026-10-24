@@ -1,0 +1,34 @@
+[package]
+name = "gmm-core"
+description = "GMM's features on top of the building blocks: install, library, (later) toggle, conflicts, storage"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+dirs.workspace = true
+gmm-adapters.workspace = true
+gmm-archive.workspace = true
+gmm-catalog.workspace = true
+gmm-db.workspace = true
+gmm-fsguard.workspace = true
+gmm-net.workspace = true
+gmm-xxmi.workspace = true
+hex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+gmm-net = { workspace = true, features = ["test-util"] }
+tempfile.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+wiremock.workspace = true
+zip = { workspace = true, features = ["deflate-flate2-zlib-rs"] }
+
+[lints]
+workspace = true

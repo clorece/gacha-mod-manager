@@ -43,6 +43,14 @@ impl Db {
     /// SHA-256) are already there.
     pub async fn record_download(&self, d: &NewCachedDownload) -> Result<(), DbError> {
         let at = now();
+        let mut tx = self.pool.begin().await?;
+        // A different archive at the same path (the file changed and was downloaded again)
+        // replaces the old record.
+        sqlx::query("DELETE FROM download_cache WHERE path_rel = ? AND sha256 <> ?")
+            .bind(&d.path_rel)
+            .bind(&d.sha256)
+            .execute(&mut *tx)
+            .await?;
         sqlx::query(
             "INSERT INTO download_cache
                  (sha256, gb_mod_id, gb_file_id, path_rel, size_bytes, added_at, last_used_at)
@@ -61,8 +69,9 @@ impl Db {
         .bind(to_db(d.size_bytes, "size_bytes")?)
         .bind(at)
         .bind(at)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+        tx.commit().await?;
         Ok(())
     }
 

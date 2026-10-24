@@ -147,6 +147,9 @@ pub struct ModStats {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ModSummary {
     pub id: u64,
+    /// GameBanana game id (`_aGame`), when the response includes it (mod pages do;
+    /// observed 2026-10-23).
+    pub game_id: Option<u64>,
     pub name: String,
     pub submitter: Member,
     pub root_category: Option<CategoryRef>,

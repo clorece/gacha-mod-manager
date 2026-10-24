@@ -108,14 +108,18 @@ Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm det
       use the saved folders and XXMI folder; `gmm fetch` records archives in `download_cache`.
       Verified on the dev machine: the cache survives between runs (459 ms → 18 ms for a
       list page)
-- [ ] Install pipeline (`gmm install <mod-id> [--file] [--variant]`): download → verify →
-      extract → classify (migoto ini markers from the manifest) → variants → scan → stage under
-      `Mods/GMM/.staging/` → rename into `Mods/GMM/<name> [gb-<id>]/` → `gmm.json` sidecar.
-      Requires `Ready` (or warns). New write root: `<XXMI>/<IMP>/Mods/` only. Records go into
-      `gmm-db`'s `installed_mods` (folder name without `DISABLED `, chosen once) and
-      `download_cache` (already filled by `gmm fetch`). Until the in-game `.staging` check
-      above is done, staging under `Mods/GMM/DISABLED .staging/` is the safe choice: XXMI
-      excludes `DISABLED*` for certain
+- [x] Install pipeline (2026-10-23): new crate `gmm-core` (`fetch_archive` → `analyze` →
+      `install_analyzed`, plus `install` and `install_gate`). `gmm install <mod-id> [--file]
+      [--game] [--variant N|name ...] [--all-variants] [--skip-blocked]` and `gmm list`;
+      `gmm fetch` now reuses the same steps and prints kind and variants. Stages under
+      `Mods/GMM/DISABLED .staging/`, writes `gmm.json` and an `installed_mods` row, never
+      overwrites. `gmm status` now counts mods inside `Mods/GMM/` one by one. The catalogue
+      model gained `game_id` (`_aGame`). 12 pipeline tests (variants, blocked files, hostile
+      names, collisions, end to end against a mock GameBanana). Verified with a real mod
+      (Belle High Waisted, 534637: 47 files, 85 MiB) installed into a throwaway XXMI folder.
+      Not yet done: installing into your real `ZZMI\Mods` and checking it in game (that's the
+      Phase 2 exit check, with `gmm launch`). Known gap: `installed_mods` doesn't record which
+      XXMI root a mod went into; `gmm list` reconciles with disk in the next item
 - [ ] Enable/disable (`DISABLED ` prefix rename), uninstall (Recycle Bin via `trash`),
       unmanaged-mod listing
 - [ ] `gmm-migoto` ini parser + conflict index + severity rules + library-mod ignore list

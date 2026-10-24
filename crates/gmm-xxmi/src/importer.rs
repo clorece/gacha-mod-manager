@@ -14,6 +14,10 @@ const MAX_INI_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_DLL_BYTES: u64 = 64 * 1024 * 1024;
 /// Stop walking `Mods/` after this many entries (sizes are then reported as "at least").
 const MAX_WALK_ENTRIES: usize = 200_000;
+/// GMM's folder inside `Mods/` and its staging folder (names owned by `gmm-core`; repeated
+/// here because `gmm-xxmi` sits below it).
+const GMM_DIR: &str = "GMM";
+const GMM_STAGING_DIR: &str = "DISABLED .staging";
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ImporterInfo {
@@ -175,17 +179,34 @@ fn summarize_mods(guard: &Guard, dir: &ScopedPath) -> ModsSummary {
         return summary;
     };
     let mut stack = Vec::new();
-    for entry in top {
-        if entry.is_dir {
-            if entry.name.to_ascii_lowercase().starts_with("disabled") {
-                summary.disabled += 1;
-            } else if !entry.name.starts_with('.') {
-                summary.enabled += 1;
-            }
-            stack.push(entry.path);
-        } else {
-            summary.total_bytes += entry.len;
+    let count = |name: &str, summary: &mut ModsSummary| {
+        if name.to_ascii_lowercase().starts_with("disabled") {
+            summary.disabled += 1;
+        } else if !name.starts_with('.') {
+            summary.enabled += 1;
         }
+    };
+    for entry in top {
+        if !entry.is_dir {
+            summary.total_bytes += entry.len;
+            continue;
+        }
+        // GMM's own folder holds one mod per sub-folder (plus its staging folder).
+        if entry.name.eq_ignore_ascii_case(GMM_DIR) && !entry.is_symlink {
+            for inner in guard.read_dir(&entry.path).unwrap_or_default() {
+                if !inner.is_dir {
+                    summary.total_bytes += inner.len;
+                    continue;
+                }
+                if !inner.name.eq_ignore_ascii_case(GMM_STAGING_DIR) {
+                    count(&inner.name, &mut summary);
+                }
+                stack.push(inner.path);
+            }
+            continue;
+        }
+        count(&entry.name, &mut summary);
+        stack.push(entry.path);
     }
     let mut seen = 0usize;
     while let Some(next) = stack.pop() {

@@ -104,6 +104,15 @@ impl World {
             &[b'x'; 1000],
         );
         write(&dir.join("Mods/DISABLED Old Outfit/a.ini"), &[b'y'; 500]);
+        write(&dir.join("Mods/GMM/Ellen [gb-1]/e.ini"), &[b'z'; 100]);
+        write(
+            &dir.join("Mods/GMM/DISABLED Miyabi [gb-2]/m.ini"),
+            &[b'z'; 100],
+        );
+        write(
+            &dir.join("Mods/GMM/DISABLED .staging/123/x.ini"),
+            &[b'z'; 100],
+        );
     }
 
     fn status(&self, installs: &[GameInstall]) -> gmm_xxmi::GameStatus {
@@ -238,8 +247,9 @@ fn ready_with_details() {
     assert!(s.steps.is_empty());
     let info = s.importer_info.as_ref().unwrap();
     assert_eq!(info.importer_version.as_deref(), Some("1.50"));
-    assert_eq!((info.mods.enabled, info.mods.disabled), (1, 1));
-    assert_eq!(info.mods.total_bytes, 1500);
+    // Mods/GMM counts per mod inside it; its staging folder isn't a mod.
+    assert_eq!((info.mods.enabled, info.mods.disabled), (2, 2));
+    assert_eq!(info.mods.total_bytes, 1800);
     assert_eq!(info.dll_version, None, "fake dll has no version resource");
     let command = s.launch_command.as_ref().unwrap();
     assert!(command[0].ends_with("XXMI Launcher.exe"));

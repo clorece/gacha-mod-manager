@@ -65,7 +65,8 @@ gacha-mod-manager/
 │  ├─ gmm-xxmi/               # ✅ XXMI root + allowlisted config read, importer checks, setup states
 │  ├─ gmm-db/                 # ✅ SQLite + migrations: settings, installed mods, caches
 │  ├─ gmm-cli/                # ✅ `gmm` binary
-│  ├─ gmm-core/               # library, install, toggle, conflicts, storage, jobs, events   (Phase 2)
+│  ├─ gmm-core/               # ✅ install pipeline (fetch, analyze, install), app folders;
+│  │                          #    toggle, conflicts, storage come next (Phase 2)
 │  └─ gmm-migoto/             # 3DMigoto .ini parser: sections, hashes, namespaces, keybinds (Phase 2)
 ├─ packages/ui/               # shared React components                                      (Phase 3)
 ├─ docs/                      # these docs (docs/research/ is local only)
@@ -89,8 +90,9 @@ user data.
   `LaunchModeMismatch`, `Ready`, with a summary, fix steps, notes, versions and mod counts
   (see [03](03-game-adapters.md)). Computed fresh each time; nothing is stored.
 - **Catalog entry**: cached GameBanana mod metadata and file list.
-- **Installed mod**: a folder under `<XXMI>/<IMP>/Mods/GMM/` with a `gmm.json` sidecar (GB mod id,
-  file id, chosen variant(s), version, file date, SHA-256 of the archive, install date).
+- **Installed mod**: a folder under `<XXMI>/<IMP>/Mods/GMM/` with a `gmm.json` sidecar
+  (`gmm_core::Sidecar`: format, game, name, variant, GB mod id, file id, file name, file date,
+  version, SHA-256 of the archive, install time, GMM version) and a row in `installed_mods`.
   3DMigoto only loads `.ini` files, so the sidecar is ignored by XXMI.
 - **Unmanaged mod**: any other folder in `Mods/`. GMM shows it, includes it in conflicts and
   storage, and offers "adopt" (link to a GB entry). It never moves or deletes one without an
@@ -118,11 +120,19 @@ has `include_recursive = Mods`, so nested folders load:
 - **Variants** (several full mods in one archive): each chosen variant becomes its own folder
   (`… [gb-id] (Variant B)`), so they toggle independently. The conflict checker usually flags
   enabling two variants of the same mod.
-- **Writes are atomic per mod:** extract to `Mods/GMM/.staging/<uuid>/`, then rename into place.
-  A crash leaves at most a staging folder, which is cleaned up on next start. Staging lives under
-  `Mods/`, so the rename stays on one volume. It starts with `.`, which should keep 3DMigoto
-  from loading it (in-game check pending, roadmap "Before Phase 2"); if not, the staging name
-  gets the `DISABLED` prefix.
+- **Writes are atomic per mod:** the archive is extracted under the cache
+  (`%LOCALAPPDATA%GMMchextract<id>`), the chosen variant's files (minus blocked ones)
+  are copied to `Mods/GMM/DISABLED .staging/<id>/<n>/` with their `gmm.json`, the DB row is
+  written, and the folder is renamed into place (the row is removed again if the rename
+  fails). Staging lives under `Mods/`, so the rename stays on one volume, and its `DISABLED`
+  prefix means 3DMigoto skips it for certain (`exclude_recursive = DISABLED*`), without
+  waiting on the in-game `.staging` check. Staging and extraction folders older than an hour
+  are leftovers from a crash and are removed the next time GMM runs.
+- **Folder names** are `<name> [gb-<id>]` plus ` (<variant>)` for one of several variants.
+  GameBanana names are untrusted: characters Windows forbids become spaces, a leading
+  `DISABLED` or `.` is dropped, the name is capped at 80 characters and validated like any path
+  component. GMM never overwrites: a name already in the DB, or an existing folder (enabled or
+  `DISABLED`) GMM didn't install, stops the install.
 - **Uninstall** = move the mod folder to the Recycle Bin and remove the DB row.
 - **Folder names must stay stable (observed 2026-10-23).** 3DMigoto saves each mod's in-game
   toggle state in `<IMP>/d3dx_user.ini`, keyed by the mod's **path**, e.g.
@@ -197,14 +207,25 @@ size cap, and nothing that identifies the user is sent to image hosts.
 
 ## Install flow
 
+Implemented in `crates/gmm-core` (`gmm install`). Steps marked ⏳ come with later features.
+
 ```
-pick GB file ─► download (allowlisted host after every redirect, size cap ≈ _nFilesize + slack)
-            ─► verify: GB _sAvResult must be "clean"; MD5 vs _sMd5Checksum if present; record SHA-256
-            ─► extract to temp (all hardening rules) ─► classify (migoto / unknown)
-            ─► detect variants ─► user picks variant(s) if more than one
-            ─► policy scan (block executables/scripts, warn on rogue d3dx.ini/d3d11.dll)
-            ─► conflict check against enabled mods ─► dialog if needed
-            ─► stage + rename into Mods/GMM/ ─► write gmm.json + DB row
+setup gate: XXMI and the importer must exist (else refuse); any other non-Ready state warns
+mod page ─► refuse trashed / withheld / obsolete mods, and mods whose _aGame isn't this game
+pick GB file (newest clean one, or --file) ─► _sAvResult must be "clean"
+            ─► download into cache/downloads (allowlisted host after every redirect, exact
+               _nFilesize, MD5 if given), or reuse the cached copy; record SHA-256 in download_cache
+            ─► extract to cache/extract/<id> (all hardening rules) ─► policy scan
+            ─► classify: a folder is a mod root when it directly holds an .ini with one of the
+               manifest's markers ([TextureOverride / [ShaderOverride, case-insensitive) and no
+               folder above it does. DISABLED* names and d3dx.ini don't count
+            ─► one root = one mod; several = variants: --variant N|name (repeatable) or
+               --all-variants, otherwise the install stops and lists them
+            ─► blocked files inside the chosen mod stop the install (--skip-blocked leaves
+               them out); blocked files elsewhere in the archive don't matter
+            ─► ⏳ conflict check against enabled mods
+            ─► copy to Mods/GMM/DISABLED .staging/<id>/ ─► gmm.json ─► DB row ─► rename into
+               Mods/GMM/<folder> ─► remove extraction + staging folders
 ```
 
 ## Launch flow

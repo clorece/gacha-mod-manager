@@ -132,6 +132,7 @@ async fn mod_profile_maps_everything_the_mod_page_needs() {
         .unwrap();
     let s = &profile.summary;
     assert_eq!(s.name, "Test Outfit A");
+    assert_eq!(s.game_id, Some(19567));
     assert_eq!(s.root_category.as_ref().unwrap().name, "Character Skins");
     assert_eq!(s.category.as_ref().unwrap().id, Some(43004));
     assert_eq!(s.images.len(), 3, "banner + slideshow");
