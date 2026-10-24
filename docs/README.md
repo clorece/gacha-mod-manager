@@ -7,13 +7,16 @@ Impact and Honkai Impact 3rd, so each of those is one adapter away.
 
 Development happens on Windows (primary target). Linux follows later from the same codebase.
 
-## Where we are (2026-10-23)
+## Where we are (2026-10-24)
 
 **Done:** Phase 0 (discovery), Phase 0b (setup check), the parts of Phase 1 that Phase 2
-needs, and every Phase 2 backend item: the local database, the install pipeline, toggling,
-uninstalling and listing mods, conflict detection, storage accounting, `gmm launch`, the adapter
-conformance suite and the egress / file-access privacy harnesses (in CI, with strace on Linux).
-Everything works from the `gmm` command line; there is no app window yet.
+needs, and **Phase 2** (2026-10-24): the local database, the install pipeline, toggling,
+uninstalling and listing mods (GMM's and hand-installed ones), conflict detection, storage
+accounting, `gmm launch` (with XXMI's administrator prompt), the adapter conformance suite and
+the egress / file-access privacy harnesses (in CI, with strace on Linux). The exit check was
+done in game: a GameBanana mod installed with `gmm install`, started with `gmm launch zzz`,
+toggled, a conflict reported, storage listed. Everything works from the `gmm` command line;
+there is no app window yet.
 
 | Crate | What it does |
 |---|---|
@@ -32,14 +35,15 @@ Everything works from the `gmm` command line; there is no app window yet.
 On the dev machine, `gmm status` reports ZZZ `Ready` (HoYoPlay install) and WuWa
 `LaunchModeMismatch` (Steam install, XXMI's Game Launch still on Direct).
 
-**Waiting on you:** the in-game checks in [05-roadmap.md](05-roadmap.md) under "Before Phase 2"
-(WuWa launch setting, `DISABLED` rename, nested `Mods/GMM/` folder, Quick Start shortcut), and
-the Phase 2 exit check: `gmm install <a ZZZ mod>`, `gmm launch zzz` (confirm the exe once), see
-it in game, `gmm disable`, `gmm conflicts`, `gmm storage`. Nothing has been installed into your
-real `ZZMI\Mods` yet; all install tests used a throwaway XXMI folder.
+**Waiting on you:** screenshots of each XXMI setup step, for the app's setup guide (whenever
+convenient).
 
-**Next:** Phase 3, the app (Tauri shell, command layer, image protocol, then the screens). See
-"Start here" under Phase 3 in the roadmap. The Phase 2 exit check above can happen any time.
+**Known issue:** `gmm status` flags WuWa's Steam copy as `LaunchModeMismatch`, but it runs
+fine with XXMI's Game Launch on Direct, so `gmm launch wuwa` refuses. The launch rule has to
+become per game.
+
+**Next:** that WuWa fix, then Phase 3, the app (Tauri shell, command layer, image protocol,
+then the screens). See "Start here" under Phase 3 in the roadmap.
 
 ## Docs
 

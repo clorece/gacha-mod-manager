@@ -98,7 +98,7 @@ The install pipeline relies on these. Confirmed by you in game:
 Exit: the CLI browses both catalogues and prints a full mod page. Archive harness green. ✅ met
 (the open items above don't block Phase 2).
 
-## Phase 2 — Backend features (backend done 2026-10-23; exit check waiting on you)
+## Phase 2 — Backend features ✅ done 2026-10-24
 
 Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm detect`,
 `gmm status`, per-state fixtures.
@@ -173,13 +173,17 @@ Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm det
 Exit: from the CLI alone, install a ZZZ mod, see it in game via `gmm launch`, toggle it, see a
 conflict reported, and see it in storage. Privacy harnesses green.
 
-**Exit check (needs you at the game):**
+**Exit check (done with you, 2026-10-24):**
 - [x] `gmm install 688491` (Casual Velina) into your real `ZZMI\Mods\GMM\` (2026-10-24; GMM
       id `#1`)
 - [x] `gmm launch zzz`, exe confirmed once, game starts with mods (after the UAC fix)
-- [ ] `gmm disable 1`; after XXMI reloads mods (or a restart) it's gone; `gmm enable 1`. Your
-      first try used the GameBanana id (`688491`); GMM now accepts `#1` and says which GMM id
-      a GameBanana id means
+- [x] `gmm disable 1` / `gmm enable 1` rename Casual Velina's folder with and without
+      `DISABLED ` (the prefix you confirmed hides a mod in game). The first try used the
+      GameBanana id (`688491`); GMM now accepts `#1` and says which GMM id a GameBanana id
+      means. `gmm disable Phoenix_duplicate` switched the hand-made copy off the same way
+- Carried into Phase 3: WuWa's Steam copy is wrongly flagged `LaunchModeMismatch` (it runs
+  fine with XXMI's Game Launch on Direct), so `gmm launch wuwa` refuses; the launch rule
+  needs to be per game (see "Before Phase 2")
 - [x] `gmm conflicts` reports a conflict: `GMM/Phoenix` and a hand-made copy
       `GMM/Phoenix_duplicate`, 8 shared hashes. `gmm enable` refusing is covered by tests
 - [x] `gmm storage` lists Casual Velina (131.0 MiB) and the hand-installed mods
