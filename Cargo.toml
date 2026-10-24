@@ -13,6 +13,7 @@ repository = "https://github.com/clorece/gacha-mod-manager"
 gmm-adapters = { path = "crates/gmm-adapters" }
 gmm-archive = { path = "crates/gmm-archive" }
 gmm-catalog = { path = "crates/gmm-catalog" }
+gmm-db = { path = "crates/gmm-db" }
 gmm-detect = { path = "crates/gmm-detect" }
 gmm-fsguard = { path = "crates/gmm-fsguard" }
 gmm-net = { path = "crates/gmm-net" }
@@ -31,6 +32,9 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"
+# SQLite with the bundled C library (no system SQLite needed). No `macros` (no compile-time
+# DB access) and no `sqlite-load-extension` (GMM never loads SQLite extensions).
+sqlx = { version = "0.9", default-features = false, features = ["sqlite-bundled", "runtime-tokio", "migrate"] }
 tokio = { version = "1", features = ["rt", "time", "sync", "macros"] }
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 url = "2"

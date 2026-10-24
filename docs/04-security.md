@@ -56,6 +56,11 @@ does is the failure we design out.
     `winreg::RegKey` everywhere else.
   - Canonicalize, check the prefix, refuse symlinks/junctions that leave the root. `std::fs` use
     outside `gmm-fsguard` fails CI.
+  - **The database is the one file opened by a library.** `gmm-db` gets the path of
+    `%APPDATA%\GMM\gmm.db` from `Guard::os_path_for_library`, which applies the same checks
+    as a write (read-write root, denylist, no escape) and hands the path to SQLite. SQLite then
+    opens that file and its `-wal`/`-shm` siblings in the same folder. SQLite extension
+    loading is not compiled in.
   - **GMM never writes to a game folder.** XXMI owns game settings.
 - **R4 — Never read secrets or personal data.** Denylisted by name, even inside allowed roots:
   - Steam `config/loginusers.vdf`, `config/config.vdf`, `local.vdf`, `ssfn*`, `userdata/`

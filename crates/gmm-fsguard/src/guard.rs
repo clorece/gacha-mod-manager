@@ -347,6 +347,13 @@ impl Guard {
         fs::remove_dir_all(&path).map_err(|e| FsError::io("remove_dir_all", path, e))
     }
 
+    /// The checked absolute path of a file in a read-write root, for a library that must open
+    /// the file itself (SQLite opens its database, journal and WAL files by name). Only use it
+    /// to hand the path straight to that library; the guard can't see what happens next.
+    pub fn os_path_for_library(&self, p: &ScopedPath) -> Result<PathBuf, FsError> {
+        self.resolve_below_root(p, Access::ReadWrite)
+    }
+
     // ---- internals -----------------------------------------------------------------------
 
     fn id_for(&self, index: usize) -> RootId {

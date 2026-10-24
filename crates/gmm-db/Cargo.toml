@@ -1,0 +1,22 @@
+[package]
+name = "gmm-db"
+description = "GMM's local SQLite database: installed mods, download cache, settings, HTTP cache"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+gmm-catalog.workspace = true
+gmm-fsguard.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+
+[lints]
+workspace = true

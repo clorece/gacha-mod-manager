@@ -3,16 +3,19 @@
 //! `gmm`: the command-line front end. Every backend feature lands here before it gets a
 //! screen (docs/05-roadmap.md).
 
+mod config;
 mod fetch;
 mod format;
 mod setup;
 
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use gmm_adapters::{GameManifest, Registry};
-use gmm_catalog::{CatalogSource, GameBanana, ListQuery, MemoryCache, SearchQuery, Sort};
+use gmm_catalog::{CatalogSource, GameBanana, ListQuery, SearchQuery, Sort};
+use gmm_db::Db;
 use gmm_net::{Client, NetConfig};
 use serde::Serialize;
 
@@ -35,28 +38,35 @@ enum Command {
     Games,
     /// Find installed games (Steam, HoYoPlay, Epic) and XXMI. Read-only.
     Detect {
-        /// XXMI Launcher folder, if it isn't found automatically (portable install).
+        /// XXMI Launcher folder, if it isn't found automatically (portable install). Overrides
+        /// `gmm config set-xxmi` for this run.
         #[arg(long)]
-        xxmi: Option<std::path::PathBuf>,
-        /// Extra game folder to check, as GAME=FOLDER. Can be repeated.
+        xxmi: Option<PathBuf>,
+        /// Extra game folder to check, as GAME=FOLDER. Can be repeated. Folders saved with
+        /// `gmm config add-folder` are always checked.
         #[arg(long = "folder", value_parser = setup::parse_folder)]
-        folders: Vec<(String, std::path::PathBuf)>,
+        folders: Vec<(String, PathBuf)>,
     },
     /// Check each game's mod setup and say what to do next. Read-only.
     Status {
         /// Only this game (see `gmm games`).
         #[arg(long, value_parser = parse_game)]
         game: Option<&'static GameManifest>,
-        /// XXMI Launcher folder, if it isn't found automatically (portable install).
+        /// XXMI Launcher folder, if it isn't found automatically (portable install). Overrides
+        /// `gmm config set-xxmi` for this run.
         #[arg(long)]
-        xxmi: Option<std::path::PathBuf>,
-        /// Extra game folder to check, as GAME=FOLDER. Can be repeated.
+        xxmi: Option<PathBuf>,
+        /// Extra game folder to check, as GAME=FOLDER. Can be repeated. Folders saved with
+        /// `gmm config add-folder` are always checked.
         #[arg(long = "folder", value_parser = setup::parse_folder)]
-        folders: Vec<(String, std::path::PathBuf)>,
+        folders: Vec<(String, PathBuf)>,
     },
     /// Browse the GameBanana catalogue.
     #[command(subcommand)]
     Catalog(CatalogCommand),
+    /// What GMM remembers between runs: game folders, the XXMI folder.
+    #[command(subcommand)]
+    Config(config::ConfigCommand),
     /// Download a mod into GMM's cache, extract it safely and print the scan report.
     /// Nothing is installed into XXMI yet.
     Fetch {
@@ -167,19 +177,57 @@ fn main() -> ExitCode {
 type AnyError = Box<dyn std::error::Error>;
 
 async fn run(cli: Cli) -> Result<(), AnyError> {
+    if let Command::Games = cli.command {
+        return games(cli.json);
+    }
+    let db = config::open_db().await?;
+    let result = run_with_db(cli, &db).await;
+    db.close().await;
+    result
+}
+
+async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
     let net = Client::new(NetConfig::production())?;
-    let gb = GameBanana::new(net.clone(), Arc::new(MemoryCache::default()));
+    let gb = GameBanana::new(net.clone(), Arc::new(db.clone()));
     match cli.command {
         Command::Games => games(cli.json),
-        Command::Detect { xxmi, folders } => setup::run_detect(cli.json, xxmi, &folders),
+        Command::Detect { xxmi, folders } => {
+            let (xxmi, folders) = with_saved_setup(db, xxmi, folders).await?;
+            setup::run_detect(cli.json, xxmi, &folders)
+        }
         Command::Status {
             game,
             xxmi,
             folders,
-        } => setup::run_status(cli.json, game, xxmi, &folders),
+        } => {
+            let (xxmi, folders) = with_saved_setup(db, xxmi, folders).await?;
+            setup::run_status(cli.json, game, xxmi, &folders)
+        }
+        Command::Config(cmd) => config::run(db, cmd, cli.json).await,
         Command::Catalog(cmd) => catalog(&gb, cmd, cli.json, cli.show_nsfw).await,
-        Command::Fetch { mod_id, file } => fetch::run(&gb, &net, mod_id, file, cli.json).await,
+        Command::Fetch { mod_id, file } => fetch::run(&gb, &net, db, mod_id, file, cli.json).await,
     }
+}
+
+/// Adds the saved game folders to the ones given on the command line, and falls back to the
+/// saved XXMI folder when `--xxmi` isn't given.
+async fn with_saved_setup(
+    db: &Db,
+    xxmi: Option<PathBuf>,
+    folders: Vec<(String, PathBuf)>,
+) -> Result<(Option<PathBuf>, Vec<(String, PathBuf)>), AnyError> {
+    let xxmi = match xxmi {
+        Some(dir) => Some(dir),
+        None => db.xxmi_root().await?,
+    };
+    let mut all: Vec<(String, PathBuf)> = db
+        .manual_game_folders()
+        .await?
+        .into_iter()
+        .map(|f| (f.game_id, f.folder))
+        .collect();
+    all.extend(folders);
+    Ok((xxmi, all))
 }
 
 fn games(json: bool) -> Result<(), AnyError> {

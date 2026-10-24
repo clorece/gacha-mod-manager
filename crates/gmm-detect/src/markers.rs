@@ -14,7 +14,7 @@ pub fn is_game_folder(game: &GameManifest, folder: &Path) -> bool {
 /// `folder` if it's a game folder, else the first of the manifest's typical sub-folder names
 /// that is (launchers often install into `<chosen folder>/<Game Name Game>`). Returns the
 /// canonical path in plain form.
-pub(crate) fn resolve_game_folder(game: &GameManifest, folder: &Path) -> Option<PathBuf> {
+pub fn resolve_game_folder(game: &GameManifest, folder: &Path) -> Option<PathBuf> {
     check(game, folder).or_else(|| {
         game.detect
             .folder_names

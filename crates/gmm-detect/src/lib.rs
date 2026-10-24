@@ -20,7 +20,7 @@ use gmm_adapters::{GameManifest, Registry};
 use serde::Serialize;
 
 pub use env::{Environment, SystemEnvironment};
-pub use markers::is_game_folder;
+pub use markers::{is_game_folder, resolve_game_folder};
 
 /// Where an install was found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]

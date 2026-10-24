@@ -86,7 +86,7 @@ The install pipeline relies on these. Run `gmm status` afterwards; it shows mod 
 - [ ] cargo-fuzz targets (archive extraction, `RelPath`, VDF) as a nightly CI job
 - [x] `gmm-catalog`: `CatalogSource` trait + GameBanana client (list, search, mod page, files,
       updates, categories), in-memory cache, synthetic fixtures, live API smoke test
-- [ ] SQLite-backed HTTP cache (with the database crate)
+- [x] SQLite-backed HTTP cache (done with `gmm-db` in Phase 2)
 - [x] `gmm-adapters`: manifest schema (unknown fields rejected), validation, registry with
       lookups by id / GameBanana id / importer / Steam appid; CLI `gmm games`
 - [x] CLI: `gmm catalog list|search|show|categories`, `gmm fetch` (download → extract → scan)
@@ -94,19 +94,28 @@ The install pipeline relies on these. Run `gmm status` afterwards; it shows mod 
 Exit: the CLI browses both catalogues and prints a full mod page. Archive harness green. ✅ met
 (the open items above don't block Phase 2).
 
-## Phase 2 — Backend features (next)
+## Phase 2 — Backend features (in progress)
 
 Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm detect`,
 `gmm status`, per-state fixtures.
 
 **Start here** (suggested order):
-- [ ] `gmm-db`: SQLite (sqlx) with migrations; tables from 02-architecture.md (installed mods,
-      download cache, settings incl. manual game folders and the confirmed XXMI exe path); move
-      the catalogue's HTTP cache onto it
+- [x] `gmm-db` (2026-10-23): SQLite (sqlx 0.9, bundled SQLite, no macros, no extension
+      loading) with migrations in `crates/gmm-db/migrations/`; tables `settings` (XXMI folder,
+      confirmed XXMI exe), `manual_game_folders`, `installed_mods`, `download_cache`,
+      `http_cache`. The catalogue's HTTP cache now lives there (`HttpCache` became async).
+      CLI: `gmm config show|add-folder|remove-folder|set-xxmi|clear-xxmi`; `detect`/`status`
+      use the saved folders and XXMI folder; `gmm fetch` records archives in `download_cache`.
+      Verified on the dev machine: the cache survives between runs (459 ms → 18 ms for a
+      list page)
 - [ ] Install pipeline (`gmm install <mod-id> [--file] [--variant]`): download → verify →
       extract → classify (migoto ini markers from the manifest) → variants → scan → stage under
       `Mods/GMM/.staging/` → rename into `Mods/GMM/<name> [gb-<id>]/` → `gmm.json` sidecar.
-      Requires `Ready` (or warns). New write root: `<XXMI>/<IMP>/Mods/` only
+      Requires `Ready` (or warns). New write root: `<XXMI>/<IMP>/Mods/` only. Records go into
+      `gmm-db`'s `installed_mods` (folder name without `DISABLED `, chosen once) and
+      `download_cache` (already filled by `gmm fetch`). Until the in-game `.staging` check
+      above is done, staging under `Mods/GMM/DISABLED .staging/` is the safe choice: XXMI
+      excludes `DISABLED*` for certain
 - [ ] Enable/disable (`DISABLED ` prefix rename), uninstall (Recycle Bin via `trash`),
       unmanaged-mod listing
 - [ ] `gmm-migoto` ini parser + conflict index + severity rules + library-mod ignore list

@@ -4,8 +4,8 @@ A desktop app for finding, downloading and organizing GameBanana mods for gacha 
 [XXMI](https://github.com/SpectrumQT/XXMI-Launcher) as the mod loader.
 
 **Status:** early development, command line only. The backend can browse GameBanana, download
-and safely extract mods, find your games and XXMI, and check your mod setup (`gmm status`).
-Installing mods into XXMI is next. Progress and plans: [docs/README.md](docs/README.md).
+and safely extract mods, find your games and XXMI, check your mod setup (`gmm status`), and
+remember your settings in a local database (`gmm config`). Installing mods into XXMI is next. Progress and plans: [docs/README.md](docs/README.md).
 
 First games: Zenless Zone Zero and Wuthering Waves.
 

@@ -73,7 +73,7 @@ impl GameBanana {
                 message: e.to_string(),
             })
         };
-        if let Some(body) = self.cache.get(url.as_str(), ttl)
+        if let Some(body) = self.cache.get(url.as_str(), ttl).await
             && let Ok(value) = decode(&body)
         {
             return Ok(value);
@@ -82,7 +82,7 @@ impl GameBanana {
         match resp.status {
             200..=299 => {
                 let value = decode(&resp.body)?;
-                self.cache.put(url.as_str(), resp.body);
+                self.cache.put(url.as_str(), resp.body).await;
                 Ok(value)
             }
             404 => Err(CatalogError::NotFound),

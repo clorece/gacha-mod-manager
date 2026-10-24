@@ -41,7 +41,7 @@ Results are canonicalized and deduped.
 | **Steam** | `HKCU\Software\Valve\Steam\SteamPath` → `steamapps/libraryfolders.vdf` → each library's `appmanifest_<appid>.acf` (`installdir`, must be one plain folder name) → `common/<installdir>/<steam_subpath>` | ✅ verified on the dev machine (WuWa 3513350). ZZZ 4162040's Steam copy nests the game in `games/ZenlessZoneZero Game` |
 | **HoYoPlay** (native ZZZ, Genshin, Star Rail, HI3) | `%APPDATA%\Cognosphere\HYP\<version>\data\gamedata.dat`: HoYoPlay's own binary format with JSON records embedded. Only `"installPath"` values are extracted; each counts only if it passes a game's markers. Most records hold default paths for uninstalled games, which fail the check on their own | ✅ verified on the dev machine (ZZZ at `D:\HoYoverse\ZenlessZoneZero Game`). The file stays readable while HoYoPlay runs (opened in shared mode) |
 | **Epic** | `%PROGRAMDATA%\Epic\EpicGamesLauncher\Data\Manifests\*.item` (JSON: only `DisplayName`, `InstallLocation` read) | ✅ implemented, fixture-tested only (no machine with Epic yet) |
-| **Manual** | `gmm detect/status --folder game=PATH`; later a folder picker. Validated against markers; a failing folder produces a note | ✅ implemented (not yet remembered between runs: needs the database, Phase 2) |
+| **Manual** | `gmm config add-folder game=PATH` (saved in the database; checked against the markers when added, and the resolved game folder is what gets stored) or `gmm detect/status --folder game=PATH` for one run; later a folder picker. Validated against markers on every run; a failing folder produces a note | ✅ implemented, remembered between runs (`manual_game_folders` table) |
 | **XXMI config** | `Importers.<IMP>.Importer.game_folder` | Used by the setup check, not as a detection source |
 | **Kuro launcher** (native WuWa) | `%APPDATA%\KRLauncher\**\kr_starter_game.json` → `path` (XXMI source) | ⏳ not implemented; needs a machine that has it |
 | **Drive scan** | User-initiated only, depth-limited, folder-name match | ⏳ not implemented |
@@ -52,11 +52,14 @@ install, but logs can contain account details. GMM doesn't need them.
 ## XXMI detection & setup states
 
 ### Finding XXMI
-1. Default root `%APPDATA%\XXMI Launcher` (observed).
-2. MSI install record (observed): `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\*`
+Tried in this order; the first folder that validates wins.
+1. A folder the user named: `--xxmi PATH` for one run, else the one saved with
+   `gmm config set-xxmi PATH` (database setting `xxmi.root`, for portable installs). It's
+   validated when saved and again on every run.
+2. Default root `%APPDATA%\XXMI Launcher` (observed).
+3. MSI install record (observed): `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\*`
    entries with `DisplayName = "XXMI Launcher"` carry `InstallLocation` (the root) and
-   `DisplayVersion`. Read-only, and only those two values.
-3. Root recorded in GMM settings (user-picked for portable installs).
+   `DisplayVersion`. Read-only, and only `InstallLocation` is read.
 
 A folder counts as an XXMI root when it has `XXMI Launcher Config.json` **and**
 `Resources/Bin/XXMI Launcher.exe` (observed; its version resource says ProductName

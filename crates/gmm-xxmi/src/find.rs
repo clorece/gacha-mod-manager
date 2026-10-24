@@ -48,10 +48,12 @@ pub fn find_xxmi(env: &dyn Environment, explicit: Option<&Path>) -> Option<XxmiI
         candidates.push(app_data.join("XXMI Launcher"));
     }
     candidates.extend(env.xxmi_install_locations());
-    candidates.iter().find_map(|c| open(c))
+    candidates.iter().find_map(|c| open_xxmi(c))
 }
 
-fn open(root: &Path) -> Option<XxmiInstall> {
+/// Validates one folder as an XXMI Launcher root (config file plus launcher exe), without
+/// trying any other location.
+pub fn open_xxmi(root: &Path) -> Option<XxmiInstall> {
     if !root.is_absolute() {
         return None;
     }

@@ -63,8 +63,8 @@ gacha-mod-manager/
 │  ├─ gmm-detect/             # ✅ Steam / HoYoPlay / Epic / manual detection, VDF parser,
 │  │                          #    the only registry reads (env.rs)
 │  ├─ gmm-xxmi/               # ✅ XXMI root + allowlisted config read, importer checks, setup states
+│  ├─ gmm-db/                 # ✅ SQLite + migrations: settings, installed mods, caches
 │  ├─ gmm-cli/                # ✅ `gmm` binary
-│  ├─ gmm-db/                 # SQLite + migrations                                          (Phase 2)
 │  ├─ gmm-core/               # library, install, toggle, conflicts, storage, jobs, events   (Phase 2)
 │  └─ gmm-migoto/             # 3DMigoto .ini parser: sections, hashes, namespaces, keybinds (Phase 2)
 ├─ packages/ui/               # shared React components                                      (Phase 3)
@@ -184,7 +184,7 @@ requests work (HTTP 206), so downloads can be paused and resumed. Images live on
 GameBanana's JSON is loosely typed (numbers as strings, `[]` for empty objects), so the client
 decodes every field leniently.
 
-Rules: HTTP cache (in memory for now; SQLite with the database crate) with lists cached for
+Rules: HTTP cache (SQLite `http_cache` table in `gmm-db`) with lists cached for
 minutes and detail pages for an hour; a global rate limit of about 2 requests/second with
 backoff on 429/5xx; and an identifying `User-Agent`. GameBanana sends no rate-limit headers. Store each mod's
 license, never re-host files, respect `_sInitialVisibility` / content ratings (NSFW hidden by
@@ -226,24 +226,39 @@ For Steam copies, XXMI's **Game Launch = Steam** makes XXMI start the game throu
 so users don't need to start XXMI first and the game second. The setup check enforces the
 matching Game Launch setting (`LaunchModeMismatch`).
 
-## Data model (SQLite, first cut)
+## Data model (SQLite)
+
+`crates/gmm-db`, one file at `%APPDATA%\GMM\gmm.db`. The schema is in
+`crates/gmm-db/migrations/` and is applied when the database opens; an older GMM refuses a
+database that a newer one has migrated. sqlx 0.9 with SQLite bundled, WAL journal, foreign
+keys on, every query a static SQL string with bound parameters (sqlx rejects anything else).
+Times are Unix seconds. Built so far (migration 0001):
 
 ```
-game_installs(id PK, game_id, source, game_folder, steam_appid NULL, detected_at, hidden BOOL)
-xxmi_roots(id PK, path, launcher_version NULL, detected_at, user_confirmed BOOL)
-importer_state(xxmi_root_id, importer, state, dll_version, package_version, game_folder_in_xxmi, checked_at)
-catalog_mods(gb_id PK, game_id, name, submitter_json, category, subcategory, version,
-             date_added, date_updated, date_modified, visibility, has_ratings,
-             license_json, preview_json, stats_json, raw_json, fetched_at)
-catalog_files(gb_file_id PK, gb_id FK, name, version, size, md5, av_result, analysis_result,
-              description, date_added, download_count, archived BOOL)
-installed_mods(id PK, game_id, folder_name, gb_id NULL, gb_file_id NULL, variant NULL,
-               enabled BOOL, sha256, size_bytes, installed_at, managed BOOL, scan_report_json)
-ini_index(installed_mod_id, mtime, hashes_json, namespaces_json, keys_json)
-download_cache(sha256 PK, gb_file_id, path_rel, size_bytes, last_used_at)
-http_cache(url PK, etag NULL, body, fetched_at, ttl)
-settings(key PK, value)
+settings(key PK, value)                  -- xxmi.root (a folder the user picked),
+                                         -- xxmi.confirmed_exe (R7); typed accessors only
+manual_game_folders(game_id, folder, added_at, PK(game_id, folder))
+installed_mods(id PK, game_id, folder_name, name, gb_mod_id NULL, gb_file_id NULL,
+               variant NULL, version NULL, file_date NULL, enabled BOOL, archive_sha256 NULL,
+               size_bytes, installed_at, scan_report_json NULL, UNIQUE(game_id, folder_name))
+download_cache(sha256 PK, gb_mod_id NULL, gb_file_id NULL, path_rel UNIQUE, size_bytes,
+               added_at, last_used_at)
+http_cache(url PK, body, fetched_at)     -- each endpoint passes its own max age on read;
+                                         -- rows older than 7 days, or beyond 5,000, are
+                                         -- pruned on open
 ```
+
+- `installed_mods.folder_name` never includes the `DISABLED ` prefix; `enabled` says which
+  name is on disk. Only managed mods are stored. Unmanaged mods are listed from disk each
+  time, so GMM never has a stale idea of what someone put there by hand.
+- Setup states, detected installs and XXMI roots are **not** stored: they're cheap to work
+  out and must reflect the machine as it is now. Only what the user told GMM (manual folders,
+  a picked XXMI folder, the confirmed exe) is remembered.
+- The database never holds anything from XXMI's config file (R4).
+
+Planned with later features: `ini_index(mod folder, mtime, hashes_json, namespaces_json,
+keys_json)` with `gmm-migoto`; parsed `catalog_mods`/`catalog_files` rows only if the UI needs
+queries the raw response cache can't answer.
 
 ## App directories (Windows)
 

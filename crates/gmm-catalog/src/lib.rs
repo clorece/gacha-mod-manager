@@ -16,7 +16,7 @@ mod model;
 
 use std::future::Future;
 
-pub use cache::{HttpCache, MemoryCache, NoCache};
+pub use cache::{CacheFuture, HttpCache, MemoryCache, NoCache};
 pub use error::CatalogError;
 pub use gamebanana::GameBanana;
 pub use model::*;

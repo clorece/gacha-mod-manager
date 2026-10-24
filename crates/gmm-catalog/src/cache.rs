@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-/// Response cache keyed by URL. The SQLite-backed implementation arrives with the database
-/// crate; until then [`MemoryCache`] serves the app and the CLI.
+/// The future an [`HttpCache`] method returns. Boxed so the cache can sit behind
+/// `Arc<dyn HttpCache>`.
+pub type CacheFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
+/// Response cache keyed by URL. `gmm-db` provides the SQLite-backed implementation that the
+/// CLI uses; [`MemoryCache`] is for tests and for running without a database.
+///
+/// A cache is best effort: failures are swallowed and look like a miss.
 pub trait HttpCache: Send + Sync {
     /// A cached body no older than `max_age`.
-    fn get(&self, key: &str, max_age: Duration) -> Option<Vec<u8>>;
-    fn put(&self, key: &str, body: Vec<u8>);
+    fn get<'a>(&'a self, key: &'a str, max_age: Duration) -> CacheFuture<'a, Option<Vec<u8>>>;
+    fn put<'a>(&'a self, key: &'a str, body: Vec<u8>) -> CacheFuture<'a, ()>;
 }
 
 /// Never caches.
@@ -17,11 +25,13 @@ pub trait HttpCache: Send + Sync {
 pub struct NoCache;
 
 impl HttpCache for NoCache {
-    fn get(&self, _: &str, _: Duration) -> Option<Vec<u8>> {
-        None
+    fn get<'a>(&'a self, _: &'a str, _: Duration) -> CacheFuture<'a, Option<Vec<u8>>> {
+        Box::pin(async { None })
     }
 
-    fn put(&self, _: &str, _: Vec<u8>) {}
+    fn put<'a>(&'a self, _: &'a str, _: Vec<u8>) -> CacheFuture<'a, ()> {
+        Box::pin(async {})
+    }
 }
 
 /// In-memory cache with a size bound. When full, the oldest entry is evicted.
@@ -46,14 +56,14 @@ impl Default for MemoryCache {
     }
 }
 
-impl HttpCache for MemoryCache {
-    fn get(&self, key: &str, max_age: Duration) -> Option<Vec<u8>> {
+impl MemoryCache {
+    fn lookup(&self, key: &str, max_age: Duration) -> Option<Vec<u8>> {
         let entries = self.entries.lock().ok()?;
         let (at, body) = entries.get(key)?;
         (at.elapsed() <= max_age).then(|| body.clone())
     }
 
-    fn put(&self, key: &str, body: Vec<u8>) {
+    fn store(&self, key: &str, body: Vec<u8>) {
         let Ok(mut entries) = self.entries.lock() else {
             return;
         };
@@ -70,6 +80,18 @@ impl HttpCache for MemoryCache {
     }
 }
 
+impl HttpCache for MemoryCache {
+    fn get<'a>(&'a self, key: &'a str, max_age: Duration) -> CacheFuture<'a, Option<Vec<u8>>> {
+        let hit = self.lookup(key, max_age);
+        Box::pin(async move { hit })
+    }
+
+    fn put<'a>(&'a self, key: &'a str, body: Vec<u8>) -> CacheFuture<'a, ()> {
+        self.store(key, body);
+        Box::pin(async {})
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -77,21 +99,24 @@ mod tests {
     #[test]
     fn expires_and_evicts() {
         let cache = MemoryCache::new(2);
-        cache.put("a", b"1".to_vec());
-        assert_eq!(cache.get("a", Duration::from_secs(60)), Some(b"1".to_vec()));
+        cache.store("a", b"1".to_vec());
+        assert_eq!(
+            cache.lookup("a", Duration::from_secs(60)),
+            Some(b"1".to_vec())
+        );
         std::thread::sleep(Duration::from_millis(5));
         assert_eq!(
-            cache.get("a", Duration::from_millis(1)),
+            cache.lookup("a", Duration::from_millis(1)),
             None,
             "older than max_age"
         );
-        cache.put("b", b"2".to_vec());
-        cache.put("c", b"3".to_vec());
+        cache.store("b", b"2".to_vec());
+        cache.store("c", b"3".to_vec());
         assert_eq!(
-            cache.get("a", Duration::from_secs(60)),
+            cache.lookup("a", Duration::from_secs(60)),
             None,
             "oldest evicted"
         );
-        assert!(cache.get("c", Duration::from_secs(60)).is_some());
+        assert!(cache.lookup("c", Duration::from_secs(60)).is_some());
     }
 }

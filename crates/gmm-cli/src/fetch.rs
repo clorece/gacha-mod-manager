@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! `gmm fetch`: catalogue → download → safe extraction → policy scan. The install step into
-//! XXMI's `Mods/` folder comes with the XXMI detection work (Phase 2).
+//! `gmm fetch`: catalogue → download → safe extraction → policy scan. Downloads are kept in
+//! the download cache and recorded in the database. Installing into XXMI's `Mods/` folder is
+//! the install pipeline's job (Phase 2).
 
 use std::io::Write;
 use std::ops::ControlFlow;
 
 use gmm_archive::{Limits, ScanOptions, Severity, extract, scan};
 use gmm_catalog::{CatalogSource, GameBanana};
+use gmm_db::{Db, NewCachedDownload};
 use gmm_fsguard::{Access, Guard};
 use gmm_net::{Client, DownloadRequest, Url};
 use serde::Serialize;
@@ -36,6 +38,7 @@ struct FetchReport {
 pub async fn run(
     gb: &GameBanana,
     net: &Client,
+    db: &Db,
     mod_id: u64,
     file_id: Option<u64>,
     json: bool,
@@ -75,12 +78,25 @@ pub async fn run(
         .path(cache, &format!("downloads/{}-{}", file.id, file.name))
         .or_else(|_| guard.path(cache, &format!("downloads/{}.bin", file.id)))?;
 
+    let path_rel = dest.rel().to_string();
+    let recorded = db
+        .cached_download_for_file(file.id)
+        .await?
+        .filter(|d| d.path_rel == path_rel);
     let mut sha256 = None;
     if guard.exists(&dest)? {
         if !json {
             eprintln!("using cached download {}", guard.display(&dest));
         }
+        if let Some(d) = recorded {
+            db.touch_download(&d.sha256).await?;
+            sha256 = Some(d.sha256);
+        }
     } else {
+        if let Some(stale) = recorded {
+            // The file was deleted behind GMM's back; forget it and download again.
+            db.remove_download(&stale.sha256).await?;
+        }
         if !json {
             eprintln!("downloading {} ({})", file.name, bytes(file.size));
         }
@@ -112,6 +128,14 @@ pub async fn run(
                 if outcome.resumed { " (resumed)" } else { "" }
             );
         }
+        db.record_download(&NewCachedDownload {
+            sha256: outcome.sha256.clone(),
+            gb_mod_id: Some(mod_id),
+            gb_file_id: Some(file.id),
+            path_rel,
+            size_bytes: outcome.bytes,
+        })
+        .await?;
         sha256 = Some(outcome.sha256);
     }
 
