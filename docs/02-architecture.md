@@ -313,4 +313,6 @@ queries the raw response cache can't answer.
 | Caches (downloads, images, HTTP) | `%LOCALAPPDATA%\GMM\cache\` |
 | Logs (local only, home path redacted) | `%LOCALAPPDATA%\GMM\logs\` |
 
-On Linux these map to the XDG equivalents through Tauri's path API.
+On Linux these map to the XDG equivalents (`dirs` in the CLI; Tauri's path API in the app).
+If `GMM_HOME` names an absolute folder, the database goes to `GMM_HOME/data/` and the cache to
+`GMM_HOME/cache/` instead (portable use; the privacy harness relies on it). Logs don't exist yet.

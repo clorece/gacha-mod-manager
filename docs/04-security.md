@@ -35,8 +35,9 @@ does is the failure we design out.
   requests: CSP `connect-src ipc: http://ipc.localhost`, and images arrive via the `gmmimg://`
   protocol served from the Rust cache.
 - **R3 — Filesystem scope.** All I/O goes through `gmm-fsguard::ScopedPath`.
-  - **Read/write:** GMM's app dirs (`%APPDATA%\GMM`, `%LOCALAPPDATA%\GMM`), and
-    `<XXMI>/<IMP>/Mods/` for each supported importer.
+  - **Read/write:** GMM's app dirs (`%APPDATA%\GMM`, `%LOCALAPPDATA%\GMM`, or `GMM_HOME` when
+    that environment variable names an absolute folder), and `<XXMI>/<IMP>/Mods/` for each
+    supported importer.
   - **Read-only:** the rest of `<XXMI>/<IMP>/` (`d3dx.ini`, `d3d11.dll` version,
     `Core/<IMP>/main.ini`), XXMI's config file (allowlisted fields only, see below), and the game
     folders (marker files only).
@@ -134,15 +135,16 @@ does is the failure we design out.
 | 1 | Lint gates (✅ done): clippy `disallowed_methods` (`std::fs`, `Command::new`) and `disallowed_types` (HTTP clients, raw sockets, `winreg::RegKey`) outside their crates; `cargo-deny`. ⏳ `cargo-audit`, `pnpm audit` | R1–R3, R7 can't be bypassed silently |
 | 0b | **XXMI config secret test** (✅ done): fixture configs with canary `github_token`, proxy password and signatures; asserts they never appear in parsed config, `GameStatus` JSON or `Debug`, and parse errors don't echo content. Phase 2: the conformance suite checks the DB file, cache and mod folders too. ⏳ logs and IPC output when those exist | R4 |
 | 0b | Detection on a fake machine (✅ done): Steam libraries, HoYoPlay data with a default path for an uninstalled game, Epic manifest, hostile `installdir` (`..\..\Windows`), planted `loginusers.vdf` canary | R3/R4, correct detection |
-| 2 | **Egress harness**: run the CLI scenario behind a logging proxy, with all other outbound traffic blocked (Windows Firewall rule on the test binary in CI; network namespace on Linux CI). Assert every host ∈ allowlist | R2 |
-| 2 | **File-access harness**: run the scenario with a fake profile full of canary files (Steam `loginusers.vdf`, `Player.log`, browser profile). Trace with Process Monitor (Windows, scripted) or `strace` (Linux). Fail if any canary is opened, or any write lands outside the write roots | R3/R4 |
+| 2 | **Egress harness** (✅ done, `crates/gmm-cli/tests/privacy.rs`): the real `gmm` binary runs every network command behind an in-test proxy that logs and refuses each request. Every `CONNECT` target must pass `Allowlist::production()` on port 443, at least one must be seen, and local commands (detect, status, config, list, conflicts, storage, launch) must make none. On Linux CI each `gmm` process also runs under `strace`, and any IPv4/IPv6 connection that isn't loopback (traffic bypassing the proxy) fails the run. ⏳ a Windows equivalent of the bypass check (firewall rule) | R2 |
+| 2 | **File-access harness** (✅ done, same test): a fake profile with canary files (Steam `loginusers.vdf`, `config.vdf`, `userdata/`, a game `Player.log`, a browser `logins.json`, `~/.ssh/id_rsa`) and secrets in XXMI's config; GMM's folders redirected with `GMM_HOME`. Asserts nothing in the profile outside `Mods/` changed and no canary content reached GMM's files. Under `strace` (Linux CI) it also fails if any canary is opened or stat-ed, or any write lands outside `GMM_HOME` and `Mods/`. ⏳ Process Monitor on Windows | R3/R4 |
 | 2 | IPC fuzz: hostile args to every Tauri command | R5 |
 | 2 | Adapter conformance suite on fixtures (✅ done: per-state fixtures in 0b; `gmm-core/tests/conformance.rs` runs detect → install → toggle → conflicts → storage → uninstall per game, asserts no file outside `Mods/` changed and no XXMI config canary reached GMM's database, cache or mod folders) | Correct detection, no writes outside `Mods/`, R4 for the database |
 | 3 | XSS corpus through the description renderer | T3 |
 | 4 | Hostile deep-link URLs | T6 |
 | 5 | Release checks: feature-flag assertion (R6), update signature verification, installer contents review | T7/T8 |
 
-`just audit-privacy` runs the egress and file-access harnesses locally against a release build,
+`just audit-privacy` runs the egress and file-access harnesses locally against a release build
+(with strace on Linux when `GMM_PRIVACY_STRACE=1` is set),
 so anyone can reproduce them.
 
 ## Process

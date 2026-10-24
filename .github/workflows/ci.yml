@@ -27,6 +27,15 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
+      # Security rules R2–R4: the privacy harness again, with every gmm process under strace.
+      # It fails on connections that bypass the logging proxy, any canary file being opened,
+      # and writes outside GMM's own folders and Mods/.
+      - name: Privacy harness under strace
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq strace
+          GMM_PRIVACY_STRACE=1 cargo test -p gmm-cli --test privacy --locked -- --nocapture
       # Security rule R6: the test-only network feature (plain HTTP to localhost) must never
       # reach a shipped binary.
       - name: Shipped binaries never enable gmm-net/test-util

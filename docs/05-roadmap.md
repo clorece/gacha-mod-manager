@@ -157,7 +157,12 @@ Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm det
       and WuWa
 - [x] CLI: `gmm install`, `gmm list`, `gmm enable|disable`, `gmm uninstall`, `gmm conflicts`,
       `gmm storage`, `gmm launch`
-- [ ] Egress + file-access harnesses in CI
+- [x] Egress + file-access harnesses (2026-10-23): `crates/gmm-cli/tests/privacy.rs` runs the real
+      binary behind a refusing, logging proxy with a canary-filled fake profile; on Linux CI
+      every `gmm` process also runs under `strace` (no non-loopback connections, no canary
+      opened, no writes outside `GMM_HOME`/`Mods/`). `GMM_HOME` relocates GMM's folders.
+      `just audit-privacy`. Deferred: Windows syscall tracing (Process Monitor) and a
+      firewall-based bypass check
 
 Exit: from the CLI alone, install a ZZZ mod, see it in game via `gmm launch`, toggle it, see a
 conflict reported, and see it in storage. Privacy harnesses green.

@@ -21,3 +21,8 @@ test:
 # Needs `cargo install cargo-deny --locked`.
 deny:
     cargo deny check
+
+# Privacy harnesses (egress + file access, crates/gmm-cli/tests/privacy.rs) against a release
+# build. On Linux, install strace and set GMM_PRIVACY_STRACE=1 to trace every syscall too.
+audit-privacy:
+    cargo test -p gmm-cli --test privacy --release --locked -- --nocapture

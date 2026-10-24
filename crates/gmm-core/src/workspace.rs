@@ -27,8 +27,19 @@ pub struct AppDirs {
 }
 
 impl AppDirs {
-    /// The standard locations for the current user (XDG equivalents outside Windows).
+    /// The standard locations for the current user (XDG equivalents outside Windows). If the
+    /// `GMM_HOME` environment variable names an absolute folder, everything goes below it
+    /// instead (`data/`, `cache/`): a portable setup, and how the privacy harnesses keep a
+    /// test run away from the real profile.
     pub fn system() -> Result<Self, CoreError> {
+        if let Some(home) = std::env::var_os("GMM_HOME").map(PathBuf::from)
+            && home.is_absolute()
+        {
+            return Ok(Self {
+                data: home.join("data"),
+                cache: home.join("cache"),
+            });
+        }
         Ok(Self {
             data: dirs::data_dir().ok_or(CoreError::NoAppDirs)?.join("GMM"),
             cache: dirs::data_local_dir()
