@@ -226,6 +226,20 @@ fn steam_install_with_direct_launch_is_a_mismatch() {
 }
 
 #[test]
+fn xxmi_folder_written_differently_still_matches_the_install() {
+    // XXMI's setting names the same folder another way (here `/` separators and a trailing
+    // separator; on CI runners also an 8.3 short temp path).
+    let w = World::new();
+    let game = w.zzz_folder();
+    let spelled = PathBuf::from(format!("{}/", game.to_string_lossy().replace('\\', "/")));
+    w.xxmi(Some((Some(&spelled), "DIRECT", 2)));
+    w.zzmi("ZenlessZoneZero.exe", true);
+    let s = w.status(&[install(&game, InstallSource::Steam)]);
+    assert_eq!(s.xxmi_game_folder_source, Some(InstallSource::Steam));
+    assert_eq!(s.state, SetupState::LaunchModeMismatch);
+}
+
+#[test]
 fn hoyoplay_install_with_steam_launch_is_a_mismatch() {
     let w = World::new();
     let game = w.zzz_folder();

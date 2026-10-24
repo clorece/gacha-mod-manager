@@ -7,7 +7,7 @@
 use std::path::{Path, PathBuf};
 
 use gmm_adapters::GameManifest;
-use gmm_detect::{GameInstall, InstallSource, is_game_folder, same_path};
+use gmm_detect::{GameInstall, InstallSource, is_game_folder, resolve_game_folder, same_path};
 use serde::Serialize;
 
 use crate::find::XxmiInstall;
@@ -215,14 +215,17 @@ pub fn evaluate(
             steps,
         );
     }
+    // Detected installs are canonical; XXMI's setting may name the same folder differently
+    // (8.3 short names, `/` separators, a trailing separator).
+    let canonical = resolve_game_folder(game, &folder_path).unwrap_or(folder_path);
     let source = detected
         .iter()
-        .find(|i| same_path(&i.folder, &folder_path))
+        .find(|i| same_path(&i.folder, &canonical))
         .map(|i| i.source);
     s.xxmi_game_folder_source = source;
     for other in detected
         .iter()
-        .filter(|i| !same_path(&i.folder, &folder_path))
+        .filter(|i| !same_path(&i.folder, &canonical))
     {
         s.notes.push(format!(
             "Another {name} install was found ({}): {}. XXMI uses {folder}.",
