@@ -31,23 +31,27 @@ path or a URL to the outside world.
 
 ## Setup & onboarding
 
-Shown on first run and whenever a game isn't `Ready`. One card per game:
+Shown on first run and whenever a game isn't `Ready`. One card per game, filled from
+`gmm_xxmi::GameStatus` (the same data `gmm status --json` prints today):
 
 ```
-┌ Zenless Zone Zero ─────────────────────────────────────────────┐
-│ Game     ✓ Found (Steam) C:\…\Zenless Zone Zero\games\ZenlessZoneZero Game │
+┌ Wuthering Waves ───────────────────────────────────────────────┐
+│ Game     ✓ Found (Steam) C:\…\steamapps\common\Wuthering Waves │
 │ XXMI     ✓ Found  %APPDATA%\XXMI Launcher (v2.4.9)             │
-│ ZZMI     ✓ Installed (ZZMI 1.50, XXMI DLL 1.2.2)               │
-│ Game path in XXMI   ⚠ Not set yet                              │
+│ WWMI     ✓ Installed (WWMI 1.10, XXMI DLL 1.2.2.0)             │
+│ Launch   ⚠ XXMI's "Game Launch" is "Direct"; Steam copies      │
+│            need "Steam"                                        │
 │                                                                │
-│ Next step: open XXMI, select ZZZ, check the game folder        │
-│ (copy: [C:\…\ZenlessZoneZero Game ⧉]), then launch once.        │
+│ Next step: in XXMI, select Wuthering Waves → settings →        │
+│ "General" → "Game Launch" → "Steam".                           │
 │ [Open setup guide]  [Re-check]                                 │
 └────────────────────────────────────────────────────────────────┘
 ```
 
-The guide is a stepper with the text from [03](03-game-adapters.md), our own screenshots, and the
-XXMI releases link (opened in the system browser after a confirmation).
+Each `SetupState` maps to one highlighted row (XXMI, importer, game folder, launch) and its
+`steps` become the "Next step" text. The guide is a stepper with the text from
+[03](03-game-adapters.md), our own screenshots, and the XXMI releases link (opened in the
+system browser after a confirmation).
 
 ## Catalogue (Browse)
 
@@ -65,8 +69,9 @@ XXMI releases link (opened in the system browser after a confirmation).
 
 - **Banner** = the first GameBanana preview image (`_aPreviewMedia._aImages[0]`). The same image
   is the card thumbnail and the mod page hero. Card size uses the ~530px variant, the hero uses
-  the largest available **[verify GB image field names: `_sBaseUrl` + `_sFile530` / `_sFile`]**.
-  Cropped with `object-fit: cover`. A placeholder shows when a mod has no image.
+  the original (`_sBaseUrl` + `_sFile530` / `_sFile`, verified; exposed as
+  `gmm_catalog::Image::url_for_width`). Cropped with `object-fit: cover`. A placeholder shows
+  when a mod has no image.
 - Card fields: name, submitter avatar + name, character (subcategory), likes, downloads, relative
   "updated" date, state badge (*Installed*, *Disabled*, *Update available*, *Conflict*).
 - **NSFW**: `_sInitialVisibility = warn/hide` or content ratings → hidden by default. If the user
@@ -111,7 +116,7 @@ cache. With one image, there are no controls. With none, a placeholder.
 | Images | `_aPreviewMedia._aImages[]` |
 | Files tab | `_aFiles[]`: `_sFile`, `_sVersion`, `_nFilesize`, `_tsDateAdded`, `_nDownloadCount`, `_sDescription`, `_sAvResult`; older files in a collapsible "Archived files" group (`_aArchivedFiles[]`) |
 | Obsolete / withheld | `_bIsObsolete`, `_bIsWithheld`, `_bIsTrashed` → banner, install disabled |
-| Updates tab | Mod updates endpoint **[verify]** |
+| Updates tab | `Mod/{id}/Updates` (verified): title, version, date, changelog entries (`text`, `cat`), file ids |
 
 **Choosing what to install:**
 1. **File** (GameBanana level): the Files tab lists each file with version, size, date and scan

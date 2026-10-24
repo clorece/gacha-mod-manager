@@ -2,7 +2,8 @@
 
 Backend and frontend are separate phases. Phases 1–2 build every feature behind the `gmm` CLI.
 Phase 3 builds the UI on top of it. Security harnesses are added in the same phase as the code
-they guard ([04](04-security.md)).
+they guard ([04](04-security.md)). When a phase finishes, every doc gets updated (see
+`CLAUDE.md`).
 
 ## Phase 0 — Discovery on the dev machine (no app code) ✅ done 2026-10-23
 
@@ -20,47 +21,54 @@ Details: `docs/research/phase0-observations.md` (local only).
 - [x] XXMI GUI labels for the setup guide, from its locale files
 - [x] Confirm GameBanana list/page/sort params, image fields, updates endpoint, download
       redirect chain
-- Deferred to Phase 0b (needs the game running): mod visible in game, `DISABLED` hides it,
-  nested `Mods/GMM/<mod>/` loads, `.staging` ignored, Quick Start command works, screenshots
+- [x] A hand-installed mod shows in game (ZZZ via HoYoPlay; confirmed by the user 2026-10-23)
+- Moved to "Before Phase 2" below: `DISABLED` hides a mod, nested `Mods/GMM/<mod>/` loads,
+  `.staging` ignored, Quick Start command works, screenshots
 - Deferred to pre-release: GameBanana's rules for API clients (no public terms found; ask them)
 
-## Phase 0b — Setup check (next session)
+## Phase 0b — Setup check ✅ done 2026-10-23
 
-Goal: `gmm detect` and `gmm status` tell the user, per game, exactly what's missing before
-mods can work, and how to fix it. Read-only: nothing is written anywhere except GMM's own
-folders. Uses the adapter registry from Phase 1.
+`gmm detect` and `gmm status` tell the user, per game, what's missing before mods can work and
+how to fix it. Read-only.
 
-**Build**
-- [ ] `gmm-detect`: Steam (`SteamPath` registry value → `libraryfolders.vdf` → `appmanifest_<appid>.acf`
-      → `common/<installdir>/<steam_subpath>`), Epic manifests, manual folder; validate against
-      each adapter's folder markers; dedupe. Only the exact files allowlisted in 04-security
-      R3 are read. HoYoPlay/Kuro launcher sources come later (no test machine has them yet)
-- [ ] VDF/ACF parser (small, fuzzed; Steam's text format)
-- [ ] `gmm-xxmi`: find the root (default path, uninstall key `InstallLocation`, user-picked),
-      validate it (config file + `Resources/Bin/XXMI Launcher.exe` + version resource), read the
-      config through a struct that declares only the allowed fields
-- [ ] Per-game state machine: `XxmiNotFound`, `ImporterMissing`, `ImporterBroken`,
-      `GamePathNotSet`, `PathMismatch`, `LaunchModeMismatch`, `Ready`, each with its fix
-      steps (wording from 03-game-adapters.md)
-- [ ] Importer details: XXMI DLL version (`d3d11.dll`), importer version (`main.ini`), mod
-      count, `Mods/` size
-- [ ] CLI: `gmm detect` (installs found, and from where) and `gmm status [--game]` (state +
-      next step), both with `--json`
-- [ ] Fixtures for every state; secret-canary test for the XXMI config (`github_token` etc.
-      never appear in output, logs or JSON)
+**Built**
+- [x] `gmm-detect`: Steam (`SteamPath` registry value → `libraryfolders.vdf` →
+      `appmanifest_<appid>.acf` → `common/<installdir>/<subpath>`), **HoYoPlay**
+      (`gamedata.dat`, `installPath` values only), Epic manifests (fixture-tested only; no
+      machine with Epic yet), manual folders (`--folder game=PATH`); every candidate validated
+      against the game's folder markers; deduped
+- [x] VDF/ACF parser (bounded depth and size, property-tested for panics)
+- [x] `gmm-xxmi`: finds the root (explicit `--xxmi`, default `%APPDATA%\XXMI Launcher`,
+      uninstall key `InstallLocation`), validates it (config file + launcher exe with `MZ`
+      header), reads the config through a struct that declares only the allowed fields
+- [x] Setup states with fix steps: `XxmiNotFound`, `ImporterMissing`, `ImporterBroken`,
+      `GamePathNotSet`, `PathMismatch`, `LaunchModeMismatch`, `Ready`
+- [x] Importer details: XXMI DLL version (`d3d11.dll` version resource), importer version (from
+      the core ini that `d3dx.ini` includes: ZZMI `main.ini`, WWMI `WuWa-Model-Importer.ini`),
+      enabled/disabled mod counts, `Mods/` size
+- [x] CLI: `gmm detect` and `gmm status [--game] [--xxmi] [--folder]`, both with `--json`
+- [x] Fixtures for every state; secret-canary tests (XXMI's `github_token`, proxy password,
+      signatures never appear in output or `Debug`)
 
-**Verify on the dev machine (needs you at the game)**
-- [ ] Set **Game Launch** to **Steam** for ZZZ and WuWa; `gmm status` then reports `Ready`
-- [ ] The Phoenix mod shows in game (its toggle menu opens with H)
-- [ ] Rename it to `DISABLED Phoenix`: gone in game
-- [ ] Move it to `Mods/GMM/Phoenix/`: still loads (nested folder)
-- [ ] An empty `Mods/GMM/.staging/` folder causes no errors
-- [ ] Desktop **ZZMI Quick Start** shortcut (`--nogui --xxmi ZZMI`) launches with mods
-- [ ] WuWa: first launch through XXMI with one mod
-- [ ] Our own screenshots of each XXMI step in the setup guide
+**Verified on the dev machine**
+- [x] ZZZ (HoYoPlay install on D:, Game Launch = Direct) → `Ready`, with ZZMI 1.50,
+      XXMI DLL 1.2.2.0, 1 mod
+- [x] WuWa (Steam, Game Launch = Direct, never started through XXMI) → `LaunchModeMismatch`,
+      fix: set "Game Launch" to "Steam"
+- [ ] WuWa after you switch Game Launch to Steam → `Ready` (needs you)
 
-Exit: `gmm status` is correct for both games on the dev machine before and after the Game
-Launch change, and every fixture state has a test.
+## Before Phase 2 — in-game checks (needs you at the game)
+
+The install pipeline relies on these. Run `gmm status` afterwards; it shows mod counts.
+
+- [ ] WuWa: set "Game Launch" to "Steam", start it once through XXMI (first start applies the
+      settings WWMI needs), confirm `gmm status` says `Ready`
+- [ ] Rename `ZZMI\Mods\Phoenix` to `DISABLED Phoenix`: gone in game
+- [ ] Move it to `ZZMI\Mods\GMM\Phoenix\`: still loads (nested folder)
+- [ ] An empty `ZZMI\Mods\GMM\.staging\` folder causes no errors
+- [ ] The desktop **ZZMI Quick Start** shortcut (`--nogui --xxmi ZZMI`) starts ZZZ with mods
+- [ ] One WuWa mod shows in game
+- [ ] Screenshots of each XXMI step for the setup guide
 
 ## Phase 1 — Backend foundations
 
@@ -75,33 +83,40 @@ Launch change, and every fixture state has a test.
 - [x] `gmm-archive`: hardened zip + 7z extraction, policy scan, malicious archive corpus,
       randomized corruption tests
 - [ ] RAR support (C `unrar`, in a sandboxed subprocess)
-- [ ] cargo-fuzz targets (archive extraction, `RelPath`) as a nightly CI job
+- [ ] cargo-fuzz targets (archive extraction, `RelPath`, VDF) as a nightly CI job
 - [x] `gmm-catalog`: `CatalogSource` trait + GameBanana client (list, search, mod page, files,
       updates, categories), in-memory cache, synthetic fixtures, live API smoke test
 - [ ] SQLite-backed HTTP cache (with the database crate)
 - [x] `gmm-adapters`: manifest schema (unknown fields rejected), validation, registry with
       lookups by id / GameBanana id / importer / Steam appid; CLI `gmm games`
-- [ ] Adapter conformance suite (runs against fixtures once detection exists, Phase 0b)
 - [x] CLI: `gmm catalog list|search|show|categories`, `gmm fetch` (download → extract → scan)
 
-Exit: the CLI browses both catalogues and prints a full mod page. Archive harness green.
+Exit: the CLI browses both catalogues and prints a full mod page. Archive harness green. ✅ met
+(the open items above don't block Phase 2).
 
-## Phase 2 — Backend features
+## Phase 2 — Backend features (next)
 
-- [ ] `gmm-detect`: Steam (registry → libraryfolders → appmanifest → sub-path), Epic, Kuro,
-      HoYoPlay, manual; dedupe + validation
-- [ ] `gmm-xxmi`: root detection, safe config read (allowlisted fields), per-importer state
-      machine, version info
-- [ ] Install pipeline: download → verify → extract → classify → variants → scan → stage →
-      `Mods/GMM/`
-- [ ] Enable/disable (DISABLED rename), uninstall (Recycle Bin), unmanaged-mod listing
+Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm detect`,
+`gmm status`, per-state fixtures.
+
+**Start here** (suggested order):
+- [ ] `gmm-db`: SQLite (sqlx) with migrations; tables from 02-architecture.md (installed mods,
+      download cache, settings incl. manual game folders and the confirmed XXMI exe path); move
+      the catalogue's HTTP cache onto it
+- [ ] Install pipeline (`gmm install <mod-id> [--file] [--variant]`): download → verify →
+      extract → classify (migoto ini markers from the manifest) → variants → scan → stage under
+      `Mods/GMM/.staging/` → rename into `Mods/GMM/<name> [gb-<id>]/` → `gmm.json` sidecar.
+      Requires `Ready` (or warns). New write root: `<XXMI>/<IMP>/Mods/` only
+- [ ] Enable/disable (`DISABLED ` prefix rename), uninstall (Recycle Bin via `trash`),
+      unmanaged-mod listing
 - [ ] `gmm-migoto` ini parser + conflict index + severity rules + library-mod ignore list
 - [ ] Storage accounting (per mod, per game, cache, drive free space)
-- [ ] Launch with XXMI (allowlisted exe + args)
-- [ ] CLI: `gmm detect`, `gmm status`, `gmm install`, `gmm enable|disable`, `gmm conflicts`,
+- [ ] `gmm launch`: run the confirmed XXMI exe with `--nogui --xxmi <IMP>` (first launch asks
+      the user to confirm the exe path; R7)
+- [ ] Adapter conformance suite: one fixture install per game, run through detect → status →
+      install → toggle → uninstall
+- [ ] CLI: `gmm install`, `gmm list`, `gmm enable|disable`, `gmm uninstall`, `gmm conflicts`,
       `gmm storage`, `gmm launch`
-- [ ] Fixtures for each XXMI state (incl. your machine's ZZZ=`GamePathNotSet`,
-      WuWa=`ImporterMissing`)
 - [ ] Egress + file-access harnesses in CI
 
 Exit: from the CLI alone, install a ZZZ mod, see it in game via `gmm launch`, toggle it, see a
@@ -112,7 +127,7 @@ conflict reported, and see it in storage. Privacy harnesses green.
 Spec: [07-frontend-design.md](07-frontend-design.md).
 
 - [ ] Design tokens, app shell, game rail, XXMI state pill, downloads tray
-- [ ] Setup/onboarding cards + setup guide stepper
+- [ ] Setup/onboarding cards + setup guide stepper (driven by `gmm-xxmi`'s states and steps)
 - [ ] Catalogue: virtualized grid, filters (category, character, sort, NSFW), banner cards,
       state badges
 - [ ] Mod page: hero banner + slideshow + lightbox, header/stats/license, Description (sanitized),
@@ -148,8 +163,11 @@ empty and error states.
 ## Phase 6+ — More games
 
 XXMI importers already exist: **Arknights: Endfield (EFMI)** first (it's in your Steam library),
-then Star Rail (SRMI), Genshin (GIMI), HI3 (HIMI). Each one goes through the adapter checklist
-in [03](03-game-adapters.md).
+then Star Rail (SRMI), Genshin (GIMI), HI3 (HIMI). HoYoPlay detection already sees Genshin,
+Star Rail and HI3 install paths. Each game goes through the adapter checklist in
+[03](03-game-adapters.md).
+
+Later detection sources: Kuro launcher (native WuWa) once a machine with it is available.
 
 ## Open questions
 

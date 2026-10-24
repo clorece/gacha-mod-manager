@@ -31,18 +31,20 @@ is needed for ZZZ or WuWa yet.
 
 ## Game detection (Windows)
 
-Sources are tried in order. All candidates are canonicalized and deduped, and each one is
-validated against the adapter's folder markers.
+Implemented in `crates/gmm-detect` (`gmm detect`). Every candidate must pass the adapter's
+folder markers (one exe name plus every required child); if a folder fails, the manifest's
+typical sub-folder names are tried (launchers often install into `<chosen>/<Game> Game`).
+Results are canonicalized and deduped.
 
-| Source | How | Notes |
+| Source | How | Status |
 |---|---|---|
-| **Steam** | `HKCU\Software\Valve\Steam\SteamPath` → `steamapps/libraryfolders.vdf` → `appmanifest_<appid>.acf` (`installdir`) → `common/<installdir>/<steam_subpath>` | Observed: ZZZ 4162040, WuWa 3513350. ZZZ's game sits at `games/ZenlessZoneZero Game` inside the Steam folder (HoYoPlay wrapper) |
-| **HoYoPlay** (native ZZZ) | HoYoPlay's data under `%APPDATA%\Cognosphere\HYP\` | Which file holds the install path is **[verify]** |
-| **Kuro launcher** (native WuWa) | `%APPDATA%\KRLauncher\**\kr_starter_game.json` → `path` | XXMI source; **[verify]** on a machine that has it |
-| **Epic** | `C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests\*.item` (JSON: `DisplayName`, `InstallLocation`) | Both games are on Epic |
-| **XXMI config** | `Importers.<IMP>.Importer.game_folder` (only this key) | Empty until the game has been launched through XXMI |
-| **Manual** | Folder picker; validated against markers | Always available |
-| **Drive scan** | User-initiated only, depth-limited, folder-name match | Never automatic |
+| **Steam** | `HKCU\Software\Valve\Steam\SteamPath` → `steamapps/libraryfolders.vdf` → each library's `appmanifest_<appid>.acf` (`installdir`, must be one plain folder name) → `common/<installdir>/<steam_subpath>` | ✅ verified on the dev machine (WuWa 3513350). ZZZ 4162040's Steam copy nests the game in `games/ZenlessZoneZero Game` |
+| **HoYoPlay** (native ZZZ, Genshin, Star Rail, HI3) | `%APPDATA%\Cognosphere\HYP\<version>\data\gamedata.dat`: HoYoPlay's own binary format with JSON records embedded. Only `"installPath"` values are extracted; each counts only if it passes a game's markers. Most records hold default paths for uninstalled games, which fail the check on their own | ✅ verified on the dev machine (ZZZ at `D:\HoYoverse\ZenlessZoneZero Game`). The file stays readable while HoYoPlay runs (opened in shared mode) |
+| **Epic** | `%PROGRAMDATA%\Epic\EpicGamesLauncher\Data\Manifests\*.item` (JSON: only `DisplayName`, `InstallLocation` read) | ✅ implemented, fixture-tested only (no machine with Epic yet) |
+| **Manual** | `gmm detect/status --folder game=PATH`; later a folder picker. Validated against markers; a failing folder produces a note | ✅ implemented (not yet remembered between runs: needs the database, Phase 2) |
+| **XXMI config** | `Importers.<IMP>.Importer.game_folder` | Used by the setup check, not as a detection source |
+| **Kuro launcher** (native WuWa) | `%APPDATA%\KRLauncher\**\kr_starter_game.json` → `path` (XXMI source) | ⏳ not implemented; needs a machine that has it |
+| **Drive scan** | User-initiated only, depth-limited, folder-name match | ⏳ not implemented |
 
 **Not used, on purpose:** game log files (e.g. ZZZ's `Player.log`). XXMI reads them to find the
 install, but logs can contain account details. GMM doesn't need them.
@@ -71,46 +73,68 @@ rule R7, threat T5).
 
 ### Per-importer state (computed per game)
 
+Implemented in `crates/gmm-xxmi` (`gmm status`). Checks run in this order; the first failing
+one decides the state, so the user gets the one next step that matters.
+
 | State | How it's detected | What GMM shows |
 |---|---|---|
-| `XxmiNotFound` | No root found | "Install XXMI" card |
-| `ImporterMissing` | `<root>/<IMP>/` missing, or no `d3d11.dll` / `d3dx.ini` / `Core/<IMP>/main.ini` | "Install the <IMP> importer in XXMI" steps |
-| `ImporterBroken` | Files present but `d3dx.ini` has no `include_recursive = Mods`, or `target` ≠ game exe | "Reinstall <IMP> in XXMI" steps |
-| `GamePathNotSet` | Importer OK, but `game_folder` in XXMI config is empty | "Open XXMI, select <game>, confirm the game folder, launch once" + the folder GMM detected, with a copy button |
-| `PathMismatch` | XXMI's `game_folder` isn't any install GMM found, or fails validation | Warning, both paths shown, fix steps |
-| `LaunchModeMismatch` | Steam install but XXMI's `game_launch` isn't `STEAM` (same for Epic / `EPIC`) | "In XXMI: Settings → General → **Game Launch** → **Steam**" |
-| `Ready` | All checks pass | Mods page enabled, **Launch with XXMI** enabled |
+| `XxmiNotFound` | No valid root found | Link to XXMI's releases, install steps |
+| `ImporterMissing` | `<root>/<IMP>/` missing, or missing `d3d11.dll`, `d3dx.ini`, or the core ini that `d3dx.ini` includes | "Under **Select Games To Mod:**, tick <game> and press **Install**" |
+| `ImporterBroken` | `d3dx.ini` `target` ≠ the manifest's `d3dx_target`, or no `include_recursive = Mods` | "Reinstall or update <IMP> in XXMI" |
+| `GamePathNotSet` | `game_folder` in XXMI's config is empty | Settings → **General** → **Game Folder**, with the folder GMM detected (or **Detect Installations**) |
+| `PathMismatch` | XXMI's `game_folder` fails the game's folder markers | Same steps, naming the wrong folder |
+| `LaunchModeMismatch` | XXMI's **Game Launch** can't work for how this copy is started (rules below) | Settings → **General** → **Game Launch** → the right option |
+| `Ready` | All checks pass | The exact launch command; notes (e.g. "XXMI hasn't started this game yet") |
 
-**Why the launch mode check exists (observed 2026-10-23).** XXMI's per-game **Game Launch**
-setting (`Importers.<IMP>.Importer.game_launch`) offers Direct, Steam, Epic Games, Custom and
-Manual. With **Direct** (the default), XXMI starts the game exe itself. Injection succeeds, but
-the **Steam** copies of ZZZ and WuWa then refuse to run ("please launch from Steam") and exit.
+**Launch mode rules.** XXMI's per-game **Game Launch** setting
+(`Importers.<IMP>.Importer.game_launch`) offers Direct, Steam, Epic Games, Custom and Manual
+(config values `DIRECT`, `STEAM`, `EPIC_GAMES`, `CUSTOM`, `MANUAL`). The source of XXMI's
+game folder is found by matching it against detected installs:
+
+| Install source | Works | Fix if not |
+|---|---|---|
+| Steam | `STEAM`, `MANUAL` | set to **Steam** |
+| Epic | `EPIC_GAMES`, `MANUAL` | set to **Epic Games** |
+| HoYoPlay, manual | `DIRECT`, `CUSTOM`, `MANUAL` | set to **Direct** |
+| not a detected install | not checked (note shown) | — |
+
+Why (observed 2026-10-23): with **Direct**, XXMI starts the game exe itself. Injection succeeds,
+but the **Steam** copies of ZZZ and WuWa then refuse to run ("please launch from Steam") and
+exit. The HoYoPlay copy of ZZZ works with Direct, and mods show in game.
 
 Mods can still be **downloaded** in any state where the importer exists. They are just inactive
 until XXMI runs. In `XxmiNotFound` / `ImporterMissing`, installs are queued and placed once the
 `Mods/` folder appears.
 
-Extra info shown per importer (read-only): XXMI DLL version (`d3d11.dll` FileVersion, observed
-`1.2.2.0`), importer version (`global $version` in `Core/<IMP>/main.ini`, observed ZZMI `1.50`),
-mod count, and `Mods/` size.
+Extra info shown per importer (read-only):
+- XXMI DLL version from `d3d11.dll`'s version resource (observed `1.2.2.0`).
+- Importer version from the importer's **core ini**, found through `d3dx.ini`'s own
+  `include = Core\<IMP>\…` line rather than a guessed name (observed: ZZMI
+  `Core\ZZMI\main.ini` with `global $version = 1.50`; WWMI `Core\WWMI\WuWa-Model-Importer.ini`
+  with `global $wwmi_version = 1.10`; `$required_*` keys ignored).
+- Enabled and disabled mod counts (top-level folders in `Mods/`, `DISABLED*` = disabled), and the
+  total size of `Mods/`.
 
-**The dev machine has gone through four of these states:** before setup, ZZZ was
-`GamePathNotSet` and WuWa `ImporterMissing`; now both are `LaunchModeMismatch` (Steam installs,
-Game Launch = Direct). Each becomes a test fixture.
+**States seen on the dev machine:** ZZZ went `GamePathNotSet` → `LaunchModeMismatch` (Steam
+copy) → `Ready` (after moving to a HoYoPlay install on D:). WuWa went `ImporterMissing` →
+`LaunchModeMismatch` (Steam, Game Launch still Direct). Every state has a fixture test.
 
 ### Reading the XXMI config safely
 
 `XXMI Launcher Config.json` contains secrets (`Launcher.github_token`, `Launcher.proxy`,
-`Security.user_signature`, `*_signature`). GMM deserializes it into a struct that **declares only**:
-`Launcher.config_version`, and per importer `Importer.game_folder`, `Importer.importer_folder`,
-`Importer.game`, `Importer.game_launch`. serde drops all other fields. The file is never logged, copied, cached or sent
-anywhere, and GMM never writes to it.
+`Security.user_signature`, `*_signature`). GMM (`gmm_xxmi::XxmiConfig`) deserializes it into a
+struct that **declares only** `Launcher.config_version`, and per importer
+`Importer.game_folder`, `Importer.importer_folder`, `Importer.game_launch` and
+`Importer.launch_count`. serde skips all other fields without storing them. Parse errors never
+echo file content. The file is never logged, copied, cached or sent anywhere, and GMM never
+writes to it. Tests plant canary secrets in a fixture config and check they never appear in
+output, JSON or `Debug`.
 
 ### In-app setup guide (our own wording)
 
 Bold names are XXMI's own English labels, taken from its locale files (`Locale/Strings/EN_*.toml`,
-XXMI 2.4.9). How to get to the game selection screen and the settings window is still to be
-confirmed by eye (Phase 0b), and our own screenshots go next to each step.
+XXMI 2.4.9). `gmm status` already prints these steps per state. Our own screenshots go next to
+each step before the setup guide ships in the app (see "Before Phase 2" in the roadmap).
 
 **Install XXMI**
 1. Open XXMI's releases page (link: `https://github.com/SpectrumQT/XXMI-Launcher/releases`).
@@ -124,7 +148,8 @@ confirmed by eye (Phase 0b), and our own screenshots go next to each step.
    **Install**.
 3. Open the settings, **General** tab. Check **Game Folder** (or press **Detect
    Installations**). GMM shows the folder it found, with a copy button.
-4. Same tab: if your game is on Steam, set **Game Launch** to **Steam** (Epic: **Epic Games**).
+4. Same tab: set **Game Launch** to match your copy: **Steam** for Steam, **Epic Games** for
+   Epic, **Direct** for HoYoPlay and other launchers.
 5. Press **Start** once, so XXMI finishes setup and applies the game settings mods need.
 6. Optional: **Add Desktop Shortcut** creates an "<importer> Quick Start" shortcut that skips
    XXMI's window.
@@ -137,7 +162,8 @@ confirmed by eye (Phase 0b), and our own screenshots go next to each step.
 | GameBanana | id 19567. Roots: Character Skins (30305), Bangboo Skins (30702), UI (30395), Other/Misc (29874). Subcategory = character | API, verified |
 | XXMI importer | ZZMI (`<XXMI>/ZZMI/`), `d3dx.ini target = ZenlessZoneZero.exe` | observed |
 | Game folder markers | `ZenlessZoneZero.exe` (or `ZenlessZoneZeroBeta.exe`) + `ZenlessZoneZero_Data/` | observed + XXMI source |
-| Steam | appid 4162040, sub-path `games/ZenlessZoneZero Game` | observed |
+| Steam | appid 4162040, sub-path `games/ZenlessZoneZero Game`. Needs Game Launch = Steam | observed |
+| HoYoPlay | `gamedata.dat` record with `gameBiz = nap_global`; works with Game Launch = Direct; mods confirmed in game | observed |
 | Library mods (ignore in conflicts) | ZZMI's own `Core/ZZMI/Libraries` (SlotFix, TTLib, HP bar) are outside `Mods/`. Common Mods-folder libraries **[collect list]** | observed |
 | Settings XXMI applies | High-precision character animation off, custom image quality (in `GENERAL_DATA.bin`) | XXMI source. GMM doesn't touch them |
 
@@ -146,9 +172,9 @@ confirmed by eye (Phase 0b), and our own screenshots go next to each step.
 | Item | Value | Source |
 |---|---|---|
 | GameBanana | id 20357. Roots: Skins (29524), UI (29496), Other/Misc (29493) | API, verified |
-| XXMI importer | WWMI (`<XXMI>/WWMI/`), expected `d3dx.ini target = Client-Win64-Shipping.exe` **[verify]** | XXMI source |
+| XXMI importer | WWMI (`<XXMI>/WWMI/`), `d3dx.ini target = Client-Win64-Shipping.exe`, core ini `Core\WWMI\WuWa-Model-Importer.ini` (`$wwmi_version`) | observed |
 | Game folder markers | `Wuthering Waves.exe` + `Client/` + `Engine/`; process `Client/Binaries/Win64/Client-Win64-Shipping.exe` | observed |
-| Steam | appid 3513350, sub-path empty (the Steam folder is the game folder) | observed |
+| Steam | appid 3513350, sub-path empty (the Steam folder is the game folder). Needs Game Launch = Steam | observed |
 | Library mods | **[collect list]** | |
 | Settings XXMI applies | Ray tracing off, mesh LOD override in `Client/Config/UserEngine.ini`, DX11 | XXMI source. GMM doesn't touch them |
 | Pak mods (`~mods`) | Out of scope. They aren't loaded by XXMI | decision |

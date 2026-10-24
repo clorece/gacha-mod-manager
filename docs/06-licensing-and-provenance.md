@@ -86,6 +86,14 @@ LGPL or AGPL dependency fails the build. Watch out for:
 - **Per-crate exceptions** live in `deny.toml` with a reason. Currently one: `webpki-root-certs`
   (Mozilla's CA certificate list, `CDLA-Permissive-2.0`, a permissive data license).
 - **Left out for licensing:** 7z BZip2 support (`libbz2-rs-sys`, `bzip2-1.0.6` license).
+- **Direct dependencies so far** (all pass `cargo deny`): `zip`, `sevenz-rust2`, `reqwest` +
+  `rustls` (ring), `tokio`, `serde`/`serde_json`, `toml`, `url`, `sha2`, `md-5`, `hex`, `clap`,
+  `dirs`, `thiserror`, `pelite` (MIT; reads `d3d11.dll`'s version resource), `winreg` (MIT;
+  Windows registry reads). Dev-only: `proptest`, `tempfile`, `wiremock`.
+- **Facts about other software** come from observing it on the dev machine (file layouts,
+  config keys, locale strings), recorded in our own words in `docs/03-game-adapters.md`. The
+  HoYoPlay `gamedata.dat` handling, for example, is based only on what the file visibly
+  contains (`"installPath"` strings), not on any other tool's code.
 
 ## Names and trademarks
 

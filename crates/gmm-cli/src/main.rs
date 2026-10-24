@@ -5,6 +5,7 @@
 
 mod fetch;
 mod format;
+mod setup;
 
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -32,6 +33,27 @@ struct Cli {
 enum Command {
     /// List the supported games.
     Games,
+    /// Find installed games (Steam, HoYoPlay, Epic) and XXMI. Read-only.
+    Detect {
+        /// XXMI Launcher folder, if it isn't found automatically (portable install).
+        #[arg(long)]
+        xxmi: Option<std::path::PathBuf>,
+        /// Extra game folder to check, as GAME=FOLDER. Can be repeated.
+        #[arg(long = "folder", value_parser = setup::parse_folder)]
+        folders: Vec<(String, std::path::PathBuf)>,
+    },
+    /// Check each game's mod setup and say what to do next. Read-only.
+    Status {
+        /// Only this game (see `gmm games`).
+        #[arg(long, value_parser = parse_game)]
+        game: Option<&'static GameManifest>,
+        /// XXMI Launcher folder, if it isn't found automatically (portable install).
+        #[arg(long)]
+        xxmi: Option<std::path::PathBuf>,
+        /// Extra game folder to check, as GAME=FOLDER. Can be repeated.
+        #[arg(long = "folder", value_parser = setup::parse_folder)]
+        folders: Vec<(String, std::path::PathBuf)>,
+    },
     /// Browse the GameBanana catalogue.
     #[command(subcommand)]
     Catalog(CatalogCommand),
@@ -149,6 +171,12 @@ async fn run(cli: Cli) -> Result<(), AnyError> {
     let gb = GameBanana::new(net.clone(), Arc::new(MemoryCache::default()));
     match cli.command {
         Command::Games => games(cli.json),
+        Command::Detect { xxmi, folders } => setup::run_detect(cli.json, xxmi, &folders),
+        Command::Status {
+            game,
+            xxmi,
+            folders,
+        } => setup::run_status(cli.json, game, xxmi, &folders),
         Command::Catalog(cmd) => catalog(&gb, cmd, cli.json, cli.show_nsfw).await,
         Command::Fetch { mod_id, file } => fetch::run(&gb, &net, mod_id, file, cli.json).await,
     }

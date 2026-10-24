@@ -7,6 +7,33 @@ Impact and Honkai Impact 3rd, so each of those is one adapter away.
 
 Development happens on Windows (primary target). Linux follows later from the same codebase.
 
+## Where we are (2026-10-23)
+
+**Done:** Phase 0 (discovery), Phase 0b (setup check), and the parts of Phase 1 that Phase 2
+needs. Everything works from the `gmm` command line; there is no app window yet.
+
+| Crate | What it does |
+|---|---|
+| `gmm-fsguard` | Every file access: registered read-only/read-write roots, safe relative paths, junction/symlink escape checks, denylist for secrets |
+| `gmm-net` | Every network request: GameBanana-only allowlist (every redirect hop), rate limiting, retries, verified resumable downloads |
+| `gmm-archive` | Safe zip/7z extraction (two-pass checks, bomb limits) and a policy scan of what came out |
+| `gmm-catalog` | GameBanana client: list, search, mod page, files, updates, categories |
+| `gmm-adapters` | The ZZZ and WuWa manifests and their validation |
+| `gmm-detect` | Finds games: Steam, HoYoPlay, Epic, manual folders |
+| `gmm-xxmi` | Reads XXMI's setup (allowlisted config fields only) and works out each game's setup state |
+| `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm detect`, `gmm status` |
+
+On the dev machine, `gmm status` reports ZZZ `Ready` (HoYoPlay install) and WuWa
+`LaunchModeMismatch` (Steam install, XXMI's Game Launch still on Direct).
+
+**Waiting on you:** the in-game checks in [05-roadmap.md](05-roadmap.md) under "Before Phase 2"
+(WuWa launch setting, `DISABLED` rename, nested `Mods/GMM/` folder, Quick Start shortcut).
+
+**Next:** Phase 2, starting with the SQLite database crate and the install pipeline into
+`<XXMI>/<IMP>/Mods/GMM/`. See "Start here" in the roadmap.
+
+## Docs
+
 | Doc | What it covers |
 |---|---|
 | [02-architecture.md](02-architecture.md) | Stack, components, repo layout, data model, core flows |
@@ -27,9 +54,10 @@ Development happens on Windows (primary target). Linux follows later from the sa
    `Mods/` folder, toggles and checks them, and offers a "Launch with XXMI" button that calls
    XXMI's own command line. GMM never injects anything, never patches game files, and never
    bundles XXMI.
-2. **Detect, then guide.** GMM detects each game (Steam, HoYoPlay, Kuro launcher, Epic, manual)
-   and XXMI's setup state per game: XXMI missing, importer not installed, game path not set, or
-   ready. For each state it shows step-by-step instructions and a link to XXMI's releases.
+2. **Detect, then guide.** GMM detects each game (Steam, HoYoPlay, Epic, manual; Kuro launcher
+   later) and XXMI's setup state per game: XXMI missing, importer missing or damaged, game folder
+   not set or wrong, launch setting that doesn't fit the install, or ready. Each state comes with
+   step-by-step instructions using XXMI's own button names.
 3. **Games are adapters: data first, code only where needed.** A TOML manifest per game
    (GameBanana ids, XXMI importer, detection sources, classifier rules), compiled into the signed
    app.

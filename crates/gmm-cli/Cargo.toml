@@ -18,8 +18,10 @@ dirs.workspace = true
 gmm-adapters.workspace = true
 gmm-archive.workspace = true
 gmm-catalog.workspace = true
+gmm-detect.workspace = true
 gmm-fsguard.workspace = true
 gmm-net.workspace = true
+gmm-xxmi.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["rt"] }

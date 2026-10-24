@@ -34,12 +34,13 @@ flowchart LR
   CLI[gmm CLI] --> CORE
   CMD --> CORE[gmm-core: library, install, toggle, conflicts, storage, jobs]
   CORE --> REG[gmm-adapters: registry of games]
-  CORE --> DET[gmm-detect: games + XXMI state]
+  CORE --> DET[gmm-detect: game installs]
   CORE --> CAT[gmm-catalog: CatalogSource]
   CAT --> GB[GameBanana apiv11 client]
   CORE --> ARC[gmm-archive: extract + classify + scan]
   CORE --> MIG[gmm-migoto: ini parser, hash index]
-  CORE --> XX[gmm-xxmi: read XXMI state, launch XXMI]
+  CORE --> XX[gmm-xxmi: XXMI setup + per-game state]
+  XX --> DET
   CORE --> IMG[image cache: gmmimg:// protocol]
   GB & IMG --> NET[gmm-net: allowlisted HTTP]
   CORE & ARC & DET & XX --> FS[gmm-fsguard: ScopedPath]
@@ -48,34 +49,45 @@ flowchart LR
 
 ## Repo layout
 
+✅ = exists today; the rest is planned.
+
 ```
 gacha-mod-manager/
-├─ apps/desktop/              # Tauri app: src/ (React), src-tauri/ (thin command layer)
+├─ apps/desktop/              # Tauri app: src/ (React), src-tauri/ (thin command layer)   (Phase 1/3)
 ├─ crates/
-│  ├─ gmm-core/               # domain: library, install, toggle, conflicts, storage, jobs, events
-│  ├─ gmm-adapters/           # game manifests (games/*.toml), schema, validation, registry
-│  ├─ gmm-detect/             # Steam/HoYoPlay/Kuro/Epic/manual game detection
-│  ├─ gmm-xxmi/               # XXMI root detection, per-importer setup state, launch command
-│  ├─ gmm-catalog/            # CatalogSource trait, cache; gamebanana/ implementation
-│  ├─ gmm-archive/            # hardened extraction, classifier, policy scan, fuzz targets
-│  ├─ gmm-migoto/             # 3DMigoto .ini parser: sections, hashes, namespaces, keybinds
-│  ├─ gmm-fsguard/            # ScopedPath, root registry, denylist
-│  ├─ gmm-net/                # allowlisted HTTP, rate limiting, resumable downloads
-│  └─ gmm-cli/                # `gmm` binary
-├─ packages/ui/               # shared React components
-├─ tests/fixtures/            # fake Steam libraries, fake XXMI roots, sample + malicious mods
-├─ docs/
+│  ├─ gmm-fsguard/            # ✅ ScopedPath, RelPath, root registry, denylist
+│  ├─ gmm-net/                # ✅ allowlisted HTTP, rate limiting, resumable verified downloads
+│  ├─ gmm-archive/            # ✅ hardened zip/7z extraction, policy scan
+│  ├─ gmm-catalog/            # ✅ CatalogSource trait, cache, GameBanana client
+│  ├─ gmm-adapters/           # ✅ game manifests (games/*.toml), schema, validation, registry
+│  ├─ gmm-detect/             # ✅ Steam / HoYoPlay / Epic / manual detection, VDF parser,
+│  │                          #    the only registry reads (env.rs)
+│  ├─ gmm-xxmi/               # ✅ XXMI root + allowlisted config read, importer checks, setup states
+│  ├─ gmm-cli/                # ✅ `gmm` binary
+│  ├─ gmm-db/                 # SQLite + migrations                                          (Phase 2)
+│  ├─ gmm-core/               # library, install, toggle, conflicts, storage, jobs, events   (Phase 2)
+│  └─ gmm-migoto/             # 3DMigoto .ini parser: sections, hashes, namespaces, keybinds (Phase 2)
+├─ packages/ui/               # shared React components                                      (Phase 3)
+├─ docs/                      # these docs (docs/research/ is local only)
+├─ CLAUDE.md                  # working agreements (doc updates per phase, commits, code rules)
 ├─ LICENSE-MIT, LICENSE-APACHE, README.md, CONTRIBUTING.md
-└─ deny.toml, rust-toolchain.toml, justfile
+└─ deny.toml, clippy.toml, rust-toolchain.toml, rustfmt.toml, justfile
 ```
+
+Test fixtures live next to each crate (`crates/*/tests/`), built in code at test time (fake
+Steam libraries, fake XXMI roots, malicious archives) so the repo holds no binary blobs or real
+user data.
 
 ## Core concepts
 
 - **Game**: a compiled-in adapter (`zzz`, `wuwa`), mapped to one XXMI importer (`ZZMI`, `WWMI`).
-- **Game install**: a detected copy of the game. Fields: game id, source (steam / hoyoplay /
-  kuro / epic / manual / xxmi-config), game folder (read-only to GMM), and Steam appid if any.
-- **XXMI state**: the root folder plus, per importer: `NotFound | ImporterMissing |
-  GamePathNotSet | PathMismatch | Ready` (see [03](03-game-adapters.md)).
+- **Game install** (`gmm_detect::GameInstall`): a detected copy of the game. Fields: game id,
+  source (Steam / HoYoPlay / Epic / manual), canonical game folder (read-only to GMM), and
+  Steam appid if any.
+- **Setup state** (`gmm_xxmi::GameStatus`): per game, one of `XxmiNotFound`,
+  `ImporterMissing`, `ImporterBroken`, `GamePathNotSet`, `PathMismatch`,
+  `LaunchModeMismatch`, `Ready`, with a summary, fix steps, notes, versions and mod counts
+  (see [03](03-game-adapters.md)). Computed fresh each time; nothing is stored.
 - **Catalog entry**: cached GameBanana mod metadata and file list.
 - **Installed mod**: a folder under `<XXMI>/<IMP>/Mods/GMM/` with a `gmm.json` sidecar (GB mod id,
   file id, chosen variant(s), version, file date, SHA-256 of the archive, install date).
@@ -108,8 +120,9 @@ has `include_recursive = Mods`, so nested folders load:
   enabling two variants of the same mod.
 - **Writes are atomic per mod:** extract to `Mods/GMM/.staging/<uuid>/`, then rename into place.
   A crash leaves at most a staging folder, which is cleaned up on next start. Staging lives under
-  `Mods/`, so the rename stays on one volume. It starts with `.`, so 3DMigoto ignores it
-  **[verify]**; if not, the staging name gets the `DISABLED` prefix.
+  `Mods/`, so the rename stays on one volume. It starts with `.`, which should keep 3DMigoto
+  from loading it (in-game check pending, roadmap "Before Phase 2"); if not, the staging name
+  gets the `DISABLED` prefix.
 - **Uninstall** = move the mod folder to the Recycle Bin and remove the DB row.
 - **Folder names must stay stable (observed 2026-10-23).** 3DMigoto saves each mod's in-game
   toggle state in `<IMP>/d3dx_user.ini`, keyed by the mod's **path**, e.g.
@@ -197,9 +210,11 @@ pick GB file ─► download (allowlisted host after every redirect, size cap �
 ## Launch flow
 
 GMM shows the game's XXMI state on its page. When it's `Ready`, **Launch with XXMI** runs
-`<XXMI>/Resources/Bin/XXMI Launcher.exe --nogui --xxmi <IMP>` **[verify path + flags in
-Phase 0]**. That's XXMI's own command line, the same one its Quick Start shortcut uses. XXMI then
-starts the game and injects. GMM doesn't watch or touch the game process.
+`<XXMI>/Resources/Bin/XXMI Launcher.exe --nogui --xxmi <IMP>`. That's XXMI's own command line:
+its "Add Desktop Shortcut" creates `<IMP> Quick Start.lnk` with exactly these arguments
+(observed). `gmm status` already prints this command for ready games; `gmm launch` (Phase 2)
+will run it after the user confirms the exe once. XXMI then starts the game (through Steam if
+its Game Launch says so) and injects. GMM doesn't watch or touch the game process.
 
 The game page always shows this notice:
 
@@ -207,8 +222,9 @@ The game page always shows this notice:
 > launcher alone starts the game without mods. Sorry, we know it's an extra step. Use
 > **Launch with XXMI** here, or XXMI's own Quick Start shortcut.
 
-If Phase 0 shows that "start XXMI first, then launch from Steam" works reliably (community
-reports suggest it does for ZZZ), the notice will mention it as an alternative.
+For Steam copies, XXMI's **Game Launch = Steam** makes XXMI start the game through Steam itself,
+so users don't need to start XXMI first and the game second. The setup check enforces the
+matching Game Launch setting (`LaunchModeMismatch`).
 
 ## Data model (SQLite, first cut)
 

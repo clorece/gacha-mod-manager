@@ -37,4 +37,6 @@ disallowed-types = [
   { path = "reqwest::ClientBuilder", reason = "use gmm-net (security rule R2)" },
   { path = "std::net::TcpStream", reason = "use gmm-net (security rule R2)" },
   { path = "std::net::UdpSocket", reason = "use gmm-net (security rule R2)" },
+  # Registry reads are limited to the values in docs/04-security.md R3 (gmm-detect's env module).
+  { path = "winreg::RegKey", reason = "registry access only in gmm-detect::env (security rule R3)" },
 ]

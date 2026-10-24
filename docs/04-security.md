@@ -40,12 +40,20 @@ does is the failure we design out.
   - **Read-only:** the rest of `<XXMI>/<IMP>/` (`d3dx.ini`, `d3d11.dll` version,
     `Core/<IMP>/main.ini`), XXMI's config file (allowlisted fields only, see below), and the game
     folders (marker files only).
-  - **Detection read allowlist (exact files):** Steam `steamapps/libraryfolders.vdf` and
-    `appmanifest_*.acf`, Epic `Manifests/*.item`, the Kuro `kr_starter_game.json`, and the
-    HoYoPlay install record **[verify file]**.
+  - **Detection read allowlist (exact files, implemented in `gmm-detect`):** Steam
+    `steamapps/libraryfolders.vdf` and `steamapps/appmanifest_<appid>.acf`; HoYoPlay
+    `%APPDATA%\Cognosphere\HYP\<version>\data\gamedata.dat` (only `installPath` values are
+    extracted; the file also holds download transaction ids and settings, which are never kept
+    or logged); Epic `Manifests/*.item` (only `DisplayName`, `InstallLocation`); later the
+    Kuro `kr_starter_game.json`. Game folders: only marker files (exe names, required children)
+    are checked.
+  - **XXMI reads (`gmm-xxmi`):** the config file (allowlisted fields only, see R4), the launcher
+    exe's first two bytes (`MZ` check), and per importer `d3dx.ini`, the core ini it includes,
+    `d3d11.dll` (version resource), and the `Mods/` folder listing (names and sizes).
   - **Registry reads (exact values, read-only):** `HKCU\Software\Valve\Steam\SteamPath`, and for
-    `Uninstall\*` keys whose `DisplayName` is `XXMI Launcher`, only `InstallLocation` and
-    `DisplayVersion`. GMM never writes to the registry.
+    `Uninstall\*` keys whose `DisplayName` is `XXMI Launcher`, only `InstallLocation`. GMM never
+    writes to the registry. All registry access sits in `gmm-detect/src/env.rs`; clippy bans
+    `winreg::RegKey` everywhere else.
   - Canonicalize, check the prefix, refuse symlinks/junctions that leave the root. `std::fs` use
     outside `gmm-fsguard` fails CI.
   - **GMM never writes to a game folder.** XXMI owns game settings.
@@ -108,13 +116,14 @@ does is the failure we design out.
 | Phase | Harness | Proves |
 |---|---|---|
 | 1 | Malicious archive corpus (`crates/gmm-archive/tests/corpus.rs`, archives built in code) incl. Windows-specific tricks; randomized corruption tests (`tests/robustness.rs`) | Extractor rejects each case, never panics, never writes outside its root |
-| 1 | `cargo-fuzz` targets: extractor, migoto ini parser, VDF/ACF parser, GB JSON, XXMI config | No panics or escapes |
-| 1 | Lint gates: `disallowed_methods` (`std::fs`, `std::process`, `reqwest` outside their crates), `cargo-deny`, `cargo-audit`, `pnpm audit` | R1–R3, R7 can't be bypassed silently |
-| 2 | **XXMI config secret test**: fixture config with canary `github_token`/`user_signature`. Assert the canaries never appear in logs, DB, cache or IPC output | R4 |
+| 1 | Property tests (✅ done): `RelPath`, archive corruption, VDF parser never panics. `cargo-fuzz` targets (extractor, migoto ini parser, VDF/ACF, GB JSON, XXMI config) as a nightly job: ⏳ | No panics or escapes |
+| 1 | Lint gates (✅ done): clippy `disallowed_methods` (`std::fs`, `Command::new`) and `disallowed_types` (HTTP clients, raw sockets, `winreg::RegKey`) outside their crates; `cargo-deny`. ⏳ `cargo-audit`, `pnpm audit` | R1–R3, R7 can't be bypassed silently |
+| 0b | **XXMI config secret test** (✅ done): fixture configs with canary `github_token`, proxy password and signatures; asserts they never appear in parsed config, `GameStatus` JSON or `Debug`, and parse errors don't echo content. Extend to logs, DB and IPC output as those appear | R4 |
+| 0b | Detection on a fake machine (✅ done): Steam libraries, HoYoPlay data with a default path for an uninstalled game, Epic manifest, hostile `installdir` (`..\..\Windows`), planted `loginusers.vdf` canary | R3/R4, correct detection |
 | 2 | **Egress harness**: run the CLI scenario behind a logging proxy, with all other outbound traffic blocked (Windows Firewall rule on the test binary in CI; network namespace on Linux CI). Assert every host ∈ allowlist | R2 |
 | 2 | **File-access harness**: run the scenario with a fake profile full of canary files (Steam `loginusers.vdf`, `Player.log`, browser profile). Trace with Process Monitor (Windows, scripted) or `strace` (Linux). Fail if any canary is opened, or any write lands outside the write roots | R3/R4 |
 | 2 | IPC fuzz: hostile args to every Tauri command | R5 |
-| 2 | Adapter conformance suite on fixtures, incl. each XXMI state | Correct detection, no writes outside `Mods/` |
+| 2 | Adapter conformance suite on fixtures (per-state fixtures ✅ done in 0b; install/toggle/uninstall ⏳) | Correct detection, no writes outside `Mods/` |
 | 3 | XSS corpus through the description renderer | T3 |
 | 4 | Hostile deep-link URLs | T6 |
 | 5 | Release checks: feature-flag assertion (R6), update signature verification, installer contents review | T7/T8 |

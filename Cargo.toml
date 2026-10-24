@@ -13,13 +13,17 @@ repository = "https://github.com/clorece/gacha-mod-manager"
 gmm-adapters = { path = "crates/gmm-adapters" }
 gmm-archive = { path = "crates/gmm-archive" }
 gmm-catalog = { path = "crates/gmm-catalog" }
+gmm-detect = { path = "crates/gmm-detect" }
 gmm-fsguard = { path = "crates/gmm-fsguard" }
 gmm-net = { path = "crates/gmm-net" }
+gmm-xxmi = { path = "crates/gmm-xxmi" }
 
 clap = { version = "4", features = ["derive"] }
 dirs = "7"
 hex = "0.4"
 md-5 = "0.11"
+# Reads only the version resource of XXMI's d3d11.dll, from bytes read through gmm-fsguard.
+pelite = { version = "0.10", default-features = false, features = ["std"] }
 # HTTPS via rustls with the ring backend (no aws-lc/C build tools) and the OS certificate
 # store. Only gmm-net may use reqwest (security rule R2).
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "http2"] }
@@ -30,6 +34,8 @@ sha2 = "0.11"
 tokio = { version = "1", features = ["rt", "time", "sync", "macros"] }
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 url = "2"
+# Registry reads (Steam path, XXMI install record). Only gmm-detect's platform module uses it.
+winreg = "0.56"
 # 7z: pure-Rust decoders only. Features are chosen per crate.
 sevenz-rust2 = { version = "0.24", default-features = false }
 thiserror = "2"

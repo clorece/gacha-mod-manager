@@ -1,0 +1,24 @@
+[package]
+name = "gmm-xxmi"
+description = "Reads XXMI's setup (read-only) and works out each game's setup state"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+gmm-adapters.workspace = true
+gmm-detect.workspace = true
+gmm-fsguard.workspace = true
+pelite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true
