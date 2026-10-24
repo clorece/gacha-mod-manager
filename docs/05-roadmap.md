@@ -174,12 +174,17 @@ Exit: from the CLI alone, install a ZZZ mod, see it in game via `gmm launch`, to
 conflict reported, and see it in storage. Privacy harnesses green.
 
 **Exit check (needs you at the game):**
-- [ ] `gmm install <a ZZZ mod id>` into your real `ZZMI\Mods` (first real install; until now
-      every install went into a throwaway XXMI folder)
-- [ ] `gmm launch zzz`, confirm the exe once; the mod shows in game
-- [ ] `gmm disable <id>`; after XXMI reloads mods (or a restart) it's gone; `gmm enable <id>`
-- [ ] Two mods for the same character on: `gmm conflicts` reports them, `gmm enable` refuses
-- [ ] `gmm storage` lists the mod
+- [x] `gmm install 688491` (Casual Velina) into your real `ZZMI\Mods\GMM\` (2026-10-24; GMM
+      id `#1`)
+- [x] `gmm launch zzz`, exe confirmed once, game starts with mods (after the UAC fix)
+- [ ] `gmm disable 1`; after XXMI reloads mods (or a restart) it's gone; `gmm enable 1`. Your
+      first try used the GameBanana id (`688491`); GMM now accepts `#1` and says which GMM id
+      a GameBanana id means
+- [x] `gmm conflicts` reports a conflict: `GMM/Phoenix` and a hand-made copy
+      `GMM/Phoenix_duplicate`, 8 shared hashes. `gmm enable` refusing is covered by tests
+- [x] `gmm storage` lists Casual Velina (131.0 MiB) and the hand-installed mods
+- [x] Hand-installed mods: `gmm enable|disable|uninstall` take their name or path too
+      (2026-10-24; uninstall lists them and asks first)
 - [x] Privacy harnesses green in CI (egress + file access, strace on Linux)
 
 ## Phase 3 — Frontend

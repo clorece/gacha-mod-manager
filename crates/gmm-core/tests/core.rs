@@ -1015,3 +1015,107 @@ async fn launch_needs_ready_and_a_confirmed_exe() {
         Err(CoreError::Launch(_))
     ));
 }
+
+// ---- mods installed by hand --------------------------------------------------------------
+
+#[tokio::test]
+async fn hand_installed_mods_can_be_switched_and_uninstalled() {
+    let f = Fixture::new().await;
+    let managed = install_named(
+        &f,
+        "Managed",
+        9,
+        &[("m.ini", &ini_for("eeee0000", "ib = R"))],
+    )
+    .await;
+    let ini = ini_for("dddd4444", "ib = R");
+    for dir in [
+        "Phoenix",
+        "GMM/Phoenix_duplicate",
+        "DISABLED_Old",
+        "Dup",
+        "GMM/Dup",
+    ] {
+        fs::create_dir_all(f.mods_dir.join(dir)).unwrap();
+        fs::write(f.mods_dir.join(dir).join("m.ini"), &ini).unwrap();
+    }
+    fs::write(f.mods_dir.join("loose.ini"), b"[Constants]\n").unwrap();
+    let lib = gmm_core::library(&f.db, &f.ws, f.mods, zzz())
+        .await
+        .unwrap();
+
+    // Found by name (any case, with or without DISABLED) or by the listed path; GMM's own
+    // mods are never among them.
+    let paths = |q: &str| -> Vec<String> {
+        gmm_core::find_unmanaged(&lib, q)
+            .iter()
+            .map(|u| u.path.clone())
+            .collect()
+    };
+    assert_eq!(paths("phoenix_duplicate"), ["GMM/Phoenix_duplicate"]);
+    assert_eq!(paths("Phoenix"), ["Phoenix"]);
+    assert_eq!(paths("old"), ["DISABLED_Old"]);
+    assert_eq!(paths("Dup").len(), 2);
+    assert_eq!(paths("GMM/Dup"), ["GMM/Dup"]);
+    assert!(paths("Managed [gb-9]").is_empty());
+    assert!(matches!(
+        gmm_core::one_unmanaged(&lib, zzz(), "Dup"),
+        Err(CoreError::AmbiguousUnmanaged { .. })
+    ));
+
+    // Off and on with XXMI's prefix.
+    let off =
+        gmm_core::set_unmanaged_enabled(&f.db, &f.ws, f.mods, zzz(), "Phoenix_duplicate", false)
+            .await
+            .unwrap();
+    assert_eq!(
+        (off.from.as_str(), off.to.as_str()),
+        ("GMM/Phoenix_duplicate", "GMM/DISABLED Phoenix_duplicate")
+    );
+    assert!(f.gmm().join("DISABLED Phoenix_duplicate/m.ini").exists());
+    let again =
+        gmm_core::set_unmanaged_enabled(&f.db, &f.ws, f.mods, zzz(), "phoenix_duplicate", false)
+            .await
+            .unwrap();
+    assert!(!again.changed);
+    let on = gmm_core::set_unmanaged_enabled(&f.db, &f.ws, f.mods, zzz(), "Old", true)
+        .await
+        .unwrap();
+    assert_eq!(on.to, "Old", "any DISABLED prefix style is removed");
+    let loose = gmm_core::set_unmanaged_enabled(&f.db, &f.ws, f.mods, zzz(), "loose.ini", false)
+        .await
+        .unwrap();
+    assert_eq!(loose.to, "DISABLED loose.ini");
+
+    // Before switching the duplicate back on: it would clash with the mods still on.
+    let report = gmm_core::conflicts_for_unmanaged(
+        &f.db,
+        &f.ws,
+        f.mods,
+        zzz(),
+        "GMM/DISABLED Phoenix_duplicate",
+    )
+    .await
+    .unwrap();
+    let partners: Vec<String> = report
+        .conflicts
+        .iter()
+        .map(|c| format!("{} | {}", c.a.label(), c.b.label()))
+        .collect();
+    assert_eq!(report.conflicts.len(), 4, "{partners:?}"); // Phoenix, Old, Dup, GMM/Dup
+
+    // Uninstall takes only an exact listed path, and goes through the trash.
+    let trash = FakeTrash::default();
+    assert!(matches!(
+        gmm_core::uninstall_unmanaged(&f.db, &f.ws, f.mods, zzz(), "phoenix", &trash).await,
+        Err(CoreError::NoSuchUnmanaged { .. })
+    ));
+    let gone = gmm_core::uninstall_unmanaged(&f.db, &f.ws, f.mods, zzz(), "Phoenix", &trash)
+        .await
+        .unwrap();
+    assert_eq!(gone, "Phoenix");
+    assert_eq!(*trash.0.lock().unwrap(), ["Phoenix"]);
+    assert!(!f.mods_dir.join("Phoenix").exists());
+    assert!(f.gmm().join("Managed [gb-9]/m.ini").exists());
+    assert!(f.db.installed_mod(managed).await.unwrap().is_some());
+}

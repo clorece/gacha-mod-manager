@@ -29,7 +29,9 @@ mod storage;
 mod workspace;
 
 pub use analyze::{Analysis, Variant, analyze};
-pub use conflicts::{Conflict, ConflictReport, ModRef, conflicts, conflicts_for};
+pub use conflicts::{
+    Conflict, ConflictReport, ModRef, conflicts, conflicts_for, conflicts_for_unmanaged,
+};
 pub use error::CoreError;
 pub use fetch::{FetchEvent, FetchedArchive, MAX_DOWNLOAD_BYTES, choose_file, fetch_archive};
 pub use install::{
@@ -39,7 +41,8 @@ pub use install::{
 pub use launch::{LaunchPlan, confirm_exe, plan_launch, start};
 pub use library::{
     DiskState, Library, ManagedMod, RecycleBin, ToggleOutcome, Trash, UninstallOutcome,
-    UnmanagedMod, library, set_enabled, uninstall,
+    UnmanagedMod, UnmanagedToggle, find_unmanaged, library, one_unmanaged, set_enabled,
+    set_unmanaged_enabled, uninstall, uninstall_unmanaged,
 };
 pub use names::{
     DISABLED_PREFIX, GMM_DIR, SIDECAR_FILE, STAGING_DIR, mod_folder_name, on_disk_name,
@@ -47,6 +50,6 @@ pub use names::{
 pub use setup::{Machine, ModsTarget, SetupHints, saved_setup};
 pub use storage::{
     CacheStorage, ClearedCache, GameStorage, ModUsage, Size, cache_storage, clear_downloads,
-    game_storage,
+    game_storage, unmanaged_size,
 };
 pub use workspace::{AppDirs, Workspace, open_db};

@@ -73,6 +73,10 @@ pub enum CoreError {
     Launch(String),
     #[error("the XXMI Launcher exe hasn't been confirmed yet: {}", .0.display())]
     ExeNotConfirmed(std::path::PathBuf),
+    #[error("no mod named {query:?} in {game}'s Mods folder (see `gmm list`)")]
+    NoSuchUnmanaged { query: String, game: String },
+    #[error("{query:?} matches more than one mod; use the full path from `gmm list`: {}", .matches.join(", "))]
+    AmbiguousUnmanaged { query: String, matches: Vec<String> },
     #[error("no mod {id} installed for {game} (see `gmm list`)")]
     NoSuchMod { id: i64, game: String },
     #[error("the folder of {0:?} is gone from the Mods folder (deleted or moved outside GMM)")]

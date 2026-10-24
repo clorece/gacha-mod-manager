@@ -10,6 +10,7 @@ mod install;
 mod launch;
 mod library;
 mod setup;
+mod toggle;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -21,8 +22,8 @@ use gmm_catalog::{CatalogSource, GameBanana, ListQuery, SearchQuery, Sort};
 use gmm_core::SetupHints;
 use gmm_db::Db;
 use gmm_net::{Client, NetConfig};
-use library::Action;
 use serde::Serialize;
+use toggle::Action;
 
 #[derive(Parser)]
 #[command(name = "gmm", version, about = "Gacha Mod Manager (command line)")]
@@ -117,21 +118,29 @@ enum Command {
         #[command(flatten)]
         setup: SetupArgs,
     },
-    /// Switch mods on (ids from `gmm list`). Refuses when a mod would conflict with one
-    /// that's already on, unless --anyway.
+    /// Switch mods on: GMM's by id (`12` or `#12`), hand-installed ones by name or path, as
+    /// `gmm list` shows them. Refuses when a mod would conflict with one that's already on,
+    /// unless --anyway.
     Enable {
         #[arg(required = true)]
-        ids: Vec<i64>,
+        mods: Vec<String>,
+        /// Only look in this game for hand-installed mods (see `gmm games`).
+        #[arg(long, value_parser = parse_game)]
+        game: Option<&'static GameManifest>,
         /// Enable even if it conflicts with another enabled mod.
         #[arg(long)]
         anyway: bool,
         #[command(flatten)]
         setup: SetupArgs,
     },
-    /// Switch mods off: XXMI skips folders named `DISABLED ...` (ids from `gmm list`).
+    /// Switch mods off: XXMI skips folders named `DISABLED ...`. GMM's mods by id, hand-installed
+    /// ones by name or path (see `gmm list`).
     Disable {
         #[arg(required = true)]
-        ids: Vec<i64>,
+        mods: Vec<String>,
+        /// Only look in this game for hand-installed mods (see `gmm games`).
+        #[arg(long, value_parser = parse_game)]
+        game: Option<&'static GameManifest>,
         #[command(flatten)]
         setup: SetupArgs,
     },
@@ -166,11 +175,17 @@ enum Command {
         #[command(flatten)]
         setup: SetupArgs,
     },
-    /// Move mods to the Recycle Bin and forget them (ids from `gmm list`). The downloaded
-    /// archive stays in the cache.
+    /// Move mods to the Recycle Bin. GMM's mods by id (their downloaded archive stays in the
+    /// cache); hand-installed ones by name or path, after listing them and asking.
     Uninstall {
         #[arg(required = true)]
-        ids: Vec<i64>,
+        mods: Vec<String>,
+        /// Only look in this game for hand-installed mods (see `gmm games`).
+        #[arg(long, value_parser = parse_game)]
+        game: Option<&'static GameManifest>,
+        /// Don't ask before moving hand-installed mods to the Recycle Bin.
+        #[arg(long)]
+        yes: bool,
         #[command(flatten)]
         setup: SetupArgs,
     },
@@ -186,6 +201,15 @@ struct SetupArgs {
     /// Extra game folder to check, as GAME=FOLDER. Can be repeated.
     #[arg(long = "folder", value_parser = setup::parse_folder)]
     folders: Vec<(String, PathBuf)>,
+}
+
+impl SetupArgs {
+    fn hints(self) -> SetupHints {
+        SetupHints {
+            xxmi: self.xxmi,
+            folders: self.folders,
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -342,13 +366,17 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
         Command::List { game, setup } => {
             library::list(db, game, setup.xxmi, setup.folders, cli.json).await
         }
-        Command::Enable { ids, anyway, setup } => {
+        Command::Enable {
+            mods,
+            game,
+            anyway,
+            setup,
+        } => {
             let action = Action::Enable { anyway };
-            library::apply(db, action, &ids, setup.xxmi, setup.folders, cli.json).await
+            toggle::apply(db, action, &mods, game, setup.hints(), cli.json).await
         }
-        Command::Disable { ids, setup } => {
-            let action = Action::Disable;
-            library::apply(db, action, &ids, setup.xxmi, setup.folders, cli.json).await
+        Command::Disable { mods, game, setup } => {
+            toggle::apply(db, Action::Disable, &mods, game, setup.hints(), cli.json).await
         }
         Command::Storage {
             game,
@@ -375,9 +403,14 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
         Command::Conflicts { game, setup } => {
             library::show_conflicts(db, game, setup.xxmi, setup.folders, cli.json).await
         }
-        Command::Uninstall { ids, setup } => {
-            let action = Action::Uninstall;
-            library::apply(db, action, &ids, setup.xxmi, setup.folders, cli.json).await
+        Command::Uninstall {
+            mods,
+            game,
+            yes,
+            setup,
+        } => {
+            let action = Action::Uninstall { yes };
+            toggle::apply(db, action, &mods, game, setup.hints(), cli.json).await
         }
     }
 }

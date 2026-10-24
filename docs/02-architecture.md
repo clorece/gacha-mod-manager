@@ -94,9 +94,13 @@ user data.
   (`gmm_core::Sidecar`: format, game, name, variant, GB mod id, file id, file name, file date,
   version, SHA-256 of the archive, install time, GMM version) and a row in `installed_mods`.
   3DMigoto only loads `.ini` files, so the sidecar is ignored by XXMI.
-- **Unmanaged mod**: any other folder in `Mods/`. GMM shows it, includes it in conflicts and
-  storage, and offers "adopt" (link to a GB entry). It never moves or deletes one without an
-  explicit user action.
+- **Unmanaged mod**: any other folder (or loose `.ini`) in `Mods/`, i.e. installed by hand.
+  GMM shows it, includes it in conflicts and storage, and later offers "adopt" (link to a GB
+  entry). It only touches one the user names: `gmm enable`/`gmm disable <name or path>` use
+  the same `DISABLED ` rename (enabling removes any `DISABLED` prefix style, e.g.
+  `DISABLED_Old` → `Old`; switching on checks conflicts first), and `gmm uninstall <name>`
+  lists the exact folder with its size and asks before moving it to the Recycle Bin. A bare
+  name matching two mods (`Dup` and `GMM/Dup`) is refused until the full path is given.
 - **Download cache**: original archives in `%LOCALAPPDATA%\GMM\cache\downloads`, kept for quick
   reinstall/rollback. Size-capped and clearable from the Storage screen.
 
@@ -318,3 +322,10 @@ queries the raw response cache can't answer.
 On Linux these map to the XDG equivalents (`dirs` in the CLI; Tauri's path API in the app).
 If `GMM_HOME` names an absolute folder, the database goes to `GMM_HOME/data/` and the cache to
 `GMM_HOME/cache/` instead (portable use; the privacy harness relies on it). Logs don't exist yet.
+
+Observed 2026-10-24: a `gmm` started from inside a packaged (MSIX) app that virtualizes
+`%APPDATA%` (e.g. the Claude desktop app's shell) gets its writes redirected to
+`%LOCALAPPDATA%\Packages\<app>\LocalCache\Roaming\GMM\`. Once a normal run has also created
+the real `%APPDATA%\GMM`, the folder and the database resolve to different places and fsguard
+refuses the database as "resolves outside its root" (correctly: it can't tell this apart from a
+planted link). Run `gmm` from a normal terminal, or set `GMM_HOME`.

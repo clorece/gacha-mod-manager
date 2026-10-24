@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! `gmm list`, `gmm enable`, `gmm disable`, `gmm uninstall`.
+//! `gmm list`, `gmm conflicts`, `gmm storage`.
 
-use std::collections::HashMap;
 use std::fmt::Write;
 use std::path::PathBuf;
 
 use gmm_adapters::{GameManifest, Registry};
 use gmm_core::{
-    Conflict, DiskState, ModsTarget, RecycleBin, SetupHints, UnmanagedMod, conflicts,
-    conflicts_for, library, on_disk_name, set_enabled, uninstall,
+    Conflict, DiskState, ModsTarget, RecycleBin, SetupHints, UnmanagedMod, conflicts, library,
+    on_disk_name,
 };
 use gmm_db::Db;
 use serde::Serialize;
@@ -172,103 +171,6 @@ fn row(m: gmm_db::InstalledMod, disk: &str) -> ListRow {
         size_bytes: m.size_bytes,
         installed_at: m.installed_at,
     }
-}
-
-/// What `enable`, `disable` and `uninstall` do to each mod.
-#[derive(Clone, Copy)]
-pub enum Action {
-    /// `anyway`: enable even if it conflicts with another enabled mod.
-    Enable {
-        anyway: bool,
-    },
-    Disable,
-    Uninstall,
-}
-
-/// Applies `action` to each mod id (from `gmm list`). Mods of different games are fine.
-pub async fn apply(
-    db: &Db,
-    action: Action,
-    ids: &[i64],
-    xxmi: Option<PathBuf>,
-    folders: Vec<(String, PathBuf)>,
-    json: bool,
-) -> Result<(), AnyError> {
-    let registry = Registry::builtin()?;
-    let mut targets: HashMap<String, ModsTarget> = HashMap::new();
-    let mut results = Vec::new();
-    for &id in ids {
-        let row = db
-            .installed_mod(id)
-            .await?
-            .ok_or_else(|| format!("no mod {id} installed by GMM (see `gmm list`)"))?;
-        let game = registry
-            .get(&row.game_id)
-            .ok_or_else(|| format!("mod {id} belongs to an unknown game {:?}", row.game_id))?;
-        if !targets.contains_key(game.id()) {
-            let target = ModsTarget::open(
-                db,
-                game,
-                SetupHints {
-                    xxmi: xxmi.clone(),
-                    folders: folders.clone(),
-                },
-            )
-            .await?;
-            targets.insert(game.id().to_owned(), target);
-        }
-        let Some(target) = targets.get(game.id()) else {
-            continue;
-        };
-        let value = match action {
-            Action::Enable { .. } | Action::Disable => {
-                let on = matches!(action, Action::Enable { .. });
-                if let Action::Enable { anyway: false } = action
-                    && !row.enabled
-                {
-                    let report = conflicts_for(db, &target.ws, target.mods, game, id).await?;
-                    if !report.conflicts.is_empty() {
-                        let lines: Vec<String> = report.conflicts.iter().map(describe).collect();
-                        return Err(format!(
-                            "enabling #{id} would conflict with mods that are already on:\n  \
-                             {}\nDisable the other one first, or add --anyway.",
-                            lines.join("\n  ")
-                        )
-                        .into());
-                    }
-                }
-                let t = set_enabled(db, &target.ws, target.mods, game, id, on).await?;
-                if !json {
-                    let verb = if on { "enabled" } else { "disabled" };
-                    if t.changed {
-                        println!("{verb} {:?}", t.folder_name);
-                    } else {
-                        println!("{:?} was already {verb}", t.folder_name);
-                    }
-                }
-                serde_json::to_value(t)?
-            }
-            Action::Uninstall => {
-                let u = uninstall(db, &target.ws, target.mods, game, id, &RecycleBin).await?;
-                if !json {
-                    if u.trashed {
-                        println!("moved {:?} to the Recycle Bin", u.folder_name);
-                    } else {
-                        println!(
-                            "{:?} was already gone from the Mods folder; forgot it",
-                            u.folder_name
-                        );
-                    }
-                }
-                serde_json::to_value(u)?
-            }
-        };
-        results.push(value);
-    }
-    if json {
-        println!("{}", serde_json::to_string_pretty(&results)?);
-    }
-    Ok(())
 }
 
 /// `A  <->  B  (3 shared: 0fc8027f, 9040e2c4, ...)`

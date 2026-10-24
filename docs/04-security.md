@@ -91,8 +91,11 @@ does is the failure we design out.
   clippy ban).
 - **R8 — Recoverable deletes.** Uninstall and storage deletes go through the Recycle Bin
   (`gmm_fsguard::Guard::move_to_trash`, the only caller of the `trash` crate; it applies the
-  same read-write-root checks as any write). Unmanaged folders are never deleted without an
-  explicit, itemized confirmation; today GMM has no command that deletes one at all.
+  same read-write-root checks as any write). Unmanaged (hand-installed) mods are never deleted
+  without an explicit, itemized confirmation: `gmm uninstall <name>` resolves every name first,
+  lists each folder with its full path, file count and size, and asks `[y/N]`; without a
+  terminal only `--yes` confirms. The removal then takes the exact listed path, nothing looser,
+  and goes to the Recycle Bin too.
 
 ## Archive hardening (gmm-archive)
 

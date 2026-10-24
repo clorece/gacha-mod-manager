@@ -243,3 +243,18 @@ pub(crate) fn tree_size(guard: &Guard, dir: &ScopedPath) -> Size {
     }
     size
 }
+
+/// Size of one entry of the library's unmanaged list (folder or loose file).
+pub fn unmanaged_size(
+    ws: &Workspace,
+    mods: RootId,
+    entry: &crate::library::UnmanagedMod,
+) -> Result<Size, CoreError> {
+    let guard = ws.guard();
+    let path = guard.path(mods, &entry.path)?;
+    Ok(if entry.is_dir {
+        tree_size(guard, &path)
+    } else {
+        file_size(guard, &path)
+    })
+}

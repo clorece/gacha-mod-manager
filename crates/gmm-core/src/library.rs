@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! The mods in one game's `Mods/` folder: GMM's own (from the database, checked against the
-//! disk) and everything else (unmanaged), plus switching GMM's mods on and off and
-//! uninstalling them.
+//! disk) and everything else (unmanaged, i.e. installed by hand), plus switching mods on and
+//! off and uninstalling them.
 //!
 //! The disk is the truth for on/off: if someone renamed a folder by hand, the database is
 //! updated to match. A managed mod whose folder is gone is reported as missing, never
-//! silently forgotten. Unmanaged folders are only ever listed (security rule R8).
+//! silently forgotten. Unmanaged mods are only touched when the user names one: on/off is the
+//! same `DISABLED ` rename, and uninstalling moves it to the Recycle Bin after the caller has
+//! shown exactly what goes and got a yes (security rule R8).
 
 use gmm_adapters::GameManifest;
 use gmm_db::{Db, InstalledMod};
@@ -261,4 +263,144 @@ pub async fn uninstall(
         folder_name: row.folder_name,
         trashed,
     })
+}
+
+/// Unmanaged mods matching what the user typed: the path from `gmm list` (`GMM/Phoenix`,
+/// `Phoenix`), or just the name, with or without a `DISABLED` prefix. Case-insensitive.
+pub fn find_unmanaged<'a>(lib: &'a Library, query: &str) -> Vec<&'a UnmanagedMod> {
+    let query = query.trim().replace('\\', "/");
+    let wanted = base_name(&query).to_ascii_lowercase();
+    // A path with a folder names exactly one entry. A bare name may match several (`Dup`
+    // and `GMM/Dup`); the caller then asks for the full path instead of guessing.
+    if query.contains('/') {
+        return lib
+            .unmanaged
+            .iter()
+            .filter(|u| u.path.eq_ignore_ascii_case(&query))
+            .collect();
+    }
+    lib.unmanaged
+        .iter()
+        .filter(|u| base_name(&u.name).eq_ignore_ascii_case(&wanted))
+        .collect()
+}
+
+/// `name` without its `DISABLED` prefix (and the separator after it), and without any folder.
+fn base_name(name: &str) -> &str {
+    let name = name.rsplit('/').next().unwrap_or(name);
+    match (name.get(..8), name.get(8..)) {
+        (Some(head), Some(rest)) if head.eq_ignore_ascii_case("disabled") => {
+            rest.trim_start_matches([' ', '_', '-'])
+        }
+        _ => name,
+    }
+}
+
+/// The one unmanaged mod `query` names in this game.
+pub fn one_unmanaged<'a>(
+    lib: &'a Library,
+    game: &GameManifest,
+    query: &str,
+) -> Result<&'a UnmanagedMod, CoreError> {
+    match find_unmanaged(lib, query).as_slice() {
+        [only] => Ok(only),
+        [] => Err(CoreError::NoSuchUnmanaged {
+            query: query.to_owned(),
+            game: game.game.name.clone(),
+        }),
+        many => Err(CoreError::AmbiguousUnmanaged {
+            query: query.to_owned(),
+            matches: many.iter().map(|u| u.path.clone()).collect(),
+        }),
+    }
+}
+
+/// Outcome of [`set_unmanaged_enabled`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct UnmanagedToggle {
+    /// Relative to `Mods/`, before and after.
+    pub from: String,
+    pub to: String,
+    pub enabled: bool,
+    /// False when the mod already was in that state.
+    pub changed: bool,
+}
+
+/// Switches a mod GMM didn't install on or off, by the same rename XXMI uses: adding
+/// `DISABLED ` in front of its name, or removing whatever `DISABLED` prefix it has. Nothing
+/// inside the folder changes. 3DMigoto saves in-game toggle choices by path, so the mod's
+/// saved choices start fresh afterwards.
+pub async fn set_unmanaged_enabled(
+    db: &Db,
+    ws: &Workspace,
+    mods: RootId,
+    game: &GameManifest,
+    query: &str,
+    enabled: bool,
+) -> Result<UnmanagedToggle, CoreError> {
+    let guard = ws.guard();
+    let lib = library(db, ws, mods, game).await?;
+    let entry = one_unmanaged(&lib, game, query)?;
+    if entry.enabled == enabled {
+        return Ok(UnmanagedToggle {
+            from: entry.path.clone(),
+            to: entry.path.clone(),
+            enabled,
+            changed: false,
+        });
+    }
+    let new_name = if enabled {
+        base_name(&entry.name).to_owned()
+    } else {
+        format!("{DISABLED_PREFIX}{}", entry.name)
+    };
+    if new_name.is_empty() {
+        return Err(CoreError::Io(format!(
+            "{:?} has no name besides DISABLED; rename it by hand",
+            entry.path
+        )));
+    }
+    let parent = entry
+        .path
+        .rsplit_once('/')
+        .map(|(dir, _)| format!("{dir}/"))
+        .unwrap_or_default();
+    let to = format!("{parent}{new_name}");
+    let from_path = guard.path(mods, &entry.path)?;
+    let to_path = guard.path(mods, &to)?;
+    if guard.exists(&to_path)? {
+        return Err(CoreError::FolderTaken { folder: to });
+    }
+    guard.rename(&from_path, &to_path)?;
+    Ok(UnmanagedToggle {
+        from: entry.path.clone(),
+        to,
+        enabled,
+        changed: true,
+    })
+}
+
+/// Moves a mod GMM didn't install to the Recycle Bin. The caller must have shown the user
+/// exactly this path and got a yes (security rule R8); GMM never does this on its own.
+pub async fn uninstall_unmanaged(
+    db: &Db,
+    ws: &Workspace,
+    mods: RootId,
+    game: &GameManifest,
+    path: &str,
+    trash: &dyn Trash,
+) -> Result<String, CoreError> {
+    let guard = ws.guard();
+    let lib = library(db, ws, mods, game).await?;
+    // Only an exact path from the listing: the confirmation showed this path, nothing looser.
+    let entry = lib
+        .unmanaged
+        .iter()
+        .find(|u| u.path == path)
+        .ok_or_else(|| CoreError::NoSuchUnmanaged {
+            query: path.to_owned(),
+            game: game.game.name.clone(),
+        })?;
+    trash.trash(guard, &guard.path(mods, &entry.path)?)?;
+    Ok(entry.path.clone())
 }

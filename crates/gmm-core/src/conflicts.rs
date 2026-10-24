@@ -87,7 +87,7 @@ pub async fn conflicts(
     mods: RootId,
     game: &GameManifest,
 ) -> Result<ConflictReport, CoreError> {
-    let (units, _) = enabled_units(db, ws, mods, game, None).await?;
+    let (units, _) = enabled_units(db, ws, mods, game, Include::Nothing).await?;
     Ok(check(ws.guard(), game, units, None))
 }
 
@@ -100,10 +100,38 @@ pub async fn conflicts_for(
     game: &GameManifest,
     id: i64,
 ) -> Result<ConflictReport, CoreError> {
-    let (units, focus) = enabled_units(db, ws, mods, game, Some(id)).await?;
+    let (units, focus) = enabled_units(db, ws, mods, game, Include::Managed(id)).await?;
     let Some(focus) = focus else {
         return Err(CoreError::NoSuchMod {
             id,
+            game: game.game.name.clone(),
+        });
+    };
+    Ok(check(ws.guard(), game, units, Some(focus)))
+}
+
+/// A mod to check even though it is switched off (it's about to be switched on).
+#[derive(Clone, Copy)]
+enum Include<'a> {
+    Nothing,
+    Managed(i64),
+    /// Path relative to `Mods/`, exactly as listed.
+    Unmanaged(&'a str),
+}
+
+/// What a mod GMM didn't install (path from `gmm list`, on or off) conflicts with among the
+/// other enabled mods. Used before switching it on.
+pub async fn conflicts_for_unmanaged(
+    db: &Db,
+    ws: &Workspace,
+    mods: RootId,
+    game: &GameManifest,
+    path: &str,
+) -> Result<ConflictReport, CoreError> {
+    let (units, focus) = enabled_units(db, ws, mods, game, Include::Unmanaged(path)).await?;
+    let Some(focus) = focus else {
+        return Err(CoreError::NoSuchUnmanaged {
+            query: path.to_owned(),
             game: game.game.name.clone(),
         });
     };
@@ -117,7 +145,7 @@ async fn enabled_units(
     ws: &Workspace,
     mods: RootId,
     game: &GameManifest,
-    include: Option<i64>,
+    include: Include<'_>,
 ) -> Result<(Vec<Unit>, Option<usize>), CoreError> {
     let guard = ws.guard();
     let lib = library(db, ws, mods, game).await?;
@@ -125,7 +153,7 @@ async fn enabled_units(
     let mut units = Vec::new();
     let mut focus = None;
     for m in &lib.managed {
-        let wanted = Some(m.row.id) == include;
+        let wanted = matches!(include, Include::Managed(id) if id == m.row.id);
         let enabled = match m.disk {
             DiskState::Enabled => true,
             DiskState::Disabled if wanted => false,
@@ -143,7 +171,14 @@ async fn enabled_units(
             is_dir: true,
         });
     }
-    for u in lib.unmanaged.iter().filter(|u| u.enabled) {
+    for u in &lib.unmanaged {
+        let wanted = matches!(include, Include::Unmanaged(path) if path == u.path);
+        if !u.enabled && !wanted {
+            continue;
+        }
+        if wanted {
+            focus = Some(units.len());
+        }
         units.push(Unit {
             mod_ref: ModRef::Unmanaged {
                 path: u.path.clone(),
