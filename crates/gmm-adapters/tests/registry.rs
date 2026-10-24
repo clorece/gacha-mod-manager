@@ -24,6 +24,10 @@ fn zzz_facts() {
         (steam.appid, steam.subpath.as_str()),
         (4162040, "games/ZenlessZoneZero Game")
     );
+    assert!(
+        !steam.direct_launch,
+        "ZZZ's Steam copy must be started by Steam"
+    );
     assert_eq!(zzz.xxmi_launch_args(), ["--nogui", "--xxmi", "ZZMI"]);
     let skins = zzz.root_category(30305).unwrap();
     assert_eq!(skins.tag, Tag::CharacterSkin);
@@ -37,6 +41,10 @@ fn wuwa_facts() {
     assert_eq!(wuwa.xxmi.importer, Importer::Wwmi);
     assert_eq!(wuwa.detect.steam.as_ref().unwrap().appid, 3513350);
     assert_eq!(wuwa.detect.steam.as_ref().unwrap().subpath, "");
+    assert!(
+        wuwa.detect.steam.as_ref().unwrap().direct_launch,
+        "WuWa's Steam copy runs when XXMI starts it directly"
+    );
     assert_eq!(wuwa.xxmi_launch_args(), ["--nogui", "--xxmi", "WWMI"]);
 }
 

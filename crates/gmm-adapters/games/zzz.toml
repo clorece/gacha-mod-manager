@@ -46,6 +46,9 @@ folder_names = ["ZenlessZoneZero Game"]
 appid = 4162040
 # The Steam copy wraps HoYoPlay; the game itself is nested.
 subpath = "games/ZenlessZoneZero Game"
+# Started directly, the Steam copy closes itself and asks to be launched from Steam
+# (observed 2026-10-23), so XXMI's "Game Launch" must be "Steam".
+direct_launch = false
 
 [detect.epic]
 display_names = ["Zenless Zone Zero"]

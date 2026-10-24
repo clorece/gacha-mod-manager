@@ -157,6 +157,12 @@ pub struct SteamDetect {
     /// Game folder relative to `steamapps/common/<installdir>`; empty if it's the same folder.
     #[serde(default)]
     pub subpath: String,
+    /// Whether XXMI may start the Steam copy directly ("Game Launch" = Direct). False means the
+    /// copy only runs when Steam starts it, so XXMI must be set to "Steam" (the setup check
+    /// reports `LaunchModeMismatch` otherwise). Off by default: a wrong "off" only asks for a
+    /// setting change, a wrong "on" lets the game close itself.
+    #[serde(default)]
+    pub direct_launch: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

@@ -40,6 +40,9 @@ folder_names = ["Wuthering Waves Game", "Wuthering Waves"]
 appid = 3513350
 # The Steam folder is the game folder.
 subpath = ""
+# XXMI starts the Steam copy fine with "Game Launch" on Direct (observed 2026-10-24: started
+# twice that way, mods loaded).
+direct_launch = true
 
 [detect.epic]
 display_names = ["Wuthering Waves"]

@@ -38,11 +38,7 @@ On the dev machine, `gmm status` reports ZZZ `Ready` (HoYoPlay install) and WuWa
 **Waiting on you:** screenshots of each XXMI setup step, for the app's setup guide (whenever
 convenient).
 
-**Known issue:** `gmm status` flags WuWa's Steam copy as `LaunchModeMismatch`, but it runs
-fine with XXMI's Game Launch on Direct, so `gmm launch wuwa` refuses. The launch rule has to
-become per game.
-
-**Next:** that WuWa fix, then Phase 3, the app (Tauri shell, command layer, image protocol,
+**Next:** Phase 3, the app (Tauri shell, command layer, image protocol,
 then the screens). See "Start here" under Phase 3 in the roadmap.
 
 ## Docs

@@ -102,14 +102,18 @@ game folder is found by matching it against detected installs:
 
 | Install source | Works | Fix if not |
 |---|---|---|
-| Steam | `STEAM`, `MANUAL` | set to **Steam** |
+| Steam, game with `[detect.steam] direct_launch = false` (ZZZ) | `STEAM`, `MANUAL` | set to **Steam** |
+| Steam, game with `direct_launch = true` (WuWa) | `STEAM`, `MANUAL`, `DIRECT` | set to **Steam** |
 | Epic | `EPIC_GAMES`, `MANUAL` | set to **Epic Games** |
 | HoYoPlay, manual | `DIRECT`, `CUSTOM`, `MANUAL` | set to **Direct** |
 | not a detected install | not checked (note shown) | — |
 
-Why (observed 2026-10-23): with **Direct**, XXMI starts the game exe itself. Injection succeeds,
-but the **Steam** copies of ZZZ and WuWa then refuse to run ("please launch from Steam") and
-exit. The HoYoPlay copy of ZZZ works with Direct, and mods show in game.
+Why: with **Direct**, XXMI starts the game exe itself. ZZZ's **Steam** copy (which wraps
+HoYoPlay) then refuses to run ("please launch from Steam") and exits (observed 2026-10-23).
+WuWa's Steam copy runs fine that way: XXMI started it twice with Direct and mods loaded
+(observed 2026-10-24). So it's a per-game manifest flag, `direct_launch`, off by default: a wrong
+"off" only asks for a setting change, a wrong "on" would let the game close itself. The
+HoYoPlay copy of ZZZ works with Direct, and mods show in game.
 
 Mods can still be **downloaded** in any state where the importer exists. They are just inactive
 until XXMI runs. In `XxmiNotFound` / `ImporterMissing`, installs are queued and placed once the
@@ -126,7 +130,8 @@ Extra info shown per importer (read-only):
 
 **States seen on the dev machine:** ZZZ went `GamePathNotSet` → `LaunchModeMismatch` (Steam
 copy) → `Ready` (after moving to a HoYoPlay install on D:). WuWa went `ImporterMissing` →
-`LaunchModeMismatch` (Steam, Game Launch still Direct). Every state has a fixture test.
+`LaunchModeMismatch` (Steam, Game Launch Direct, under the old one-rule-for-all-Steam-copies
+check) → `Ready` (2026-10-24, with `direct_launch = true`). Every state has a fixture test.
 
 ### Reading the XXMI config safely
 
@@ -158,7 +163,8 @@ each step before the setup guide ships in the app (see "Before Phase 2" in the r
 3. Open the settings, **General** tab. Check **Game Folder** (or press **Detect
    Installations**). GMM shows the folder it found, with a copy button.
 4. Same tab: set **Game Launch** to match your copy: **Steam** for Steam, **Epic Games** for
-   Epic, **Direct** for HoYoPlay and other launchers.
+   Epic, **Direct** for HoYoPlay and other launchers. (WuWa's Steam copy also works with
+   Direct; GMM accepts either for it.)
 5. Press **Start** once, so XXMI finishes setup and applies the game settings mods need.
 6. Optional: **Add Desktop Shortcut** creates an "<importer> Quick Start" shortcut that skips
    XXMI's window.
@@ -183,7 +189,7 @@ each step before the setup guide ships in the app (see "Before Phase 2" in the r
 | GameBanana | id 20357. Roots: Skins (29524), UI (29496), Other/Misc (29493) | API, verified |
 | XXMI importer | WWMI (`<XXMI>/WWMI/`), `d3dx.ini target = Client-Win64-Shipping.exe`, core ini `Core\WWMI\WuWa-Model-Importer.ini` (`$wwmi_version`) | observed |
 | Game folder markers | `Wuthering Waves.exe` + `Client/` + `Engine/`; process `Client/Binaries/Win64/Client-Win64-Shipping.exe` | observed |
-| Steam | appid 3513350, sub-path empty (the Steam folder is the game folder). Needs Game Launch = Steam | observed |
+| Steam | appid 3513350, sub-path empty (the Steam folder is the game folder). Works with Game Launch = Steam or Direct (`direct_launch = true`) | observed |
 | Library mods | **[collect list]** | |
 | Settings XXMI applies | Ray tracing off, mesh LOD override in `Client/Config/UserEngine.ini`, DX11 | XXMI source. GMM doesn't touch them |
 | Pak mods (`~mods`) | Out of scope. They aren't loaded by XXMI | decision |

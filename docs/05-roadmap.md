@@ -54,8 +54,8 @@ how to fix it. Read-only.
 - [x] ZZZ (HoYoPlay install on D:, Game Launch = Direct) → `Ready`, with ZZMI 1.50,
       XXMI DLL 1.2.2.0, 1 mod
 - [x] WuWa (Steam, Game Launch = Direct, never started through XXMI) → `LaunchModeMismatch`,
-      fix: set "Game Launch" to "Steam"
-- [ ] WuWa after you switch Game Launch to Steam → `Ready` (needs you)
+      fix: set "Game Launch" to "Steam". Superseded 2026-10-24: WuWa's Steam copy works with
+      Direct too, so it's now `Ready` either way (`direct_launch = true` in its manifest)
 
 ## Before Phase 2 — in-game checks ✅ done 2026-10-24 (except screenshots)
 
@@ -181,9 +181,10 @@ conflict reported, and see it in storage. Privacy harnesses green.
       `DISABLED ` (the prefix you confirmed hides a mod in game). The first try used the
       GameBanana id (`688491`); GMM now accepts `#1` and says which GMM id a GameBanana id
       means. `gmm disable Phoenix_duplicate` switched the hand-made copy off the same way
-- Carried into Phase 3: WuWa's Steam copy is wrongly flagged `LaunchModeMismatch` (it runs
-  fine with XXMI's Game Launch on Direct), so `gmm launch wuwa` refuses; the launch rule
-  needs to be per game (see "Before Phase 2")
+- [x] WuWa's Steam copy was wrongly flagged `LaunchModeMismatch` (it runs fine with XXMI's Game
+      Launch on Direct). Fixed 2026-10-24 with a per-game manifest flag,
+      `[detect.steam] direct_launch` (WuWa `true`, ZZZ `false`); `gmm status` now says WuWa is
+      `Ready`
 - [x] `gmm conflicts` reports a conflict: `GMM/Phoenix` and a hand-made copy
       `GMM/Phoenix_duplicate`, 8 shared hashes. `gmm enable` refusing is covered by tests
 - [x] `gmm storage` lists Casual Velina (131.0 MiB) and the hand-installed mods

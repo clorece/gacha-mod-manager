@@ -238,7 +238,8 @@ pub fn evaluate(
     let game_launch = s.game_launch.clone();
     match (source, game_launch.as_deref()) {
         (Some(source), Some(launch)) => {
-            if let Some(expected) = launch_mismatch(source, launch) {
+            let steam_direct_ok = game.detect.steam.as_ref().is_some_and(|s| s.direct_launch);
+            if let Some(expected) = launch_mismatch(source, launch, steam_direct_ok) {
                 return s.with(
                     SetupState::LaunchModeMismatch,
                     format!(
@@ -295,11 +296,21 @@ impl GameStatus {
 }
 
 /// The label XXMI's "Game Launch" should be set to, if the current value can't work for this
-/// kind of install. Manual (XXMI waits for the game) works for every source.
-fn launch_mismatch(source: InstallSource, launch: &str) -> Option<&'static str> {
+/// kind of install. Manual (XXMI waits for the game) works for every source. `steam_direct_ok`
+/// is the game's manifest flag `[detect.steam] direct_launch`: some Steam copies (WuWa) also
+/// run when XXMI starts them directly, others (ZZZ's, which wraps HoYoPlay) close themselves.
+fn launch_mismatch(
+    source: InstallSource,
+    launch: &str,
+    steam_direct_ok: bool,
+) -> Option<&'static str> {
     let launch = launch.to_ascii_uppercase();
     match source {
-        InstallSource::Steam => (!matches!(launch.as_str(), "STEAM" | "MANUAL")).then_some("Steam"),
+        InstallSource::Steam => {
+            let ok = matches!(launch.as_str(), "STEAM" | "MANUAL")
+                || (steam_direct_ok && launch == "DIRECT");
+            (!ok).then_some("Steam")
+        }
         InstallSource::Epic => {
             (!matches!(launch.as_str(), "EPIC_GAMES" | "EPIC" | "MANUAL")).then_some("Epic Games")
         }
@@ -326,22 +337,19 @@ mod tests {
 
     #[test]
     fn launch_rules() {
-        assert_eq!(
-            launch_mismatch(InstallSource::Steam, "DIRECT"),
-            Some("Steam")
-        );
-        assert_eq!(launch_mismatch(InstallSource::Steam, "STEAM"), None);
-        assert_eq!(launch_mismatch(InstallSource::Steam, "MANUAL"), None);
-        assert_eq!(
-            launch_mismatch(InstallSource::Epic, "DIRECT"),
-            Some("Epic Games")
-        );
-        assert_eq!(launch_mismatch(InstallSource::Epic, "EPIC_GAMES"), None);
-        assert_eq!(launch_mismatch(InstallSource::HoYoPlay, "DIRECT"), None);
-        assert_eq!(
-            launch_mismatch(InstallSource::HoYoPlay, "STEAM"),
-            Some("Direct")
-        );
-        assert_eq!(launch_mismatch(InstallSource::Manual, "CUSTOM"), None);
+        use InstallSource::{Epic, HoYoPlay, Manual, Steam};
+        // A Steam copy that only runs when Steam starts it (ZZZ).
+        assert_eq!(launch_mismatch(Steam, "DIRECT", false), Some("Steam"));
+        assert_eq!(launch_mismatch(Steam, "STEAM", false), None);
+        assert_eq!(launch_mismatch(Steam, "MANUAL", false), None);
+        // One that XXMI may start directly (WuWa).
+        assert_eq!(launch_mismatch(Steam, "DIRECT", true), None);
+        assert_eq!(launch_mismatch(Steam, "STEAM", true), None);
+        assert_eq!(launch_mismatch(Steam, "EPIC_GAMES", true), Some("Steam"));
+        assert_eq!(launch_mismatch(Epic, "DIRECT", false), Some("Epic Games"));
+        assert_eq!(launch_mismatch(Epic, "EPIC_GAMES", false), None);
+        assert_eq!(launch_mismatch(HoYoPlay, "DIRECT", false), None);
+        assert_eq!(launch_mismatch(HoYoPlay, "STEAM", false), Some("Direct"));
+        assert_eq!(launch_mismatch(Manual, "CUSTOM", false), None);
     }
 }
