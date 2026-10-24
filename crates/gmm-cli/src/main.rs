@@ -141,6 +141,17 @@ enum Command {
         #[command(flatten)]
         setup: SetupArgs,
     },
+    /// Space used by each mod, each game's Mods folder and GMM's cache, and free space.
+    Storage {
+        /// Only this game (see `gmm games`).
+        #[arg(long, value_parser = parse_game)]
+        game: Option<&'static GameManifest>,
+        /// Move every cached download to the Recycle Bin (installed mods stay).
+        #[arg(long)]
+        clear_downloads: bool,
+        #[command(flatten)]
+        setup: SetupArgs,
+    },
     /// Move mods to the Recycle Bin and forget them (ids from `gmm list`). The downloaded
     /// archive stays in the cache.
     Uninstall {
@@ -324,6 +335,21 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
         Command::Disable { ids, setup } => {
             let action = Action::Disable;
             library::apply(db, action, &ids, setup.xxmi, setup.folders, cli.json).await
+        }
+        Command::Storage {
+            game,
+            clear_downloads,
+            setup,
+        } => {
+            library::storage(
+                db,
+                game,
+                clear_downloads,
+                setup.xxmi,
+                setup.folders,
+                cli.json,
+            )
+            .await
         }
         Command::Conflicts { game, setup } => {
             library::show_conflicts(db, game, setup.xxmi, setup.folders, cli.json).await

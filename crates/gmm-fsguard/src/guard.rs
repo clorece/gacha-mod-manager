@@ -347,6 +347,12 @@ impl Guard {
         fs::remove_dir_all(&path).map_err(|e| FsError::io("remove_dir_all", path, e))
     }
 
+    /// Free space, in bytes, on the drive that holds this path (for the storage report).
+    pub fn available_space(&self, p: &ScopedPath) -> Result<u64, FsError> {
+        let path = self.resolve(p, Access::ReadOnly)?;
+        fs4::available_space(&path).map_err(|e| FsError::io("available_space", path, e))
+    }
+
     /// Moves a file or folder to the Recycle Bin (the trash on Linux), so the user can get it
     /// back. This is how GMM deletes anything the user asked to delete (security rule R8).
     pub fn move_to_trash(&self, p: &ScopedPath) -> Result<(), FsError> {

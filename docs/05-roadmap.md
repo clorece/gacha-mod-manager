@@ -139,7 +139,10 @@ Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm det
       unless `--anyway`, `gmm install` warns. Verified: the real Belle mod and an unmanaged copy
       of it conflict on 20 hashes; the real setup (Phoenix alone) has none. Deferred: the
       "same character" warning tier (needs the category stored at install) and caching the index
-- [ ] Storage accounting (per mod, per game, cache, drive free space)
+- [x] Storage accounting (2026-10-23): `gmm-core::storage` (`game_storage`, `cache_storage`,
+      `clear_downloads`), `Guard::available_space` (new `fs4` dependency). CLI: `gmm storage
+      [--game] [--clear-downloads]`. Verified on the real setup: Phoenix 123.4 MiB, 369.9 GiB
+      free, cache 22.7 MiB of downloads
 - [ ] `gmm launch`: run the confirmed XXMI exe with `--nogui --xxmi <IMP>` (first launch asks
       the user to confirm the exe path; R7)
 - [ ] Adapter conformance suite: one fixture install per game, run through detect → status →

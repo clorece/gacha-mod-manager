@@ -320,3 +320,106 @@ pub async fn show_conflicts(
     }
     Ok(())
 }
+
+/// `gmm storage`: space used per mod and per game, the cache, and free space.
+pub async fn storage(
+    db: &Db,
+    game: Option<&'static GameManifest>,
+    clear_downloads: bool,
+    xxmi: Option<PathBuf>,
+    folders: Vec<(String, PathBuf)>,
+    json: bool,
+) -> Result<(), AnyError> {
+    let ws = gmm_core::Workspace::open(&gmm_core::AppDirs::system()?.cache)?;
+    if clear_downloads {
+        let cleared = gmm_core::clear_downloads(db, &ws, &RecycleBin).await?;
+        if json {
+            println!("{}", serde_json::to_string_pretty(&cleared)?);
+        } else {
+            println!(
+                "moved {} cached download(s) ({}) to the Recycle Bin",
+                cleared.archives,
+                bytes(cleared.bytes)
+            );
+        }
+        return Ok(());
+    }
+
+    let games: Vec<&GameManifest> = match game {
+        Some(g) => vec![g],
+        None => Registry::builtin()?.games().iter().collect(),
+    };
+    #[derive(Serialize)]
+    struct Out {
+        games: Vec<gmm_core::GameStorage>,
+        cache: gmm_core::CacheStorage,
+        not_checked: Vec<String>,
+    }
+    let mut out = Out {
+        games: Vec::new(),
+        cache: gmm_core::cache_storage(db, &ws).await?,
+        not_checked: Vec::new(),
+    };
+    for game in games {
+        match ModsTarget::open(db, game, xxmi.clone(), folders.clone()).await {
+            Ok(target) => {
+                out.games
+                    .push(gmm_core::game_storage(db, &target.ws, target.mods, game).await?);
+            }
+            Err(e) => out.not_checked.push(format!("{}: {e}", game.game.name)),
+        }
+    }
+    if json {
+        println!("{}", serde_json::to_string_pretty(&out)?);
+        return Ok(());
+    }
+
+    let size =
+        |s: &gmm_core::Size| format!("{}{}", bytes(s.bytes), if s.truncated { "+" } else { "" });
+    let free = |f: Option<u64>| f.map_or("?".to_owned(), bytes);
+    let mut text = String::new();
+    for g in &out.games {
+        let name = Registry::builtin()?
+            .get(&g.game)
+            .map_or(g.game.clone(), |m| m.game.name.clone());
+        let _ = writeln!(
+            text,
+            "{name}: GMM mods {} ({} mods), other mods {} ({}), drive free {}",
+            size(&g.managed_total),
+            g.managed.len(),
+            size(&g.unmanaged_total),
+            g.unmanaged.len(),
+            free(g.free_bytes)
+        );
+        for m in g.managed.iter().chain(&g.unmanaged) {
+            let _ = writeln!(
+                text,
+                "  {:>10}  {}  {}",
+                size(&m.size),
+                if m.enabled { "on " } else { "off" },
+                m.mod_ref.label()
+            );
+        }
+        if g.other.bytes > 0 {
+            let _ = writeln!(text, "  {:>10}  other files", size(&g.other));
+        }
+    }
+    for line in &out.not_checked {
+        let _ = writeln!(text, "{line}");
+    }
+    let c = &out.cache;
+    let _ = writeln!(
+        text,
+        "cache: downloads {} ({} files), API responses {} ({}), drive free {}",
+        size(&c.downloads),
+        c.downloads.files,
+        bytes(c.http_bytes),
+        c.http_entries,
+        free(c.free_bytes)
+    );
+    if c.extract.bytes > 0 {
+        let _ = writeln!(text, "  leftover extraction folders: {}", size(&c.extract));
+    }
+    print!("{text}");
+    Ok(())
+}

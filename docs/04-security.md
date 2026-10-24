@@ -127,7 +127,7 @@ does is the failure we design out.
 | Phase | Harness | Proves |
 |---|---|---|
 | 1 | Malicious archive corpus (`crates/gmm-archive/tests/corpus.rs`, archives built in code) incl. Windows-specific tricks; randomized corruption tests (`tests/robustness.rs`) | Extractor rejects each case, never panics, never writes outside its root |
-| 1 | Property tests (✅ done): `RelPath`, archive corruption, VDF parser never panics. `cargo-fuzz` targets (extractor, migoto ini parser, VDF/ACF, GB JSON, XXMI config) as a nightly job: ⏳ | No panics or escapes |
+| 1 | Property tests (✅ done): `RelPath`, archive corruption, VDF parser and (Phase 2) the migoto ini parser never panic. `cargo-fuzz` targets (extractor, migoto ini parser, VDF/ACF, GB JSON, XXMI config) as a nightly job: ⏳ | No panics or escapes |
 | 1 | Lint gates (✅ done): clippy `disallowed_methods` (`std::fs`, `Command::new`) and `disallowed_types` (HTTP clients, raw sockets, `winreg::RegKey`) outside their crates; `cargo-deny`. ⏳ `cargo-audit`, `pnpm audit` | R1–R3, R7 can't be bypassed silently |
 | 0b | **XXMI config secret test** (✅ done): fixture configs with canary `github_token`, proxy password and signatures; asserts they never appear in parsed config, `GameStatus` JSON or `Debug`, and parse errors don't echo content. Extend to logs, DB and IPC output as those appear | R4 |
 | 0b | Detection on a fake machine (✅ done): Steam libraries, HoYoPlay data with a default path for an uninstalled game, Epic manifest, hostile `installdir` (`..\..\Windows`), planted `loginusers.vdf` canary | R3/R4, correct detection |

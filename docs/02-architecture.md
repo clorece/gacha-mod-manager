@@ -181,10 +181,16 @@ folder + mtime is a later optimisation). Conflicts are advisory: GMM never edits
 
 ## Storage accounting
 
-For each game: total size of `Mods/GMM/*`, unmanaged mods, and the download cache. Per-mod size is
-computed on install and refreshed by a background scan (cached, by mtime). Each drive that holds
-an XXMI root shows free space. The Storage screen ([07](07-frontend-design.md)) supports
-multi-select: disable, delete (Recycle Bin), or clear the cached archive only.
+Implemented in `gmm-core::storage` (`gmm storage`). For each game: every managed and unmanaged
+mod's size (largest first), the totals, other files (loose non-mod files in `Mods/` and staging
+leftovers), and free space on the drive. For the cache: downloads (with partial downloads),
+leftover extraction folders, and the GameBanana responses in the database. Sizes are measured on
+disk each time without following links (a walk stops at 500,000 entries and reports "at
+least"); a managed mod's recorded size is corrected when it changed. Free space comes from
+`Guard::available_space` (`fs4`). `gmm storage --clear-downloads` moves every cached archive to
+the Recycle Bin and drops the records; installed mods stay. Planned for the Storage screen
+([07](07-frontend-design.md)): multi-select disable, delete (Recycle Bin), or clear one mod's
+cached archive.
 
 ## Catalog flow (GameBanana apiv11)
 

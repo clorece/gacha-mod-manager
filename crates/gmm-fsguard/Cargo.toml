@@ -9,6 +9,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+fs4.workspace = true
 thiserror.workspace = true
 trash.workspace = true
 

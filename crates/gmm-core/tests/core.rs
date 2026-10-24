@@ -573,7 +573,11 @@ struct FakeTrash(std::sync::Mutex<Vec<String>>);
 impl gmm_core::Trash for FakeTrash {
     fn trash(&self, guard: &gmm_fsguard::Guard, path: &ScopedPath) -> Result<(), CoreError> {
         self.0.lock().unwrap().push(path.rel().to_string());
-        guard.remove_dir_all(path)?;
+        if guard.metadata(path)?.is_dir() {
+            guard.remove_dir_all(path)?;
+        } else {
+            guard.remove_file(path)?;
+        }
         Ok(())
     }
 }
@@ -864,4 +868,67 @@ async fn different_parts_and_libraries_dont_conflict() {
         .unwrap();
     assert!(report.conflicts.is_empty(), "{:?}", report.conflicts);
     assert_eq!(report.libraries.len(), 1);
+}
+
+// ---- storage -----------------------------------------------------------------------------
+
+#[tokio::test]
+async fn storage_measures_mods_cache_and_free_space() {
+    let f = Fixture::new().await;
+    let id = install_named(
+        &f,
+        "Big",
+        1,
+        &[
+            ("m.ini", &ini_for("cccc3333", "ib = R")),
+            ("t.dds", &[0u8; 5000]),
+        ],
+    )
+    .await;
+    fs::create_dir_all(f.mods_dir.join("Manual")).unwrap();
+    fs::write(f.mods_dir.join("Manual/a.dds"), [0u8; 300]).unwrap();
+    fs::write(f.mods_dir.join("notes.txt"), [0u8; 7]).unwrap();
+    // The recorded size drifts when someone adds files by hand; storage corrects it.
+    fs::write(f.gmm().join("Big [gb-1]/extra.dds"), [0u8; 1000]).unwrap();
+
+    let s = gmm_core::game_storage(&f.db, &f.ws, f.mods, zzz())
+        .await
+        .unwrap();
+    assert_eq!(s.managed.len(), 1);
+    let sidecar = fs::metadata(f.gmm().join("Big [gb-1]/gmm.json"))
+        .unwrap()
+        .len();
+    let ini = ini_for("cccc3333", "ib = R").len() as u64;
+    assert_eq!(s.managed_total.bytes, 5000 + 1000 + ini + sidecar);
+    assert_eq!(s.managed_total.files, 4);
+    assert_eq!(s.unmanaged_total.bytes, 300);
+    assert_eq!(s.other.bytes, 7);
+    assert!(s.free_bytes.is_some_and(|b| b > 0));
+    assert_eq!(
+        f.db.installed_mod(id).await.unwrap().unwrap().size_bytes,
+        s.managed_total.bytes
+    );
+
+    let c = gmm_core::cache_storage(&f.db, &f.ws).await.unwrap();
+    assert!(c.downloads.bytes > 0, "the test archive sits in downloads/");
+    assert_eq!(c.extract.bytes, 0, "extraction folders were cleaned up");
+
+    let trash = FakeTrash::default();
+    let cleared = gmm_core::clear_downloads(&f.db, &f.ws, &trash)
+        .await
+        .unwrap();
+    assert_eq!(cleared.archives, 1);
+    assert_eq!(cleared.bytes, c.downloads.bytes);
+    assert_eq!(
+        gmm_core::cache_storage(&f.db, &f.ws)
+            .await
+            .unwrap()
+            .downloads
+            .bytes,
+        0
+    );
+    assert!(
+        f.gmm().join("Big [gb-1]/m.ini").exists(),
+        "installed mods stay"
+    );
 }

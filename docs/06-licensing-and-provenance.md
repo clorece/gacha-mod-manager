@@ -93,7 +93,8 @@ LGPL or AGPL dependency fails the build. Watch out for:
   in `libsqlite3-sys` (MIT) with SQLite's own C source **bundled**. SQLite itself is in the
   public domain; list it in `THIRD-PARTY-NOTICES` anyway. Building it needs a C compiler
   (the MSVC Build Tools the Rust Windows toolchain already uses). `trash` 5 (MIT; Recycle
-  Bin moves, default features off except COM apartment threading, so no `chrono`). Dev-only: `proptest`, `tempfile`, `wiremock`.
+  Bin moves, default features off except COM apartment threading, so no `chrono`). `fs4` 1
+  (MIT OR Apache-2.0; free disk space only, `sync` feature). Dev-only: `proptest`, `tempfile`, `wiremock`.
 - **Facts about other software** come from observing it on the dev machine (file layouts,
   config keys, locale strings), recorded in our own words in `docs/03-game-adapters.md`. The
   HoYoPlay `gamedata.dat` handling, for example, is based only on what the file visibly
