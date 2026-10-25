@@ -18,6 +18,7 @@ mod http_cache;
 mod mods;
 mod profiles;
 mod settings;
+mod toggles;
 
 use std::str::FromStr;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -33,7 +34,8 @@ pub use downloads::{CachedDownload, NewCachedDownload};
 pub use error::DbError;
 pub use mods::{FileChange, InstalledMod, ModCategories, NewInstalledMod};
 pub use profiles::ProfileRow;
-pub use settings::ManualGameFolder;
+pub use settings::{ManualGameFolder, Preferences, Theme};
+pub use toggles::SavedToggles;
 
 /// The database's file name inside GMM's data folder.
 pub const DB_FILE_NAME: &str = "gmm.db";
@@ -55,6 +57,11 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
         3,
         "profiles",
         include_str!("../migrations/0003_profiles.sql"),
+    ),
+    (
+        4,
+        "saved_toggles",
+        include_str!("../migrations/0004_saved_toggles.sql"),
     ),
 ];
 

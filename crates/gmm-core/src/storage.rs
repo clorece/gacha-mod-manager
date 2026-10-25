@@ -12,7 +12,7 @@ use serde::Serialize;
 
 use crate::conflicts::ModRef;
 use crate::error::CoreError;
-use crate::library::{DiskState, Trash, library};
+use crate::library::{DiskState, Remover, library};
 use crate::names::{GMM_DIR, STAGING_DIR, on_disk_name};
 use crate::workspace::Workspace;
 
@@ -181,13 +181,13 @@ pub struct ClearedCache {
     pub bytes: u64,
 }
 
-/// Empties the download cache: every archive (and partial download) goes to the Recycle
-/// Bin, and the records are dropped. Installed mods are not affected; reinstalling one
+/// Empties the download cache: every archive (and partial download) is deleted for good,
+/// and the records are dropped. Installed mods are not affected; reinstalling one
 /// downloads it again.
 pub async fn clear_downloads(
     db: &Db,
     ws: &Workspace,
-    trash: &dyn Trash,
+    remover: &dyn Remover,
 ) -> Result<ClearedCache, CoreError> {
     let guard = ws.guard();
     let downloads = guard.path(ws.cache_root(), "downloads")?;
@@ -201,7 +201,7 @@ pub async fn clear_downloads(
         } else {
             file_size(guard, &entry.path)
         };
-        trash.trash(guard, &entry.path)?;
+        remover.remove(guard, &entry.path)?;
         cleared.archives += 1;
         cleared.bytes += size.bytes;
     }

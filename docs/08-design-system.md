@@ -18,8 +18,10 @@ Development, dev builds only). Built screens: the sidebar with Select Game, the 
 (bubbles, Launch, recently installed, setup), the Mods Library (game cards, search, enable /
 disable all, switches, conflict notice; category, character and select mode wait for stored
 categories) and a first Mod settings panel (switch, details, Uninstall). The rest follow in
-Phase 5. Two details differ from the canvas on purpose: "Last played" isn't shown until GMM
-records it (Phase 5), and mod cards use placeholder art until previews are wired.
+Phase 5. Since 2026-10-25 the game banners carry real key art, the Dashboard bubbles show
+"Played … ago" (or "Not played from GMM yet"), and two screens not on the canvas are built
+from its tokens: the first-run preferences card and the setup guide. Mod cards still use
+placeholder art until previews are wired.
 
 ## Direction
 
@@ -86,7 +88,10 @@ offers the same choice as large banner cards, so the two always agree.
   slides the strip left so the current one leads. Source: GameBanana's top submissions for
   the game (see Data, below).
 - **Toolbar** (one row, wraps when narrow): search · Category dropdown · Characters
-  multi-select · Sort · (right) result count with "N hidden as sensitive". It is **sticky**:
+  multi-select · Sort (Recommended, Recently updated, Newest, Most downloaded, Most liked,
+  Most viewed) · **Hide installed** and **Show sensitive** toggle chips (pills with a small
+  slider switch like the sidebar's theme switch; added 2026-10-25) · (right) result count
+  with "N hidden as sensitive". It is **sticky**:
   once the featured gallery scrolls away, the search and filter row locks to the top of the
   page (on the page background, with a soft shadow under it) while the grid keeps scrolling
   beneath it. Open dropdowns stay above the cards.
@@ -103,12 +108,14 @@ offers the same choice as large banner cards, so the two always agree.
   "Add versions" mode.
 
 ### Mods Library
-- Header: title, one line ("Switch one off and XXMI skips it…"), then the game banner cards
-  (All games / each game, with "N mods · M on").
-- Toolbar: search, Category, Characters on the left; **Enable all**, **Disable all** and
-  **Select** on the right. Sticky like the store's, together with the selection bar. Select
-  mode adds a selection bar under the toolbar ("N selected", a hint, Enable selected /
-  Disable selected / Done) and a checkbox on each card.
+- Header: title, one line ("Switch one off and XXMI skips it…"), **Update all (N)** when the
+  startup check found updates (added 2026-10-25), then the game banner cards (All games /
+  each game, with "N mods · M on").
+- Toolbar: search, Category, Characters and the **Show sensitive** chip on the left;
+  **Enable all**, **Disable all** and **Select** on the right. Sticky like the store's,
+  together with the selection bar. Select mode adds a selection bar under the toolbar ("N
+  selected", a hint, Enable selected / Disable selected / **Delete selected** (red outline,
+  opens the uninstall confirmation; added 2026-10-25) / Done) and a checkbox on each card.
 - Cards: preview, character badge (mods installed through GMM), a round settings button
   (opens Mod settings), name, "Installed 24 Oct 2026" or "Added by hand", size, On/Off label
   and a switch. A mod with versions shows "2 of 8 versions" on its preview; its switch turns
@@ -187,8 +194,23 @@ A panel that slides in from the right (480 px) from a library card's settings bu
   **local install** confirmation (game, versions, blocked files) opened by a file dropped
   on the window or "Install from a file" on Downloads, and the **GameBanana notice** at the
   top of the page while GMM holds off after a "slow down".
-- **Uninstall** (red outline) with a line saying what it does: all versions to the Recycle
-  Bin, archive kept in the cache; for hand-installed mods, the itemized confirmation first.
+- **Uninstall** (red outline) with a line saying what it does: deleted for good together
+  with GMM's downloaded copy (R8, amended 2026-10-25). The confirmation lists each folder and
+  its size and says it won't be in the Recycle Bin; hand-installed folders add a red notice
+  (GameBanana can't give them back). The same dialog serves the Library's Delete selected.
+
+### First run (built 2026-10-25, not on the canvas)
+After the first startup check, the startup screen's layout (mark, lockup, card) with "Before
+you start": Theme (segmented Dark / Light / Match Windows), Show mods marked as sensitive and
+Blur their previews until hovered (switches with On / Off labels; the blur switch is
+disabled while sensitive mods are hidden), a hint that these change later from the Store and
+Library filters and in Settings, and a full-width primary Continue. Nothing else.
+
+### Setup guide (built 2026-10-25, not on the canvas)
+A dialog from a setup card: a row of four step tiles (number, or a green tick when done; the
+current one ringed in `--accent`), the step's title, a short paragraph, a numbered list with
+XXMI's labels in bold, and step actions as default buttons. Footer: Check again on the left,
+Back and Next / Done on the right. Text only.
 
 ### Settings
 Cards: Appearance (Dark / Light / Match Windows), Mods Store (show sensitive mods, blur their
@@ -294,10 +316,15 @@ All colors are CSS custom properties on the app root; `.t-dark` and `.t-light` s
 - **Versions often exclude each other**: the 8 sword versions all replace Anby's weapon, so
   only one can be on. Conflict detection between versions decides this, not names.
 - **Characters have icons** on GameBanana (subcategory icons); Bangboo don't (initials).
-- **Game banner art** has no source yet: GameBanana's game record has no banner, and game key
-  art can't be bundled (trademark, [06](06-licensing-and-provenance.md)). Until decided, the
-  banners are the game's colors and name. Options: a banner you provide per game under a
-  clear license, a top mod's preview image loaded live, or plain styled banners.
+- **Game banner art** (decided 2026-10-25): official key art per game, provided by the
+  project owner, bundled under a notice that it isn't covered by GMM's license and goes on
+  request ([06](06-licensing-and-provenance.md)). `apps/desktop/src/assets/banners/`,
+  1800 × 900 JPEG (about 300–400 KiB each; the source art is 2000 × 1125, and an open bubble
+  on a 2× screen needs about this much), cropped 2:1 with the ZZZ logo cut off. Every banner
+  size uses the same file with `background-size: cover` around a focal point per game (ZZZ
+  `45% 35%`, WuWa `50% 40%`), so the characters stay in frame from the 34 px Downloads chip
+  to the open bubble. Text keeps its dark scrim (`.fade`); the watermark is off on art. A
+  game without art keeps its styled banner (colors and name).
 - **"Last played"** is recorded when GMM's Launch button starts a game (`game_activity`,
   2026-10-25); launches from elsewhere aren't seen.
 - **Character for library cards** comes from the mod's categories, stored at install since
@@ -305,15 +332,16 @@ All colors are CSS custom properties on the app root; `.t-dark` and `.t-light` s
   Skins"); earlier and hand-installed mods have none.
 - **Description images are often off GameBanana's image host**: across ten mods (2026-10-25)
   they were as often on `filecacheNN.gamebanana.com` / `files.gamebanana.com` or imgur-like
-  hosts as on `images.gamebanana.com`. Only the last are shown; the mod page needs a quiet
-  placeholder for the rest.
-- **Report a Bug** will need a destination host (GitHub issues or similar), which the network
-  allowlist (R2) doesn't allow today; that's part of building it, after the beta.
+  hosts as on `images.gamebanana.com`. GameBanana's own hosts (all three) are shown; the mod
+  page needs a quiet placeholder for the rest (imgur and others, never loaded: R2).
+- **Report a Bug** (decided 2026-10-25): a pre-filled GitHub issue opened in the browser, with
+  a local log the user reviews and attaches; GMM itself doesn't connect to GitHub, so the
+  network allowlist (R2) stays as it is.
 
 ## Open design decisions
 
 1. ~~Theme and layout sign-off~~ (done 2026-10-25).
-2. Game banner source (above).
+2. ~~Game banner source~~: official key art, bundled with a notice (2026-10-25, above).
 3. "Powered by GameBanana" in the lockup is descriptive and stays; it changes if GameBanana
    asks (no outreach is planned, roadmap open question 2).
 4. ~~Component library~~: built by hand (`src/ui`, 2026-10-25); dialogs use the native

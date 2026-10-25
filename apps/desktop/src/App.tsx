@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The app shell (docs/08, "Navigation"): the startup check first, then the sidebar and the
-// current page, the install queue, the install confirmation and the local install (a file
+// The app shell (docs/08, "Navigation"): the startup check first, the preferences screen on
+// the first run, then the sidebar and the current page, the install queue, the install confirmation and the local install (a file
 // dropped on the window). Dashboard, Downloads and Mods Library are built; the other pages
 // arrive in Phase 5 (docs/05-roadmap.md).
 
@@ -16,16 +16,20 @@ import { Downloads } from "./pages/Downloads";
 import { Library } from "./pages/Library";
 import { ComingSoon, ReportBug } from "./pages/Placeholders";
 import { Startup } from "./pages/Startup";
+import { Welcome } from "./pages/Welcome";
+import { usePrefs } from "./prefs";
 import { isActive, useQueue } from "./queue";
 import { type Page, Sidebar } from "./shell/Sidebar";
-import { useTheme } from "./theme";
+import { useAppliedTheme } from "./theme";
 
 // Dev builds only; `import.meta.env.DEV` is false in release builds, so the page is dropped.
 const StyleGuide = import.meta.env.DEV ? lazy(() => import("./pages/StyleGuide")) : null;
 
 export default function App() {
   const data = useAppData();
-  const { theme, choose } = useTheme();
+  const { prefs, loaded, update } = usePrefs();
+  const theme = useAppliedTheme(prefs.theme);
+  const choose = (next: typeof prefs.theme) => void update({ theme: next });
   const [page, setPage] = useState<Page>("dashboard");
   const [scope, setScope] = useState<Scope>(ALL);
   const [started, setStarted] = useState(false);
@@ -43,6 +47,10 @@ export default function App() {
   useEffect(() => {
     api.dropWatch((name) => setLocalFile(name)).catch(() => {});
   }, []);
+
+  if (started && loaded && !prefs.onboarded) {
+    return <Welcome />;
+  }
 
   if (!started) {
     return (

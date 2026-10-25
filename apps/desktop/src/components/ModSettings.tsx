@@ -6,10 +6,11 @@
 
 import { useState } from "react";
 import { api, asCmdError, type ModUpdateInfo, type UninstallItem } from "../api";
-import { bytes, plural } from "../format";
+import { bytes } from "../format";
 import type { LibraryItem } from "../pages/Library";
-import { Button, Dialog, SidePanel, Switch, useToast } from "../ui";
+import { Button, SidePanel, Switch, useToast } from "../ui";
 import { ActionsSection, KeySection, UpdateSection } from "./ModExtras";
+import { UninstallDialog } from "./UninstallDialog";
 
 export function ModSettings({
   item,
@@ -33,28 +34,11 @@ export function ModSettings({
 }) {
   const toast = useToast();
   const [preview, setPreview] = useState<UninstallItem[] | null>(null);
-  const [busy, setBusy] = useState(false);
-
   const askUninstall = async () => {
     try {
       setPreview(await api.uninstallPreview(item.game.id, [item.key]));
     } catch (e) {
       toast("bad", asCmdError(e).message);
-    }
-  };
-
-  const uninstall = async () => {
-    setBusy(true);
-    try {
-      const done = await api.uninstall(item.game.id, [item.key]);
-      const trashed = done.some((d) => d.trashed);
-      toast("ok", trashed ? `${item.name} moved to the Recycle Bin.` : `${item.name} removed from GMM's list.`);
-      setPreview(null);
-      await onRemoved();
-    } catch (e) {
-      toast("bad", asCmdError(e).message);
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -113,52 +97,22 @@ export function ModSettings({
           </Button>
           <p className="sub">
             {item.hand
-              ? "Moves the folder to the Recycle Bin. GMM shows exactly what goes first."
-              : "Moves the mod to the Recycle Bin. The downloaded archive stays in GMM's cache."}
+              ? "Deletes the folder for good. GMM shows exactly what goes first."
+              : "Deletes the mod and GMM's downloaded copy for good. You can always install it again."}
           </p>
         </section>
       </SidePanel>
 
       {preview && (
-        <Dialog
-          eyebrow="Uninstall"
-          title={`Move ${plural(preview.length, "mod")} to the Recycle Bin?`}
+        <UninstallDialog
+          game={item.game.id}
+          items={preview}
           onClose={() => setPreview(null)}
-          footer={
-            <>
-              <Button onClick={() => setPreview(null)}>Cancel</Button>
-              <Button variant="danger" disabled={busy} onClick={uninstall}>
-                Move to Recycle Bin
-              </Button>
-            </>
-          }
-        >
-          {preview.map((p) => (
-            <div key={p.folder} className="kv">
-              <div className="kv-row">
-                <span>Mod</span>
-                <b>{p.name}</b>
-              </div>
-              <div className="kv-row">
-                <span>Folder</span>
-                <b className="mono">{p.folder}</b>
-              </div>
-              <div className="kv-row">
-                <span>Size</span>
-                <b>
-                  {p.truncated ? "at least " : ""}
-                  {bytes(p.bytes)}
-                  {p.files !== null ? ` · ${plural(p.files, "file")}` : ""}
-                </b>
-              </div>
-            </div>
-          ))}
-          {preview.some((p) => p.hand_installed) && (
-            <p className="hint">
-              This folder wasn't installed by GMM: it holds your own files. You can restore it from the Recycle Bin.
-            </p>
-          )}
-        </Dialog>
+          onDone={async () => {
+            setPreview(null);
+            await onRemoved();
+          }}
+        />
       )}
     </>
   );

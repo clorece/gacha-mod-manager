@@ -203,6 +203,8 @@ fn main() {
             commands::launch_plan,
             commands::launch,
             commands::settings,
+            commands::preferences,
+            commands::set_preferences,
             commands::pick_xxmi_folder,
             commands::clear_xxmi_folder,
             commands::pick_game_folder,

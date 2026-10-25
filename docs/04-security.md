@@ -16,7 +16,7 @@ does is the failure we design out.
 | T6 | **Deep-link abuse** (Phase 6) | `gmm://install?url=https://evil/` | Deep links carry GB ids only, plus a confirmation dialog |
 | T7 | **Supply chain** | Malicious crate/npm package | Lockfiles, `cargo-deny`, minimal deps, license + advisory checks |
 | T8 | **Update channel compromise** | Fake GMM update | Signed Tauri updates, keys offline, GitHub Releases only |
-| T9 | **Data loss** | Deleting the wrong mods | Deletes go to the Recycle Bin; unmanaged mods are never auto-deleted |
+| T9 | **Data loss** | Deleting the wrong mods | Nothing is deleted without an itemized confirmation (stronger for hand-installed mods); unmanaged mods are never auto-deleted; deletes are permanent by the user's choice (R8) |
 | T10 | **Account / ToS risk** | Anti-cheat flags modded client | Per-game risk notice; GMM never injects; no anti-cheat bypass, ever |
 
 ## Hard rules (enforced in code and CI)
@@ -68,8 +68,19 @@ does is the failure we design out.
     or picked): that folder is registered read-only on a separate guard for the one copy into
     GMM's cache (a regular `.zip`/`.7z`/`.rar` file, size-capped), and nothing else in it is
     read. The path comes from the OS drop event or a native dialog, both handled in Rust (R5).
-  - **`d3dx_user.ini` is not written.** Profiles would need to snapshot and restore it (it sits
-    in `<IMP>/`, outside `Mods/`); that waits on an explicit amendment of this rule.
+  - **`d3dx_user.ini` is the one file GMM writes outside `Mods/`** (amended 2026-10-25, the
+    project owner's decision). 3DMigoto keeps each mod's saved in-game toggles there, keyed by
+    the mod's path, and drops them while the mod is switched off (`DISABLED `), so GMM keeps
+    them across a switch (`gmm-core/src/toggles.rs`). Fenced in: the file is reached through a
+    guard of its own whose only path is `<IMP>/d3dx_user.ini` (nothing else in `<IMP>/` becomes
+    writable); GMM copies a mod's lines into its database before switching it off and only ever
+    *adds* lines it saved from that same file, never changing or removing one; a copy of the
+    old file goes to `cache/backups/d3dx_user/` before each write (the newest ten are kept);
+    the write is atomic (a temporary sibling, then a rename); and nothing is written while the
+    game is running (checked by process image name, `gmm_xxmi::game_running`): the write-back
+    then waits and happens before GMM's next launch of the game or at the next switch. The
+    file-access harness allows exactly this file (and its temporary sibling) and checks that a
+    switch off and on puts the dropped line back.
 - **R4 — Never read secrets or personal data.** Denylisted by name, even inside allowed roots:
   - Steam `config/loginusers.vdf`, `config/config.vdf`, `local.vdf`, `ssfn*`, `userdata/`
   - Game logs (`Player.log`, `output_log.txt`) and launcher login caches
@@ -115,6 +126,9 @@ does is the failure we design out.
   `requireAdministrator`; a plain process start fails with Windows error 740), so on Windows
   it is started with `ShellExecuteExW` and the default verb, like Explorer starting XXMI's own
   Quick Start shortcut: Windows shows its UAC prompt, and declining it is reported, not retried.
+  The same module also answers "is the game running?" for the `d3dx_user.ini` write (R3):
+  a Windows ToolHelp snapshot of process image names, compared with the manifest's exe names;
+  nothing else about other processes is read or kept (always "no" elsewhere for now).
   Reviewed `unsafe` code is limited to three files: this module, the helper's job object
   (`gmm-archive/src/helper.rs`) and the helper itself (`gmm-extract/src/main.rs` with its
   `ffi` and `lockdown` modules: the UnRAR calls and the helper's own lockdown). The workspace
@@ -128,13 +142,19 @@ does is the failure we design out.
   GameBanana can't answer. A 429, a 503 with `Retry-After` or a Cloudflare challenge pauses
   every GameBanana client of the app at once (`gmm-net/src/cooldown.rs`) and is never
   retried in a loop; GMM never tries to pass a challenge.
-- **R8 — Recoverable deletes.** Uninstall and storage deletes go through the Recycle Bin
-  (`gmm_fsguard::Guard::move_to_trash`, the only caller of the `trash` crate; it applies the
-  same read-write-root checks as any write). Unmanaged (hand-installed) mods are never deleted
-  without an explicit, itemized confirmation: `gmm uninstall <name>` resolves every name first,
-  lists each folder with its full path, file count and size, and asks `[y/N]`; without a
-  terminal only `--yes` confirms. The removal then takes the exact listed path, nothing looser,
-  and goes to the Recycle Bin too.
+- **R8 — Confirmed, thorough deletes** (amended 2026-10-25, the project owner's decision:
+  an uninstall the user confirmed should leave nothing behind, and filling the Recycle Bin
+  only makes them clean up again). Every delete GMM makes for the user (uninstall, the
+  Library's select-mode delete, clearing the download cache, the previous folders an update
+  or roll back replaces) is **permanent**, through `gmm_fsguard::Guard::delete`, which applies
+  the same read-write-root checks as any write, refuses a root itself, removes links without
+  following them and clears read-only attributes first. Uninstalling the last version of a
+  GameBanana mod also deletes its archives from the download cache. Nothing is deleted
+  without a confirmation that lists what goes: the app's dialog shows each mod, its folder
+  and size and says the delete is permanent; hand-installed folders get a stronger warning
+  (GameBanana can't give them back). `gmm uninstall <name>` resolves every name first, lists
+  each folder with its full path, file count and size, and asks `[y/N]`; without a terminal
+  only `--yes` confirms. The removal then takes the exact listed path, nothing looser.
 
 ## Archive hardening (gmm-archive)
 
@@ -248,7 +268,7 @@ does is the failure we design out.
 | 0b | **XXMI config secret test** (✅ done): fixture configs with canary `github_token`, proxy password and signatures; asserts they never appear in parsed config, `GameStatus` JSON or `Debug`, and parse errors don't echo content. Phase 2: the conformance suite checks the DB file, cache and mod folders too. ⏳ logs and IPC output when those exist | R4 |
 | 0b | Detection on a fake machine (✅ done): Steam libraries, HoYoPlay data with a default path for an uninstalled game, Epic manifest, hostile `installdir` (`..\..\Windows`), planted `loginusers.vdf` canary | R3/R4, correct detection |
 | 2 | **Egress harness** (✅ done, `crates/gmm-cli/tests/privacy.rs`): the real `gmm` binary runs every network command behind an in-test proxy that logs and refuses each request. Every `CONNECT` target must pass `Allowlist::production()` on port 443, at least one must be seen, and local commands (detect, status, config, list, conflicts, storage, launch) must make none. On Linux CI each `gmm` process also runs under `strace`, and any IPv4/IPv6 connection that isn't loopback (traffic bypassing the proxy) fails the run. ⏳ a Windows equivalent of the bypass check (firewall rule) | R2 |
-| 2 | **File-access harness** (✅ done, same test): a fake profile with canary files (Steam `loginusers.vdf`, `config.vdf`, `userdata/`, a game `Player.log`, a browser `logins.json`, `~/.ssh/id_rsa`) and secrets in XXMI's config; GMM's folders redirected with `GMM_HOME`. Asserts nothing in the profile outside `Mods/` changed and no canary content reached GMM's files. Under `strace` (Linux CI) it also fails if any canary is opened or stat-ed, or any write lands outside `GMM_HOME` and `Mods/`. ⏳ Process Monitor on Windows | R3/R4 |
+| 2 | **File-access harness** (✅ done, same test): a fake profile with canary files (Steam `loginusers.vdf`, `config.vdf`, `userdata/`, a game `Player.log`, a browser `logins.json`, `~/.ssh/id_rsa`) and secrets in XXMI's config; GMM's folders redirected with `GMM_HOME`. Asserts nothing in the profile outside `Mods/` changed except `d3dx_user.ini` (2026-10-25: a hand-installed mod is switched off, its toggle line dropped as 3DMigoto would, and switched on again; the line must be back and the rest of the file unchanged), and no canary content reached GMM's files. Under `strace` (Linux CI) it also fails if any canary is opened or stat-ed, or any write lands outside `GMM_HOME`, `Mods/` and `d3dx_user.ini` (with its temporary sibling). ⏳ Process Monitor on Windows | R3/R4 |
 | 5 | IPC fuzz: hostile args to every Tauri command. ⏳ Not automated yet; checked by hand in the running app (2026-10-24): an unknown game id (`../../etc`), an unmanaged key `../XXMI Launcher Config.json`, an image key GMM never issued, and plugin commands are all refused; 2026-10-25: `open_mod_folder` with an unmanaged key `../../Windows` and an unknown mod id is refused | R5 |
 | 2 | Slow-down tests (✅ `gmm-net`, `gmm-catalog`): a 429 pauses every sibling client with no further request, a Cloudflare challenge counts, a plain 403 doesn't, a download keeps its partial file, saved answers stand in (never for a 404), identical requests are fetched once | R2a |
 | 6 | Share-code tests (✅ `gmm-core/tests/core.rs`): garbage, a newer format, another game, an unknown game, an empty name and an oversized code are refused | R5 |

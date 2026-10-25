@@ -21,5 +21,7 @@ mod status;
 pub use config::{ImporterConfig, XxmiConfig};
 pub use find::{XxmiInstall, find_xxmi, open_xxmi};
 pub use importer::{ImporterInfo, ModsSummary, inspect_importer};
-pub use launch::{LaunchCommand, MAX_PAGE_URL, launch, launch_command, open_folder, open_page};
+pub use launch::{
+    LaunchCommand, MAX_PAGE_URL, game_running, launch, launch_command, open_folder, open_page,
+};
 pub use status::{GameStatus, SetupState, XXMI_RELEASES, evaluate};

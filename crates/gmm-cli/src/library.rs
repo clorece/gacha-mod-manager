@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use gmm_adapters::{GameManifest, Registry};
 use gmm_core::{
-    Conflict, DiskState, ModsTarget, RecycleBin, SetupHints, UnmanagedMod, conflicts, library,
+    Conflict, DeleteForever, DiskState, ModsTarget, SetupHints, UnmanagedMod, conflicts, library,
     on_disk_name,
 };
 use gmm_db::Db;
@@ -259,12 +259,12 @@ pub async fn storage(
 ) -> Result<(), AnyError> {
     let ws = gmm_core::Workspace::open(&gmm_core::AppDirs::system()?.cache)?;
     if clear_downloads {
-        let cleared = gmm_core::clear_downloads(db, &ws, &RecycleBin).await?;
+        let cleared = gmm_core::clear_downloads(db, &ws, &DeleteForever).await?;
         if json {
             println!("{}", serde_json::to_string_pretty(&cleared)?);
         } else {
             println!(
-                "moved {} cached download(s) ({}) to the Recycle Bin",
+                "deleted {} cached download(s) ({})",
                 cleared.archives,
                 bytes(cleared.bytes)
             );

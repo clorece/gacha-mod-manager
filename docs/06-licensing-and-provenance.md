@@ -98,13 +98,14 @@ LGPL or AGPL dependency fails the build. Watch out for:
   `rustls` (ring), `tokio`, `serde`/`serde_json`, `toml`, `url`, `sha2`, `md-5`, `hex`, `clap`,
   `dirs`, `thiserror`, `pelite` (MIT; reads `d3d11.dll`'s version resource), `winreg` (MIT;
   Windows registry reads), `windows-sys` 0.61 (MIT OR Apache-2.0; the `ShellExecuteExW` call
-  that starts XXMI, the RAR helper's job object and its lockdown), `cc` (MIT OR Apache-2.0;
+  that starts XXMI, the "is the game running" process-name check, the RAR helper's job object
+  and its lockdown), `cc` (MIT OR Apache-2.0;
   build-time, compiles the vendored UnRAR), `libc` (MIT OR Apache-2.0; the helper's Linux
   lockdown), `sqlx` 0.9 (MIT OR Apache-2.0; SQLite only, no macros), which pulls
   in `libsqlite3-sys` (MIT) with SQLite's own C source **bundled**. SQLite itself is in the
   public domain; list it in `THIRD-PARTY-NOTICES` anyway. Building it needs a C compiler
-  (the MSVC Build Tools the Rust Windows toolchain already uses). `trash` 5 (MIT; Recycle
-  Bin moves, default features off except COM apartment threading, so no `chrono`). `fs4` 1
+  (the MSVC Build Tools the Rust Windows toolchain already uses). (`trash` was removed on
+  2026-10-25: deletes are permanent now, R8.) `fs4` 1
   (MIT OR Apache-2.0; free disk space only, `sync` feature). Dev-only: `proptest`, `tempfile`, `wiremock`.
 - **Desktop app** (Phase 3, all pass `cargo deny`): `tauri` 2.12 (Apache-2.0 OR MIT; default
   features minus `dynamic-acl` and `dbus`), `tauri-build` 2.7, `tauri-plugin-dialog` 2.8
@@ -125,8 +126,18 @@ LGPL or AGPL dependency fails the build. Watch out for:
   `@fontsource-variable/nunito`) under the SIL Open Font License 1.1 (OFL-1.1): free to bundle
   and ship with software, not sold on its own, and its notice and license text must travel with
   it. The npm license check allows OFL-1.1 for that one package only, and
-  `THIRD-PARTY-NOTICES.md` (repo root) carries the copyright line and the full license. Game key art and logos are not used (see "Names and trademarks"); GameBanana's logo
-  is never used, only its name as text.
+  `THIRD-PARTY-NOTICES.md` (repo root) carries the copyright line and the full license.
+  GameBanana's logo is never used, only its name as text.
+- **Game banner art** (`apps/desktop/src/assets/banners/`, 2026-10-25, the project owner's
+  decision): official key art of Zenless Zone Zero (© COGNOSPHERE / HoYoverse) and Wuthering
+  Waves (© Kuro Games), provided by the project owner, cropped to 2:1 and recompressed (the ZZZ
+  logo cropped out). The **one exception** to "everything shipped is ours or openly
+  licensed": no published fan-content policy of either publisher covering software was found
+  (checked 2026-10-25), so it is used descriptively, to identify each game, with a notice
+  in `THIRD-PARTY-NOTICES.md` and the README that the art isn't covered by GMM's license and
+  will be removed or replaced at the owners' request. Game logos are not used. A game
+  without art gets the styled banner (its colors and name). Revisit before the public beta
+  ("Before the first public release", below).
 - **Facts about other software** come from observing it on the dev machine (file layouts,
   config keys, locale strings), recorded in our own words in `docs/03-game-adapters.md`. The
   HoYoPlay `gamedata.dat` handling, for example, is based only on what the file visibly
@@ -168,6 +179,8 @@ LGPL or AGPL dependency fails the build. Watch out for:
 - [ ] Name cleared; disclaimer in README and About
 - [ ] Setup guide and About credit XXMI and link to its official repo/releases
 - [ ] README Credits section current (GameBanana, mod creators, XXMI, 3Dmigoto, UnRAR, Nunito,
-      libraries) with the contact line for credit changes or removal. No GameBanana outreach
+      game banner art, libraries) with the contact line for credit changes or removal. No GameBanana outreach
       (decided 2026-10-25, [10](10-gamebanana-api.md)); comply with any request they make
+- [ ] Game banner art: still wanted, notice current, no request from HoYoverse or Kuro Games to
+      remove it (exception above)
 - [ ] `docs/research/` removed from the public repo or marked as prior art

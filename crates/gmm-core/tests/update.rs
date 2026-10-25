@@ -14,7 +14,7 @@ use std::time::Duration;
 use gmm_adapters::{GameManifest, Registry};
 use gmm_catalog::{GameBanana, NoCache};
 use gmm_core::{
-    CoreError, InstallOptions, InstallRequest, StopSignal, Trash, VariantChoice, Workspace,
+    CoreError, InstallOptions, InstallRequest, Remover, StopSignal, VariantChoice, Workspace,
     change_file, install, rollback_choices, set_enabled,
 };
 use gmm_db::Db;
@@ -58,10 +58,10 @@ fn net() -> Client {
 }
 
 #[derive(Default)]
-struct FakeTrash(Mutex<Vec<String>>);
+struct FakeRemover(Mutex<Vec<String>>);
 
-impl Trash for FakeTrash {
-    fn trash(&self, guard: &Guard, path: &ScopedPath) -> Result<(), CoreError> {
+impl Remover for FakeRemover {
+    fn remove(&self, guard: &Guard, path: &ScopedPath) -> Result<(), CoreError> {
         self.0.lock().unwrap().push(path.rel().to_string());
         guard.remove_dir_all(path)?;
         Ok(())
@@ -158,7 +158,7 @@ impl Env {
     async fn change(
         &self,
         file: Option<u64>,
-        trash: &FakeTrash,
+        remover: &FakeRemover,
     ) -> Result<gmm_core::FileChangeReport, CoreError> {
         change_file(
             &self.gb,
@@ -169,7 +169,7 @@ impl Env {
             zzz(),
             MOD,
             file,
-            trash,
+            remover,
             &StopSignal::new(),
             |_| {},
         )
@@ -207,8 +207,8 @@ async fn update_keeps_the_folder_name_and_switch_then_rolls_back_from_the_cache(
         .await
         .unwrap();
 
-    let trash = FakeTrash::default();
-    let report = env.change(None, &trash).await.unwrap();
+    let remover = FakeRemover::default();
+    let report = env.change(None, &remover).await.unwrap();
     assert_eq!(report.file.id, NEW);
     assert_eq!(report.changed.len(), 1);
     assert_eq!(report.changed[0].id, ids[0], "same database row");
@@ -224,12 +224,16 @@ async fn update_keeps_the_folder_name_and_switch_then_rolls_back_from_the_cache(
     let sidecar: serde_json::Value =
         serde_json::from_slice(&fs::read(disabled.join("gmm.json")).unwrap()).unwrap();
     assert_eq!(sidecar["gb_file_id"], NEW);
-    assert_eq!(trash.0.lock().unwrap().len(), 1, "previous folder trashed");
+    assert_eq!(
+        remover.0.lock().unwrap().len(),
+        1,
+        "previous folder removed"
+    );
 
     // Roll back: the old archive is still cached, so nothing is downloaded again.
     assert_eq!(rollback_choices(&env.db, zzz(), MOD).await.unwrap(), [OLD]);
     let before = env.downloads_of(OLD).await;
-    let back = env.change(Some(OLD), &trash).await.unwrap();
+    let back = env.change(Some(OLD), &remover).await.unwrap();
     assert_eq!(back.file.id, OLD);
     assert_eq!(env.downloads_of(OLD).await, before);
     assert_eq!(fs::read(disabled.join("body.dds")).unwrap(), b"v1");
@@ -241,7 +245,7 @@ async fn update_keeps_the_folder_name_and_switch_then_rolls_back_from_the_cache(
     assert_eq!(gmm_entries, [format!("DISABLED {folder}")]);
 
     // Already on that file: nothing to do.
-    let same = env.change(Some(OLD), &trash).await.unwrap();
+    let same = env.change(Some(OLD), &remover).await.unwrap();
     assert!(same.changed.is_empty());
     assert_eq!(same.kept, [folder]);
 }
@@ -259,8 +263,8 @@ async fn versions_are_matched_by_name_and_missing_ones_are_kept() {
     let env = Env::new(&old, &new).await;
     env.install_old(VariantChoice::All).await;
 
-    let trash = FakeTrash::default();
-    let report = env.change(None, &trash).await.unwrap();
+    let remover = FakeRemover::default();
+    let report = env.change(None, &remover).await.unwrap();
     assert_eq!(report.changed.len(), 1);
     assert!(report.changed[0].folder_name.contains("(Red)"));
     assert_eq!(report.kept.len(), 1);
@@ -277,7 +281,7 @@ async fn a_file_without_a_mod_changes_nothing() {
     let new = zip_of(&[("readme.txt", b"moved to another page")]);
     let env = Env::new(&old, &new).await;
     let ids = env.install_old(VariantChoice::Only).await;
-    let err = env.change(None, &FakeTrash::default()).await.unwrap_err();
+    let err = env.change(None, &FakeRemover::default()).await.unwrap_err();
     assert!(matches!(err, CoreError::NotAMod { .. }), "{err}");
     let row = env.db.installed_mod(ids[0]).await.unwrap().unwrap();
     assert_eq!(row.gb_file_id, Some(OLD));
@@ -291,7 +295,7 @@ async fn a_file_without_a_mod_changes_nothing() {
 #[tokio::test]
 async fn not_installed_is_refused() {
     let env = Env::new(&zip_of(&[("a/a.ini", INI)]), &zip_of(&[("a/a.ini", INI)])).await;
-    let err = env.change(None, &FakeTrash::default()).await.unwrap_err();
+    let err = env.change(None, &FakeRemover::default()).await.unwrap_err();
     assert!(matches!(err, CoreError::NotInstalled { .. }), "{err}");
 }
 
@@ -345,7 +349,7 @@ async fn a_hand_installed_folder_is_adopted_then_updates_like_any_other() {
     assert_eq!((row.gb_mod_id, row.gb_file_id), (Some(MOD), Some(OLD)));
 
     // Now it's GMM's: an update swaps its files in under the same name.
-    let report = env.change(None, &FakeTrash::default()).await.unwrap();
+    let report = env.change(None, &FakeRemover::default()).await.unwrap();
     assert_eq!(report.changed.len(), 1);
     assert_eq!(fs::read(inside.join("body.dds")).unwrap(), b"v2");
 

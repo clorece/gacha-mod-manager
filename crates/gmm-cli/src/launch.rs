@@ -5,7 +5,7 @@
 use std::io::{BufRead, IsTerminal, Write};
 
 use gmm_adapters::GameManifest;
-use gmm_core::{Machine, SetupHints, confirm_exe, start};
+use gmm_core::{Machine, ModsTarget, SetupHints, confirm_exe, restore_pending, start};
 use gmm_db::Db;
 
 use crate::AnyError;
@@ -17,10 +17,8 @@ pub async fn run(
     hints: SetupHints,
     json: bool,
 ) -> Result<(), AnyError> {
-    let mut plan = Machine::scan(db, hints)
-        .await?
-        .launch_plan(db, game)
-        .await?;
+    let machine = Machine::scan(db, hints).await?;
+    let mut plan = machine.launch_plan(db, game).await?;
 
     if !plan.confirmed {
         let exe = plan.command.exe.display().to_string();
@@ -48,6 +46,10 @@ pub async fn run(
         confirm_exe(db, &mut plan).await?;
     }
 
+    // In-game toggles that waited for the game to close go back before it starts again.
+    if let Ok(target) = ModsTarget::from_machine(&machine, game) {
+        let _ = restore_pending(db, &target.ws, target.mods, game).await;
+    }
     let pid = start(db, game, &plan).await?;
     if json {
         println!(

@@ -8,7 +8,7 @@ import type { GameInfo, GameStatus } from "../api";
 import { useLaunch } from "../components/Launch";
 import { SetupCard } from "../components/SetupCard";
 import { type AppData, modCounts } from "../data";
-import { bytes, day, plural } from "../format";
+import { ago, bytes, day, plural } from "../format";
 import { bannerClass, launchRoute, setupLabel, sourceLabel } from "../games";
 import { Button, Chip, Icon, Notice } from "../ui";
 
@@ -172,6 +172,10 @@ function GameBubble({
           <span className="meta" title="Mods installed">
             <Icon name="download" size={14} stroke={2.6} />
             {plural(counts.total, "mod")}
+          </span>
+          <span className="meta" title="Last started from GMM">
+            <Icon name="clock" size={14} stroke={2.6} />
+            {game.last_played ? `Played ${ago(game.last_played)}` : "Not played from GMM yet"}
           </span>
           <span className="meta">
             <span className={`dot${state.tone === "ok" ? "" : ` dot-${state.tone}`}`} aria-hidden="true" />

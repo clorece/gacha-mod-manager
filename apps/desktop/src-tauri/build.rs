@@ -39,6 +39,8 @@ const COMMANDS: &[&str] = &[
     "launch_plan",
     "launch",
     "settings",
+    "preferences",
+    "set_preferences",
     "pick_xxmi_folder",
     "clear_xxmi_folder",
     "pick_game_folder",

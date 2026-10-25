@@ -30,7 +30,7 @@ fn render() -> String {
         InstallArgs, InstallProgress, InstallResult, Toggled, UninstallItem, Uninstalled,
         GameStorageView, StorageView, LaunchInfo, Launched, FolderRow, Settings, StepState,
         StartupStep, StartupReport, CardStats, NetworkStatus,
-        RollbackFile,
+        RollbackFile, ThemeChoice, Preferences,
         // Setup (gmm-xxmi, gmm-detect).
         gmm_xxmi::GameStatus, gmm_xxmi::SetupState, gmm_xxmi::ImporterInfo,
         gmm_xxmi::ModsSummary, gmm_detect::GameInstall, gmm_detect::InstallSource,

@@ -69,6 +69,11 @@ const CANARY_NAMES: &[&str] = &[
     "logins.json",
     "id_rsa",
 ];
+/// The hand-installed mod's saved in-game toggle in `d3dx_user.ini`.
+const MANUAL_KEY: &str = "$\\mods\\manual\\manual.ini\\v = 3\r\n";
+/// 3DMigoto's `d3dx_user.ini` as the harness starts it: XXMI's own key and the mod's.
+const USER_INI: &str = "; AUTOMATICALLY GENERATED FILE - DO NOT EDIT\r\n[Constants]\r\n\
+    $\\zzmiv1\\shown = 1\r\n$\\mods\\manual\\manual.ini\\v = 3\r\n";
 
 // ---- a refusing, logging proxy ---------------------------------------------------------
 
@@ -125,6 +130,8 @@ struct World {
     xxmi: PathBuf,
     game: PathBuf,
     mods: PathBuf,
+    /// 3DMigoto's saved toggles: the one file outside Mods/ GMM may write (R3).
+    user_ini: PathBuf,
     traces: PathBuf,
     proxy: Proxy,
     strace: bool,
@@ -181,6 +188,8 @@ impl World {
             &mods.join("Manual/manual.ini"),
             b"[TextureOverrideManual]\nhash = 11111111\nib = R\n",
         );
+        let user_ini = zzmi.join("d3dx_user.ini");
+        write(&user_ini, USER_INI.as_bytes());
 
         let traces = base.join("traces");
         fs::create_dir_all(&traces).unwrap();
@@ -193,6 +202,7 @@ impl World {
             xxmi,
             game,
             mods,
+            user_ini,
             traces,
             proxy: Proxy::start(),
             strace,
@@ -362,6 +372,10 @@ fn egress_and_file_access() {
         ("config-show", vec!["config", "show"]),
         ("list", vec!["list"]),
         ("conflicts", vec!["conflicts"]),
+        // Switching off saves the mod's toggles; switching on writes back what the game
+        // dropped in between (the loop below drops it before "enable").
+        ("disable", vec!["disable", "Manual", "--game", "zzz"]),
+        ("enable", vec!["enable", "Manual", "--game", "zzz"]),
         ("storage", vec!["storage"]),
         // Nothing installed, so there is nothing to check.
         ("update-check", vec!["update"]),
@@ -376,6 +390,10 @@ fn egress_and_file_access() {
         ("config-clear", vec!["config", "clear-xxmi"]),
     ];
     for (name, args) in &local {
+        if *name == "enable" {
+            // What 3DMigoto does when it saves while the mod is off.
+            fs::write(&w.user_ini, USER_INI.replace(MANUAL_KEY, "")).unwrap();
+        }
         let out = w.run(name, args);
         let expect_ok = *name != "launch";
         assert_eq!(
@@ -402,13 +420,17 @@ fn egress_and_file_access() {
         &w.proxy.targets()[seen..]
     );
 
-    // Nothing in the profile changed except under Mods/ (and nothing changed there either:
-    // no install succeeded).
-    assert_eq!(
-        snapshot(&w.profile, &[&w.mods]),
-        before,
-        "a file outside GMM's folders changed"
-    );
+    // Nothing in the profile changed except under Mods/ (a mod switched off and on again; no
+    // install succeeded) and d3dx_user.ini, which holds the mod's toggle again.
+    // (The importer folder's own entry changes too: a file inside it was replaced.)
+    let importer_dir = w.user_ini.parent().unwrap();
+    let mut expected = before;
+    expected.remove(&w.user_ini);
+    expected.remove(importer_dir);
+    let mut after = snapshot(&w.profile, &[&w.mods, &w.user_ini]);
+    after.remove(importer_dir);
+    assert_eq!(after, expected, "a file outside GMM's folders changed");
+    assert_eq!(fs::read_to_string(&w.user_ini).unwrap(), USER_INI);
 
     // No canary content in GMM's own files.
     for file in files_below(&w.gmm_home) {
@@ -432,6 +454,15 @@ fn egress_and_file_access() {
 
 fn check_traces(w: &World) {
     let allowed_write_roots = [w.gmm_home.clone(), w.mods.clone()];
+    // d3dx_user.ini, and the temporary file it is written through (`.d3dx_user.ini.gmm-tmp-*`).
+    let user_ini_dir = w.user_ini.parent().unwrap();
+    let is_user_ini = |path: &Path| {
+        path.parent() == Some(user_ini_dir)
+            && path.file_name().is_some_and(|n| {
+                let n = n.to_string_lossy();
+                n == "d3dx_user.ini" || n.starts_with(".d3dx_user.ini.gmm-tmp-")
+            })
+    };
     let mut checked = 0;
     for trace in files_below(&w.traces) {
         let text = fs::read_to_string(&trace).unwrap();
@@ -449,6 +480,7 @@ fn check_traces(w: &World) {
                 for path in quoted(line) {
                     let ok = path.starts_with("/dev/")
                         || path.starts_with("/proc/")
+                        || is_user_ini(Path::new(&path))
                         || allowed_write_roots
                             .iter()
                             .any(|r| Path::new(&path).starts_with(r));

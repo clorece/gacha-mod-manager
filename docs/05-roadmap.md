@@ -14,7 +14,7 @@ the code they guard ([04](04-security.md)). When a phase finishes, every doc get
 | 0b — Setup check | 2026-10-23 | `gmm-detect` (Steam, HoYoPlay, Epic, manual), `gmm-xxmi` (allowlisted config read, importer checks), the setup states with fix steps, `gmm detect` / `gmm status` |
 | In-game checks | 2026-10-24 | Confirmed in game: `DISABLED ` hides a mod, nested `Mods/GMM/<mod>/` loads, Quick Start works, WuWa's Steam copy runs with Game Launch = Direct |
 | 1 — Foundations | 2026-10-23 | Workspace, CI (Windows + Linux), `cargo-deny`; `gmm-fsguard`, `gmm-net`, `gmm-archive` (zip/7z, malicious corpus), `gmm-catalog`, `gmm-adapters`; `gmm catalog`, `gmm fetch` |
-| 2 — Backend features | 2026-10-24 | `gmm-db`, `gmm-core` (install pipeline, library, toggle, uninstall to the Recycle Bin, conflicts, storage, launch through XXMI), `gmm-migoto`; the adapter conformance suite and the egress / file-access privacy harnesses. Exit check passed in game with Casual Velina (GameBanana 688491) |
+| 2 — Backend features | 2026-10-24 | `gmm-db`, `gmm-core` (install pipeline, library, toggle, uninstall (to the Recycle Bin then; permanent since 2026-10-25), conflicts, storage, launch through XXMI), `gmm-migoto`; the adapter conformance suite and the egress / file-access privacy harnesses. Exit check passed in game with Casual Velina (GameBanana 688491) |
 | 4 — Design | 2026-10-25 | The design canvas (23 artboards, dark and light; signed off) written up in [08](08-design-system.md), file formats in [09](09-archive-formats.md); in the app: the tokens and base styles for both themes in `styles.css`, Nunito bundled (OFL-1.1 exception, `THIRD-PARTY-NOTICES.md`), hand-built primitives in `src/ui` (button, icon button, switch, checkbox, radio, segmented control, dropdown, chip / badge, notice, dialog, side panel, toast, progress bar, spinner, icons), a dev-only style guide page, and the shell restyled to the sidebar (Select Game, Dashboard with bubbles and Launch, Mods Library with switches, conflicts and a first Mod settings panel, the launch dialog) |
 | 3 — App foundations | 2026-10-24 | `apps/desktop`: Tauri 2 shell over `gmm-core` with 22 commands (ids only), generated TypeScript types, the `gmmimg` image protocol, locked-down capability / CSP / navigation guard, a first shell (game rail, state pill, setup card, mod list, Launch with XXMI); frontend CI (typecheck, lint, `pnpm audit`, npm license check). Verified in a release build on the dev machine |
 
@@ -24,23 +24,39 @@ into shared `gmm-catalog` / `gmm-core` functions used by both the CLI and the ap
 to a release outside pnpm's minimum-age window (the auto-added exemption removed); finished
 phases condensed in this file.
 
-Phase 4 decisions: the primitives are built by hand (no component library); the theme choice
-is kept per window in `localStorage` until the Settings screen stores it. Still open, waiting
-on you: the game banner source (08); the banners are the game's colors until then.
+Phase 4 decisions: the primitives are built by hand (no component library). The theme
+choice and the banner source, open then, were settled in Phase 5 (below).
 
 ## Phase 5 — Screens (in progress)
 
 Every screen sits on commands that exist or are small additions. Order: what unblocks
 installs first, then the screens in the order users meet them. Started 2026-10-24. Done so
-far: RAR, the whole backend list (2026-10-25), and the first three screens (startup check,
-Downloads, install confirmation), each checked in a real `tauri dev` window against the
-real XXMI setup. Next: the Dashboard and setup guide polish, then the Mods Store (which
-gives the install confirmation its Download buttons).
+far: RAR, the whole backend list (2026-10-25), the startup check, Downloads, the install
+confirmation, and (2026-10-25, first review checkpoint) the Dashboard polish, the setup
+guide, the first-run preferences screen and the banner art, each checked in a real `tauri
+dev` window against the real XXMI setup. Next: the Mods Store (which gives the install
+confirmation its Download buttons) and the mod page (second checkpoint), then the Library,
+Mod settings, Settings and Documentation (third checkpoint), then the tests.
+
+**Decisions for the rest of Phase 5** (the project owner, 2026-10-25): Store sort offers all
+six GameBanana sorts (Recommended first); **Hide installed** and **Show sensitive** are toggle
+chips with a slider switch; sensitive mods appear in the featured gallery when shown; the
+Store grid uses `@tanstack/react-virtual` (MIT) and the slideshow is hand-built; the mod page
+is a full page, built from 07's sketch without a canvas round, opened by clicking a card,
+with a link out to GameBanana (the Library's mod settings opens it too); the Library's
+select mode has Enable / Disable / **Delete selected** (confirmed, permanent); the Library
+header has **Update all**; Storage is the full breakdown without "Last used" and the drive
+line; the Documentation guides are repo Markdown built into the app (drafted by Claude,
+edited by the owner); the contrast and overlap audit runs with Playwright on Linux CI.
 
 **Carried over from Phase 4**
-- [ ] Game banner source (your decision, 08): swap the styled banners for it once chosen
-- [ ] Theme choice into `gmm-db` settings with the Settings screen (Dark / Light / Match
-      Windows; `src/theme.ts` already handles all three)
+- [x] Game banner source (2026-10-25): official key art per game, provided by the project
+      owner, bundled with a notice (exception in [06](06-licensing-and-provenance.md));
+      cropped 2:1 at 1800 × 900 with the ZZZ logo cut off, one file per game for every banner
+      size ([08](08-design-system.md))
+- [x] Theme choice into `gmm-db` settings (2026-10-25): part of the stored preferences
+      (`ui.theme`, `preferences` / `set_preferences`, `src/prefs.tsx`); `localStorage` keeps
+      only a copy for the first paint
 
 **Backend additions**
 - [x] **RAR support** (2026-10-24): the `gmm-extract` helper process, sandboxed (job object
@@ -94,33 +110,49 @@ gives the install confirmation its Download buttons).
 - [x] App shell: sidebar (Select Game, theme switch, active-download count); Downloads page on
       the install queue (2026-10-25): grouped by game, progress with Pause / Resume / Cancel,
       failed rows with View on GameBanana, installed rows clear after 5 s
-- [ ] Dashboard: game bubbles with Launch, setup cards for games that aren't Ready, recently
-      installed
-- [ ] Setup guide: the failing row highlighted per `SetupState`, a stepper with your
-      screenshots
-- [ ] Mods Store: featured gallery, sticky toolbar, virtualized grid, filters (category,
-      character, sort), state badges (installed, disabled, update available, conflict)
+- [x] First-run preferences (2026-10-25): `pages/Welcome.tsx` after the first startup check:
+      theme, show sensitive mods, blur their previews, and where to change them later;
+      stored in `gmm-db` settings (`preferences` / `set_preferences`)
+- [x] Dashboard (2026-10-25): game bubbles with the key art, Launch, "Played … ago" from
+      `GameInfo.last_played`, setup cards for games that aren't Ready, recently installed
+      (real previews come with the Library's stored preview images)
+- [x] Setup guide (2026-10-25): `components/SetupGuide.tsx` from the setup card, four
+      text-only steps in XXMI (install XXMI, select the game, Install, follow XXMI's prompts),
+      opening at the step the `SetupState` needs, Check again; the CLI-only "run `gmm status`"
+      lines are hidden in the app
+- [ ] Mods Store: featured gallery, sticky toolbar, virtualized grid (`@tanstack/react-virtual`),
+      filters (category, character, sort: the six GameBanana sorts), Hide installed and Show
+      sensitive toggle chips, "N hidden as sensitive", download counts via `catalog_stats`,
+      state badges (installed, off, update available, conflict on installed mods); clicking
+      a card opens the mod page, every Download opens InstallDialog ("Add versions" when
+      installed); move the dev style guide's install form out
 - [x] Install confirmation (2026-10-25): `components/InstallDialog.tsx` from `InstallPlan`:
       one version, choose a file, choose versions (installed ones locked), the clash note,
       blocked files, "no mod found" and unsupported-file notices; the first version picked
       stays on and clashing ones are switched off after install (queue worker). Opened from
       the dev style guide until the Store's Download buttons exist
-- [ ] Mod page: hero + slideshow + lightbox, header / stats / license, Description, Files
-      (archived files), Credits, Updates
-- [ ] Mods Library: grid, sticky toolbar, switches, filters, select mode, enable / disable
-      all, hand-installed mods, conflict notice
-- [ ] Mod settings panel: versions, details, actions, uninstall with the itemized
-      confirmation for hand-installed mods
-- [ ] Settings (with Storage: segment bar, table, multi-select disable / delete, clear caches)
-      and About (notices, disclaimer, XXMI credit)
-- [ ] Documentation page (guides rewritten for players); Report a Bug as the WIP page
+- [ ] Mod page (full page, Back to the Store): hero + hand-built slideshow + lightbox, header
+      / stats / license, Description (RichText), Files (with archived), Credits, Updates
+      (`catalog_updates`), a link out to GameBanana
+- [ ] Mods Library: category and character filters (ModRow categories), Show sensitive chip
+      (content rating stored at install), stored preview images on cards, select mode with
+      Enable / Disable / Delete selected (`UninstallDialog`), version groups with
+      `switch_version`, update badges and **Update all** from the startup report
+- [ ] Mod settings panel: Versions section (install more from the cached archive, switch,
+      remove); the itemized, permanent uninstall is built (2026-10-25)
+- [ ] Settings: Appearance and Mods Store on the stored preferences, XXMI folder, games,
+      Storage (full breakdown without "Last used" or the drive line; download / image /
+      HTTP caches with Clear) and About (notices, disclaimer, credits)
+- [ ] Documentation page: guides as repo Markdown built into the app; Report a Bug stays the
+      WIP page
 
 **Tests**
 - [ ] Vitest component tests and fixture-based snapshots
 - [ ] XSS corpus through the description renderer (T3): the Rust rewrite has unit tests
       (`html.rs`); the DOMPurify side (`RichText.sanitize`) still needs the Vitest corpus
 - [ ] IPC fuzz harness: hostile arguments to every command (R5; so far checked by hand)
-- [ ] The contrast and overlap audit from Phase 4, run against the real app in CI
+- [ ] The contrast and overlap audit from Phase 4, run with Playwright (Chromium, cached) on
+      Linux CI against the Vite frontend with the commands faked from recorded data
 
 Exit: everything the CLI does is reachable in the app for ZZZ and WuWa (RAR included), with
 the designed loading, empty and error states; install (all confirmation paths), versions,
@@ -136,8 +168,8 @@ Phase 5 screen.
 - [x] **Update and roll back** (2026-10-25): `gmm_core::change_file` moves every installed
       folder of a GameBanana mod to another of its files, keeping each folder's name (so
       3DMigoto's saved toggles survive) and on/off state; versions are matched by name; a
-      failed swap is undone; the previous folders go to the Recycle Bin and their archive
-      stays cached, so a roll back downloads nothing (`rollback_choices`). `gmm update`
+      failed swap is undone; the previous folders are deleted and their archive stays
+      cached, so a roll back downloads nothing (`rollback_choices`). `gmm update`
       (no id: list updates), `gmm rollback`; app: `queue_change_file` (through the queue,
       "Updated" rows), `rollback_files`, Update / Roll back in the Mod settings panel
 - [x] **Profiles** (2026-10-25): named sets of switched-on mods per game (migration 0003);
@@ -146,8 +178,16 @@ Phase 5 screen.
       validated as untrusted input (size, counts, game, name). `gmm profile ...`; app:
       `profiles`, `profile_save` / `apply` / `rename` / `delete` / `export` / `import`,
       the Profiles panel in the Library
-- [ ] Profiles: snapshot / restore `d3dx_user.ini` (3DMigoto's saved in-game toggles). Waits
-      on your decision: the file is outside `Mods/`, so writing it needs an R3 amendment
+- [x] **Saved in-game toggles kept across every switch** (2026-10-25; R3 amended at your
+      decision, "every time", not only profiles): `gmm-core/src/toggles.rs` copies a mod's
+      `d3dx_user.ini` lines (by path and declared namespace) into `saved_toggles` (migration
+      0004) before it goes off and adds back the missing ones after it comes on; only that
+      file, on its own guard, backed up first, never while the game runs (pending, written
+      before GMM's next launch); `gmm_xxmi::game_running`; privacy harness extended
+- [x] **Permanent deletes** (2026-10-25; R8 amended at your decision): uninstall, select-mode
+      delete, clearing the download cache and the folders an update replaces are deleted for
+      good (`Guard::delete`; the `trash` crate is gone); uninstalling a mod's last version
+      deletes its cached archives too; the confirmation warns harder for hand-installed mods
 - [x] **Key bindings** (2026-10-25): `gmm_core::mod_keybindings` reads every `.ini` of a mod
       (`DISABLED*` skipped, links not followed, conflict-check limits). `gmm keys`; app:
       `mod_keybindings`, Key bindings in the Mod settings panel (key names prettified)
@@ -162,7 +202,10 @@ Phase 5 screen.
       install-file`; app: a file dropped on the window reaches Rust (R5), or "Install from a
       file" on Downloads opens a native dialog; the local install confirmation (game,
       versions, blocked files)
-- [ ] Report a Bug (describe, attach a log the user reviews; needs a destination host, R2)
+- [ ] Report a Bug (decided 2026-10-25): a pre-filled GitHub issue opened through the
+      confirmed browser opener (the one link added), plus a small local error log (errors
+      only, rotated, no identifying paths) the user reviews in the app and attaches
+      themselves; GMM never connects to GitHub, so R2 is unchanged
 - [ ] 1-click install deep links (`gmm://`): needs GameBanana to add GMM as a mod-manager
       integration for ZZZ/WuWa (none listed today, [10](10-gamebanana-api.md)); then T6
 - [ ] UI still to come with Phase 5 screens: version groups and switching in the Library,
@@ -212,10 +255,8 @@ Epic install to confirm the Epic reader (fixture-tested only).
 - The install confirmation fetches the archive before showing it (versions are only known
   from inside), so the Downloads page mostly shows the install step; download progress
   appears there only for files that weren't fetched first.
-- Description images hosted outside `images.gamebanana.com` aren't shown: third-party
-  hosts (imgur and others) never will be (R2), and GameBanana's own file hosts
-  (`filecacheNN.gamebanana.com`, `files.gamebanana.com`, common in descriptions) wait on
-  your decision.
+- Description images on third-party hosts (imgur and others) are never shown (R2);
+  GameBanana's own image and file hosts are.
 - The browser openers (`open_mod_page`, `open_link`, `open_xxmi_releases`) need a click
   in their native dialog, so they haven't been driven end to end yet; their address checks
   have unit tests. The same goes for a real file drop and the "Install from a file" dialog:
@@ -223,17 +264,22 @@ Epic install to confirm the Epic reader (fixture-tested only).
 - GameBanana publishes no rate limit; GMM's budget (2 API requests/s per install) is a
   guess, backed by the shared cooldown ([10](10-gamebanana-api.md)). The cooldown and the
   "slow down" notice have only been exercised against a mock server.
-- Applying a profile renames the mods it switches (`DISABLED `), so 3DMigoto forgets their
-  saved in-game toggles until `d3dx_user.ini` snapshots exist (above).
+- Saved in-game toggles: a write-back that waited for the game to close happens before
+  GMM's next launch of the game or the next switch, not when the game closes; started from
+  XXMI meanwhile, the mod starts with fresh choices once (the lines stay saved). The
+  "is the game running" check is Windows-only for now (elsewhere it always says no). A
+  profile keeps each mod's last choices; it doesn't store different choices per profile.
+- Deletes are permanent (R8): there is no undo for an uninstall beyond installing again.
 - Updating an adopted mod replaces the files that were there by hand with GameBanana's.
 
 ## Open questions
 
 1. **Name.** The license is decided (MIT OR Apache-2.0, see [06](06-licensing-and-provenance.md)).
-   The product name still needs to be chosen and cleared before publishing.
+   2026-10-25: the project keeps "Gacha Mod Manager" ("Pity — a gacha mod manager" was
+   considered and set aside). It still needs clearing before publishing (Phase 7).
 2. ~~**GameBanana relationship.**~~ Decided 2026-10-25: no permission is needed and no outreach
    is planned; GameBanana can find GMM and ask, and the project complies with any request
    ([10](10-gamebanana-api.md)). 1-click buttons stay out of reach unless they add GMM.
 3. **Copyright holder** for the license files (currently "The Gacha Mod Manager Contributors").
-4. **`d3dx_user.ini` in profiles**: an R3 amendment letting GMM write that one file in each
-   importer folder. Your call.
+4. ~~**`d3dx_user.ini` in profiles**~~: decided 2026-10-25, R3 amended; GMM keeps saved
+   toggles across every switch (Phase 6, above).

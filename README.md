@@ -10,14 +10,14 @@ A desktop app for finding, downloading and organizing GameBanana mods for gacha 
 
 **Status:** early development. The backend is complete and works from the `gmm` command
 line: browse GameBanana, check your setup (`gmm status`), install mods into XXMI's Mods folder
-with a safety scan (`gmm install`), switch them on and off, uninstall them to the Recycle Bin,
-spot conflicts, show disk use, and start a game with mods through XXMI (`gmm launch`). Zip,
-7z and RAR mods are supported. The app
-window has the designed sidebar shell with the startup check, the Dashboard (Launch), the
-Mods Library (with profiles), Downloads (the install queue) and the install confirmation.
-Power features have started: update and roll back, profiles, key bindings, adopting
-hand-installed mods, and installing from a local archive. The Mods Store and the remaining
-screens come next.
+with a safety scan (`gmm install`), switch them on and off (keeping their saved in-game
+toggles), uninstall them for good, spot conflicts, show disk use, and start a game with mods
+through XXMI (`gmm launch`). Zip, 7z and RAR mods are supported. The app window has the
+designed sidebar shell with the startup check, a first-run preferences screen, the Dashboard
+(game banners, Launch, last played, a setup guide), the Mods Library (with profiles),
+Downloads (the install queue) and the install confirmation. Power features have started:
+update and roll back, profiles, key bindings, adopting hand-installed mods, and installing
+from a local archive. The Mods Store and the remaining screens come next.
 Progress and plans: [docs/README.md](docs/README.md).
 
 First games: Zenless Zone Zero and Wuthering Waves.
@@ -71,6 +71,9 @@ Gacha Mod Manager is an open-source interface built on other people's work:
   under its own freeware license (see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)).
 - **[Nunito](https://github.com/googlefonts/nunito)** by the Nunito Project Authors: the
   interface font (SIL Open Font License 1.1).
+- **Game banner art**: official key art of Zenless Zone Zero (© COGNOSPHERE / HoYoverse) and
+  Wuthering Waves (© Kuro Games), cropped for the game banners. Not covered by GMM's license;
+  see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 - **Open-source libraries**, among them [Tauri](https://tauri.app), [React](https://react.dev),
   [DOMPurify](https://github.com/cure53/DOMPurify), [SQLx](https://github.com/launchbadge/sqlx),
   [reqwest](https://github.com/seanmonstar/reqwest), [rustls](https://github.com/rustls/rustls),

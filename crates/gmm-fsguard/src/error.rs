@@ -47,8 +47,6 @@ pub enum FsError {
     CrossRoot,
     #[error("path belongs to a different guard")]
     ForeignPath,
-    #[error("could not move {path} to the Recycle Bin: {message}")]
-    Trash { path: PathBuf, message: String },
     #[error("{op} failed for {path}: {source}")]
     Io {
         op: &'static str,

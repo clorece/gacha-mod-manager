@@ -2,18 +2,21 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
-import { applyStoredTheme } from "./theme";
+import { PrefsProvider } from "./prefs";
+import { applyCachedTheme } from "./theme";
 import { ToastProvider } from "./ui";
 import "./styles.css";
 
-applyStoredTheme();
+applyCachedTheme();
 
 const root = document.getElementById("root");
 if (root) {
   createRoot(root).render(
     <StrictMode>
       <ToastProvider>
-        <App />
+        <PrefsProvider>
+          <App />
+        </PrefsProvider>
       </ToastProvider>
     </StrictMode>,
   );

@@ -287,30 +287,45 @@ fn make_dir_link(target: &Path, link: &Path) -> bool {
 }
 
 #[test]
-fn trash_is_refused_outside_read_write_roots() {
+fn delete_is_refused_outside_read_write_roots() {
     let f = fixture();
     let exe = f.guard.path(f.ro, "game.exe").unwrap();
     assert!(matches!(
-        f.guard.move_to_trash(&exe),
+        f.guard.delete(&exe),
         Err(FsError::ReadOnlyRoot(_))
     ));
     let root = f.guard.path(f.rw, "").unwrap();
-    assert!(
-        f.guard.move_to_trash(&root).is_err(),
-        "never the root itself"
-    );
+    assert!(f.guard.delete(&root).is_err(), "never the root itself");
     assert!(f.guard.path(f.rw, "../outside/secret.txt").is_err());
     assert!(f.outside.join("secret.txt").exists());
 }
 
-/// Puts a temp folder in the real Recycle Bin, so it only runs on request:
-/// `cargo test -p gmm-fsguard -- --ignored`.
 #[test]
-#[ignore = "uses the real Recycle Bin"]
-fn trash_moves_to_the_recycle_bin() {
+fn delete_removes_a_tree_for_good_including_read_only_files() {
     let f = fixture();
-    let dir = f.guard.path(f.rw, "gmm-trash-test").unwrap();
-    f.guard.create_dir_all(&dir).unwrap();
-    f.guard.move_to_trash(&dir).unwrap();
+    let dir = f.guard.path(f.rw, "Mods/GMM/Some mod").unwrap();
+    f.guard.create_dir_all(&dir.join("sub").unwrap()).unwrap();
+    let file = dir.join("sub/Some.ini").unwrap();
+    f.guard.write_atomic(&file, b"[TextureOverride]").unwrap();
+    let os = f
+        .outside
+        .parent()
+        .unwrap()
+        .join("mods/Mods/GMM/Some mod/sub/Some.ini");
+    let mut perms = std::fs::metadata(&os).unwrap().permissions();
+    perms.set_readonly(true);
+    std::fs::set_permissions(&os, perms).unwrap();
+
+    f.guard.delete(&dir).unwrap();
     assert!(!f.guard.exists(&dir).unwrap());
+    assert!(
+        f.guard
+            .exists(&f.guard.path(f.rw, "Mods/GMM").unwrap())
+            .unwrap()
+    );
+
+    let loose = f.guard.path(f.rw, "loose.zip").unwrap();
+    f.guard.write_atomic(&loose, b"PK").unwrap();
+    f.guard.delete(&loose).unwrap();
+    assert!(!f.guard.exists(&loose).unwrap());
 }

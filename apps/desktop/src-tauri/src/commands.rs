@@ -11,12 +11,12 @@ use std::path::PathBuf;
 use gmm_adapters::{GameManifest, Registry};
 use gmm_catalog::{CatalogSource, Category, ListQuery, ModProfile, ModUpdate, Page, SearchQuery};
 use gmm_core::{
-    ClearedCache, ConflictReport, FeaturedMod, InstallOptions, InstallPlan, InstallRequest,
-    Machine, ModsTarget, RecycleBin, SetupHints, StopSignal, ToggleOutcome, cache_storage,
+    ClearedCache, ConflictReport, DeleteForever, FeaturedMod, InstallOptions, InstallPlan,
+    InstallRequest, Machine, ModsTarget, SetupHints, StopSignal, ToggleOutcome, cache_storage,
     clear_downloads, confirm_exe, conflicts_after_install, conflicts_for, conflicts_for_unmanaged,
-    game_storage, library as core_library, listed_unmanaged, set_enabled as core_set_enabled,
-    set_unmanaged_enabled_at, start, uninstall as core_uninstall, uninstall_unmanaged,
-    unmanaged_size,
+    game_storage, library as core_library, listed_unmanaged, restore_pending,
+    set_enabled as core_set_enabled, set_unmanaged_enabled_at, start, uninstall as core_uninstall,
+    uninstall_unmanaged, unmanaged_size,
 };
 use gmm_xxmi::GameStatus;
 use tauri::ipc::Channel;
@@ -28,8 +28,9 @@ use crate::error::{CmdError, CmdResult};
 use crate::views::{
     CardStats, CatalogPage, CatalogQuery, FolderRow, GameInfo, GameStorageView, InstallArgs,
     InstallProgress, InstallResult, LaunchInfo, Launched, LibraryView, ModKey, ModRow,
-    NetworkStatus, ProgressThrottle, RollbackFile, Settings, StorageView, Toggled, UninstallItem,
-    Uninstalled, rewrite_categories, rewrite_profile, rewrite_summary, rewrite_updates,
+    NetworkStatus, Preferences, ProgressThrottle, RollbackFile, Settings, StorageView, Toggled,
+    UninstallItem, Uninstalled, rewrite_categories, rewrite_profile, rewrite_summary,
+    rewrite_updates,
 };
 
 pub(crate) fn registry() -> CmdResult<&'static Registry> {
@@ -484,7 +485,8 @@ pub async fn uninstall_preview(
     Ok(items)
 }
 
-/// Moves mods to the Recycle Bin. GMM's mods by id (the archive stays in the cache); others
+/// Deletes mods for good. GMM's mods by id (with their cached archives once no version is
+/// left); others
 /// only by the exact path [`uninstall_preview`] listed, after the user confirmed.
 #[tauri::command]
 pub async fn uninstall(
@@ -497,18 +499,18 @@ pub async fn uninstall(
     let (db, ws, mods) = (&state.db, &target.ws, target.mods);
     let mut done = Vec::with_capacity(keys.len());
     for key in keys {
-        let trashed = match &key {
+        let removed = match &key {
             ModKey::Managed { id } => {
-                core_uninstall(db, ws, mods, game, *id, &RecycleBin)
+                core_uninstall(db, ws, mods, game, *id, &DeleteForever)
                     .await?
-                    .trashed
+                    .removed
             }
             ModKey::Unmanaged { path } => {
-                uninstall_unmanaged(db, ws, mods, game, path, &RecycleBin).await?;
+                uninstall_unmanaged(db, ws, mods, game, path, &DeleteForever).await?;
                 true
             }
         };
-        done.push(Uninstalled { key, trashed });
+        done.push(Uninstalled { key, removed });
     }
     Ok(done)
 }
@@ -603,11 +605,11 @@ pub async fn storage(state: State<'_, AppState>) -> CmdResult<StorageView> {
     Ok(StorageView { games, cache })
 }
 
-/// Moves every cached download to the Recycle Bin. Installed mods stay.
+/// Deletes every cached download for good. Installed mods stay.
 #[tauri::command]
 pub async fn clear_download_cache(state: State<'_, AppState>) -> CmdResult<ClearedCache> {
     let ws = gmm_core::Workspace::open(&state.dirs.cache)?;
-    Ok(clear_downloads(&state.db, &ws, &RecycleBin).await?)
+    Ok(clear_downloads(&state.db, &ws, &DeleteForever).await?)
 }
 
 /// How GameBanana is treating GMM right now, for the app's notice: whether it asked GMM to
@@ -659,6 +661,12 @@ pub async fn launch(
     if !plan.confirmed && confirm {
         confirm_exe(&state.db, &mut plan).await?;
     }
+    // In-game toggles that waited for the game to close go back before it starts again.
+    if plan.confirmed
+        && let Ok(target) = mods_target(&state, game).await
+    {
+        let _ = restore_pending(&state.db, &target.ws, target.mods, game).await;
+    }
     Ok(Launched {
         pid: start(&state.db, game, &plan).await?,
     })
@@ -688,6 +696,23 @@ pub async fn settings(state: State<'_, AppState>) -> CmdResult<Settings> {
             .unwrap_or(u64::MAX),
         download_cache_bytes: db.download_cache_bytes().await?,
     })
+}
+
+/// The saved preferences (theme, sensitive mods, first run).
+#[tauri::command]
+pub async fn preferences(state: State<'_, AppState>) -> CmdResult<Preferences> {
+    Ok(state.db.preferences().await?.into())
+}
+
+/// Saves the preferences. Every field is a closed choice, so there is nothing to validate
+/// beyond what deserializing already checks.
+#[tauri::command]
+pub async fn set_preferences(
+    state: State<'_, AppState>,
+    preferences: Preferences,
+) -> CmdResult<Preferences> {
+    state.db.set_preferences(&preferences.into()).await?;
+    Ok(state.db.preferences().await?.into())
 }
 
 /// A folder the user picks in the system dialog, or `None` if they cancel.

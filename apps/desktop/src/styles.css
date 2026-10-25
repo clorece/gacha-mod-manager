@@ -774,6 +774,14 @@ dialog.drawer[open] {
   font-weight: 800;
   overflow-wrap: anywhere;
 }
+/* Several mods in one uninstall confirmation: scrolls past about three */
+.uninstall-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+}
 .hint {
   margin: 0;
   padding: 10px 12px;
@@ -1146,8 +1154,10 @@ dialog.drawer[open] {
   gap: 18px;
 }
 
-/* Game banners: the game's colors and name until the banner source is decided (08). Text on
-   them is always white over a dark fade. */
+/* Game banners: key art per game (assets/banners, 1800×900, © the game's publisher; see
+   THIRD-PARTY-NOTICES.md), cropped with `cover` around a focal point so every size from the
+   34 px Downloads chip to an open Dashboard bubble shows the characters. Games without art
+   get their colors and name. Text on a banner is always white over the .fade scrim. */
 .banner {
   position: relative;
   display: block;
@@ -1176,25 +1186,15 @@ dialog.drawer[open] {
   background: repeating-linear-gradient(135deg, #3a7bff 0 18px, #4c8bff 18px 36px);
 }
 .bn-zzz {
-  background: repeating-linear-gradient(135deg, #1c1c22 0 18px, #26262e 18px 36px);
-}
-.bn-zzz::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 10px;
-  background: repeating-linear-gradient(135deg, #ffd23f 0 10px, #1c1c22 10px 20px);
-  opacity: 0.9;
+  background: #1c1c22 url("./assets/banners/zzz.jpg") 45% 35% / cover no-repeat;
 }
 .bn-wuwa {
-  background: repeating-linear-gradient(135deg, #0f3340 0 18px, #14404f 18px 36px);
+  background: #0f3340 url("./assets/banners/wuwa.jpg") 50% 40% / cover no-repeat;
 }
-.bn-wuwa::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 10px;
-  background: linear-gradient(90deg, #2bd4c4, #7fdbff);
+/* Art speaks for itself: no watermark over it */
+.bn-zzz::after,
+.bn-wuwa::after {
+  content: none;
 }
 .fade {
   position: absolute;
@@ -1968,6 +1968,23 @@ dialog.drawer[open] {
   background: var(--yellow);
   color: var(--ink-on-yellow);
 }
+/* A setting: what it is on the left, its control on the right (first run, Settings) */
+.pref-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.pref-row b {
+  display: block;
+  font-weight: 800;
+}
+.pref-row .sub {
+  display: block;
+  font-size: 12.5px;
+}
 .su-foot {
   display: flex;
   justify-content: space-between;
@@ -1984,6 +2001,85 @@ dialog.drawer[open] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Setup guide (SetupGuide.tsx): numbered steps, done ones ticked, the current one ringed */
+.stepper {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+.stepper-item button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--raised);
+  color: var(--text2);
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 800;
+  line-height: 1.25;
+  cursor: pointer;
+}
+.stepper-item button:hover {
+  background: var(--hover);
+}
+.stepper-item.is-current button {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  color: var(--text);
+}
+.stepper-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  font-size: 12px;
+  font-weight: 900;
+}
+.stepper-item.is-current .stepper-n {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.stepper-item.is-done .stepper-n {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: var(--on-ok);
+}
+.guide-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 220px;
+}
+.guide-body p {
+  margin: 0;
+  color: var(--text2);
+}
+.guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 22px;
+  list-style: decimal;
+  line-height: 1.45;
+}
+.guide-list b {
+  font-weight: 800;
+  color: var(--text);
 }
 
 /* ---- GameBanana HTML (descriptions, licenses, update notes; RichText.tsx) ---- */

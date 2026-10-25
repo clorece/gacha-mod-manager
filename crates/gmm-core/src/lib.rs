@@ -38,6 +38,7 @@ mod setup;
 mod stop;
 mod storage;
 mod store;
+mod toggles;
 mod update;
 mod updates;
 mod versions;
@@ -60,10 +61,10 @@ pub use install::{
 pub use keys::{KeyBindings, ModKeyBinding, mod_keybindings};
 pub use launch::{LaunchPlan, confirm_exe, plan_launch, start};
 pub use library::{
-    DiskState, Library, ManagedMod, ModFolder, RecycleBin, ToggleOutcome, Trash, UninstallOutcome,
-    UnmanagedMod, UnmanagedToggle, find_unmanaged, library, listed_unmanaged, mod_folder,
-    one_unmanaged, set_enabled, set_unmanaged_enabled, set_unmanaged_enabled_at, uninstall,
-    uninstall_unmanaged,
+    DeleteForever, DiskState, Library, ManagedMod, ModFolder, Remover, ToggleOutcome,
+    UninstallOutcome, UnmanagedMod, UnmanagedToggle, find_unmanaged, library, listed_unmanaged,
+    mod_folder, one_unmanaged, set_enabled, set_unmanaged_enabled, set_unmanaged_enabled_at,
+    uninstall, uninstall_unmanaged,
 };
 pub use local::{
     LOCAL_ARCHIVE_TYPES, LocalPlan, LocalPrepared, install_local, local_plan, prepare_local,
@@ -85,6 +86,7 @@ pub use storage::{
     game_storage, unmanaged_size,
 };
 pub use store::{FEATURED_COUNT, FeaturedMod, featured};
+pub use toggles::{USER_INI, restore_pending};
 pub use update::{ChangedFolder, FileChangeReport, change_file, rollback_choices};
 pub use updates::{ModUpdateInfo, UpdateCheck, check_updates, refresh_catalog};
 pub use versions::{switch_version, version_group};

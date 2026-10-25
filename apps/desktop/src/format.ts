@@ -22,3 +22,15 @@ export function day(unixSeconds: number): string {
 export function plural(n: number, one: string, many = `${one}s`): string {
   return `${n} ${n === 1 ? one : many}`;
 }
+
+/** `just now`, `5 min ago`, `3 h ago`, `yesterday`, `4 days ago`, then the date. */
+export function ago(unixSeconds: number, now = Date.now() / 1000): string {
+  const s = Math.max(0, now - unixSeconds);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  const days = Math.floor(s / 86400);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  return day(unixSeconds);
+}

@@ -13,12 +13,14 @@ Development happens on Windows (primary target). Linux follows later from the sa
 2026-10-23 to 25. Phase 5 (screens) is under way, and Phase 6 (power features) started
 alongside it on 2026-10-25 (below).
 Every feature works from the `gmm` command line: browse GameBanana, install (download, safe
-extraction, policy scan, variants), switch mods on and off, uninstall to the Recycle Bin,
-conflicts, storage, launch through XXMI. The Phase 2 exit check passed in game. The app window
+extraction, policy scan, variants), switch mods on and off (keeping their saved in-game
+toggles), uninstall for good, conflicts, storage, launch through XXMI. The Phase 2 exit check
+passed in game. The app window
 (`apps/desktop`, Tauri 2 + React) has a command for every CLI action, generated TypeScript
 types, the `gmmimg` image protocol, a locked-down capability and CSP, and the designed shell:
-the sidebar (General, Mods with Select Game, Development, theme switch), the Dashboard (game
-bubbles that open to Launch, recently installed, setup cards) and the Mods Library (switches,
+the sidebar (General, Mods with Select Game, Development, theme switch), a first-run
+preferences screen, the Dashboard (game banners with key art that open to Launch, last
+played, recently installed, setup cards with a setup guide) and the Mods Library (switches,
 conflict prompt, a first Mod settings panel with Uninstall). The visual system from the
 design canvas is in the code: tokens for both themes, bundled Nunito, hand-built primitives
 (`src/ui`) and a dev-only style guide page. Run it with
@@ -36,8 +38,8 @@ design canvas is in the code: tokens for both themes, bundled Nunito, hand-built
 | `gmm-detect` | Finds games: Steam, HoYoPlay, Epic, manual folders |
 | `gmm-xxmi` | Reads XXMI's setup (allowlisted config fields only) and works out each game's setup state |
 | `gmm-migoto` | Reads 3DMigoto mod `.ini` files: override hashes, what they replace, namespaces, key bindings |
-| `gmm-db` | SQLite database (`%APPDATA%\GMM\gmm.db`): settings, manual game folders, installed mods (with categories), last played, profiles, download cache, GameBanana response cache |
-| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`, in one go or in two steps with an install plan; one download per file at a time), the install queue and stop signal, versions (grouping, switching), the update check, the featured gallery (trending, backfilled), the library (list with disk state, unmanaged mods, enable/disable, open folder, uninstall to the Recycle Bin), update and roll back, profiles, key bindings, adopting hand-installed mods, installing from a local archive, conflict detection, storage accounting, launching through XXMI (with exe confirmation, recording "last played"), app folders, the image cache behind `gmmimg` |
+| `gmm-db` | SQLite database (`%APPDATA%\GMM\gmm.db`): settings and preferences, manual game folders, installed mods (with categories), last played, profiles, saved in-game toggles, download cache, GameBanana response cache |
+| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`, in one go or in two steps with an install plan; one download per file at a time), the install queue and stop signal, versions (grouping, switching), the update check, the featured gallery (trending, backfilled), the library (list with disk state, unmanaged mods, enable/disable keeping saved in-game toggles, open folder, uninstall for good with the cached archives), update and roll back, profiles, key bindings, adopting hand-installed mods, installing from a local archive, conflict detection, storage accounting, launching through XXMI (with exe confirmation, recording "last played"), app folders, the image cache behind `gmmimg` |
 | `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, a command per CLI action plus the install confirmation, queue, versions, startup check, featured mods, card stats and the confirmed openers (ids only), the queue worker, the `gmmimg` protocol, the description address rewrite, navigation guard; the React UI is in `apps/desktop/src` |
 | `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm install-file`, `gmm list`, `gmm enable/disable/uninstall`, `gmm update`, `gmm rollback`, `gmm keys`, `gmm adopt`, `gmm profile …`, `gmm conflicts`, `gmm storage`, `gmm launch`, `gmm detect`, `gmm status`, `gmm config` |
 
@@ -48,10 +50,13 @@ On the dev machine, `gmm status` and the app report ZZZ `Ready` (HoYoPlay instal
 2026-10-25) is written up in [08-design-system.md](08-design-system.md); file formats and the
 RAR plan in [09-archive-formats.md](09-archive-formats.md).
 
-**Waiting on you:** the game banner source (see 08); whether profiles may snapshot and
-restore `d3dx_user.ini` (an R3 amendment: GMM would write that one file in each importer
-folder); screenshots of each XXMI setup step, for the setup guide; the product name, if it
-changes.
+**Waiting on you:** a look at the first review checkpoint in the app (banners, first-run
+screen, setup guide, the new uninstall confirmation); the human-only checks (a real file
+drop, the "Install from a file" dialog, the browser openers' native confirmations); then the
+Store and mod page come next. Decided 2026-10-25: the banners are official key art (bundled
+with a notice), GMM keeps saved in-game toggles across every switch (R3 amended), deletes are
+permanent (R8 amended), the name stays "Gacha Mod Manager", the setup guide is text only, and
+the rest of Phase 5 follows the decisions listed in the roadmap.
 
 **Phase 5** (started 2026-10-24): **RAR works.** GMM extracts RAR4 and RAR5 through
 `gmm-extract`, a separate sandboxed helper with RARLAB's UnRAR 7.23 that streams entries
@@ -96,9 +101,20 @@ dialog). Each works from the `gmm` command line and in the app (Mod settings pan
 Profiles panel, Downloads); update, roll back, key bindings, profiles and adopt suggestions
 were tried in the real window against the real XXMI setup (and cleaned up afterwards).
 
-**Next:** the remaining Phase 5 screens (Dashboard and setup guide polish, the Mods Store,
-which gives the install confirmation its Download buttons, the mod page, Settings), and
-Phase 6's rest (Report a Bug, deep links if GameBanana adds GMM). See the roadmap.
+**First review checkpoint** (2026-10-25): the game banners use official key art (cropped
+2:1, one file per game for every banner size); a first-run screen asks for the theme and
+whether to show and blur sensitive mods, stored in the database (`preferences`); the
+Dashboard shows "Played … ago"; setup cards open a four-step, text-only **setup guide**.
+Behind it, two rule changes the project owner decided: **saved in-game toggles survive
+every switch** (GMM copies a mod's `d3dx_user.ini` lines before it goes off and writes back
+the missing ones after it comes on; that one file only, backed up, never while the game
+runs; R3 amended), and **deletes are permanent** (uninstall, cache clearing, replaced
+folders; the last version's cached archives go too; R8 amended, `trash` dropped). Checked in
+a real `tauri dev` window; the privacy harness covers the new write.
+
+**Next:** the Mods Store and the mod page (second checkpoint), then the Library, Mod
+settings, Settings and Documentation (third), then the Phase 5 tests; Phase 6's Report a Bug
+(GitHub issue link plus a local log) and deep links if GameBanana adds GMM. See the roadmap.
 
 ## Docs
 
@@ -136,7 +152,8 @@ Phase 6's rest (Report a Bug, deep links if GameBanana adds GMM). See the roadma
 4. **No backend server.** The client talks to GameBanana's public `apiv11` directly, with a local
    cache. No accounts, no telemetry.
 5. **Least privilege in code.** GMM writes only to its own app folders and to XXMI `Mods/`
-   folders. Game folders are read-only to GMM. The webview can't name a path. Deletes go to the
-   Recycle Bin.
+   folders, plus one file per importer, `d3dx_user.ini` (saved in-game toggles, R3). Game
+   folders are read-only to GMM. The webview can't name a path. Deletes happen only after an
+   itemized confirmation, and are permanent (R8).
 6. **Backend first, then frontend.** Every feature works from the `gmm` CLI before it gets a
    screen, so the UI phase is purely presentation.

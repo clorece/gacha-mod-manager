@@ -10,8 +10,8 @@ use std::time::{Duration, Instant};
 
 use gmm_catalog::{CatalogSource, ModFile, ModProfile};
 use gmm_core::{
-    CoreError, FetchEvent, InstallEvent, InstallOptions, InstallRequest, Job, JobAction, JobId,
-    JobLabel, JobRequest, JobState, NextJob, RecycleBin, StopReason, StopSignal,
+    CoreError, DeleteForever, FetchEvent, InstallEvent, InstallOptions, InstallRequest, Job,
+    JobAction, JobId, JobLabel, JobRequest, JobState, NextJob, StopReason, StopSignal,
 };
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State};
@@ -158,7 +158,7 @@ async fn install(
             game,
             job.request.mod_id,
             job.request.file_id,
-            &RecycleBin,
+            &DeleteForever,
             &job.stop,
             track(state, job.id),
         )

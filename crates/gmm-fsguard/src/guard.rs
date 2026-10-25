@@ -345,8 +345,8 @@ impl Guard {
         fs::rename(&src, &dst).map_err(|e| FsError::io("rename", src, e))
     }
 
-    /// Permanently removes a file. Only for GMM's own temporary and staging data; deletes the
-    /// user asks for go to the Recycle Bin (security rule R8).
+    /// Permanently removes a file. For GMM's own temporary and staging data; deletes the user
+    /// confirmed go through [`Guard::delete`] (security rule R8).
     pub fn remove_file(&self, p: &ScopedPath) -> Result<(), FsError> {
         let path = self.resolve_below_root(p, Access::ReadWrite)?;
         fs::remove_file(&path).map_err(|e| FsError::io("remove_file", path, e))
@@ -365,14 +365,27 @@ impl Guard {
         fs4::available_space(&path).map_err(|e| FsError::io("available_space", path, e))
     }
 
-    /// Moves a file or folder to the Recycle Bin (the trash on Linux), so the user can get it
-    /// back. This is how GMM deletes anything the user asked to delete (security rule R8).
-    pub fn move_to_trash(&self, p: &ScopedPath) -> Result<(), FsError> {
+    /// Permanently deletes a file or folder tree the user confirmed deleting (security rule
+    /// R8: an uninstall or a cleared cache is gone for good; nothing goes to the Recycle
+    /// Bin). Links inside the tree are removed, never followed. Read-only files (common in
+    /// unpacked mods) are made writable first, so the delete is thorough.
+    pub fn delete(&self, p: &ScopedPath) -> Result<(), FsError> {
         let path = self.resolve_below_root(p, Access::ReadWrite)?;
-        trash::delete(&path).map_err(|e| FsError::Trash {
-            path,
-            message: e.to_string(),
-        })
+        let meta = fs::symlink_metadata(&path).map_err(|e| FsError::io("delete", &path, e))?;
+        let remove = |path: &Path| {
+            if meta.is_dir() {
+                fs::remove_dir_all(path)
+            } else {
+                fs::remove_file(path)
+            }
+        };
+        match remove(&path) {
+            Err(e) if e.kind() == io::ErrorKind::PermissionDenied => {
+                clear_read_only(&path);
+                remove(&path).map_err(|e| FsError::io("delete", path, e))
+            }
+            other => other.map_err(|e| FsError::io("delete", path, e)),
+        }
     }
 
     /// The checked absolute path of a file in a read-write root, for a library that must open
@@ -457,6 +470,33 @@ fn canonicalize_existing_prefix(path: &Path) -> Result<PathBuf, FsError> {
                     .ok_or_else(|| FsError::OutsideRoots(path.to_path_buf()))?;
             }
             Err(e) => return Err(FsError::io("canonicalize", path, e)),
+        }
+    }
+}
+
+/// Clears the read-only attribute on everything below `path` (links are skipped, not
+/// followed), so a confirmed delete doesn't stop at a file an archive marked read-only.
+/// Best effort: the retried delete reports anything that still fails.
+fn clear_read_only(path: &Path) {
+    let mut stack = vec![path.to_path_buf()];
+    while let Some(next) = stack.pop() {
+        let Ok(meta) = fs::symlink_metadata(&next) else {
+            continue;
+        };
+        if meta.file_type().is_symlink() {
+            continue;
+        }
+        let mut perms = meta.permissions();
+        if perms.readonly() {
+            // Only ever called on a tree that is about to be deleted.
+            #[allow(clippy::permissions_set_readonly_false)]
+            perms.set_readonly(false);
+            let _ = fs::set_permissions(&next, perms);
+        }
+        if meta.is_dir()
+            && let Ok(entries) = fs::read_dir(&next)
+        {
+            stack.extend(entries.flatten().map(|e| e.path()));
         }
     }
 }

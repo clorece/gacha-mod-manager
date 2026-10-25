@@ -44,16 +44,39 @@ first run. One card per game, filled from
 ```
 
 Each `SetupState` maps to one highlighted row (XXMI, importer, game folder, launch) and its
-`steps` become the "Next step" text. The guide is a stepper with the text from
-[03](03-game-adapters.md), our own screenshots, and the XXMI releases link (opened in the
-system browser after a confirmation).
+`steps` become the "Next step" text (the CLI's own "run `gmm status` again" line is left out;
+the card has **Check again**).
+
+**Setup guide** (built 2026-10-25, `components/SetupGuide.tsx`, opened from the card's
+**Open setup guide**): a dialog with four steps in XXMI, **text only** (the project owner's
+decision; no screenshots), using XXMI's own labels:
+
+1. **Install XXMI Launcher**: the official releases page (opened in the browser after the
+   native confirmation), the `.msi` or the portable `.zip`, start it once; "It's somewhere
+   else…" picks its folder.
+2. **Select the game**: tick it under "Select Games To Mod:".
+3. **Install the mod loader**: press "Install" (the importer, e.g. WWMI).
+4. **Follow XXMI's prompts**: XXMI checks the game settings mods need and asks for changes
+   itself (for example HD instead of UHD for a Steam copy, or where the game is), then
+   "Start" once.
+
+The setup state picks the opening step (XXMI not found → 1, importer missing → 2, importer
+damaged → 3, game folder or launch setting → 4, with what GMM sees shown as a notice). Done
+steps are ticked; **Check again** re-runs detection and moves on.
+
+**First run** (built 2026-10-25, `pages/Welcome.tsx`): once, after the first startup check,
+a "Before you start" card with only the theme (Dark / Light / Match Windows), **Show mods
+marked as sensitive** (off) and **Blur their previews until hovered** (on; only while
+sensitive mods are shown), a line saying they can be changed from the Store and Library
+filters and in Settings, and Continue. Whether the featured gallery shows sensitive mods
+follows that choice.
 
 ## Mods Store (catalogue)
 
 Layout, featured gallery and filters: [08](08-design-system.md#mods-store). Contents:
 
 ```
-[Search…………]  Category ▾  Character ▾  Sort: Recently updated ▾  ☐ Show NSFW  ☐ Hide installed
+[Search…………]  Category ▾  Character ▾  Sort: Recommended ▾  (○ Hide installed) (○ Show sensitive)
 ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐
 │  banner    │ │  banner    │ │  banner    │ │  banner    │
 │  (16:9)    │ │            │ │  [Installed]│ │ [Update ↑] │
@@ -70,9 +93,18 @@ Layout, featured gallery and filters: [08](08-design-system.md#mods-store). Cont
   `gmm_catalog::Image::url_for_width`). Cropped with `object-fit: cover`. A placeholder shows
   when a mod has no image.
 - Card fields: name, submitter avatar + name, character (subcategory), likes, downloads, relative
-  "updated" date, state badge (*Installed*, *Disabled*, *Update available*, *Conflict*).
+  "updated" date, state badge (*Installed*, *Disabled*, *Update available*, *Conflict*). The
+  *Conflict* badge is only for installed mods that clash with a mod that's on (a mod that
+  isn't installed can't be checked before its archive is fetched).
+- **Clicking a card** (anywhere but its Download button) opens GMM's own mod page.
+- **Sort** (decided 2026-10-25): Recommended (GameBanana's default, the default here),
+  Recently updated, Newest, Most downloaded, Most liked, Most viewed.
+- **Toggle chips** (decided 2026-10-25): **Hide installed** and **Show sensitive**, each a
+  pill with a small slider switch like the sidebar's theme switch. Show sensitive is the same
+  preference as on the first-run screen and in Settings.
 - **NSFW**: `_sInitialVisibility = warn/hide` or content ratings → hidden by default. If the user
-  shows them, they are blurred until hovered or clicked.
+  shows them, they are blurred until hovered (the "blur" preference), in the grid and in the
+  featured gallery, which then includes them too.
 - Infinite scroll with a virtualized grid (TanStack Virtual), cached pages, and skeleton cards
   while loading.
 - Filters map to GB categories. The character list comes from the game's subcategories.
@@ -94,9 +126,18 @@ Layout, featured gallery and filters: [08](08-design-system.md#mods-store). Cont
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Slideshow**: an Embla carousel. Arrow buttons, keyboard ←/→, swipe or trackpad, a thumbnail
-strip, and a click opening a full-screen lightbox. Images load lazily through the `gmmimg://`
-cache. With one image, there are no controls. With none, a placeholder.
+**A full page of its own** (decided 2026-10-25), built from this sketch and the existing
+tokens and pieces (not designed on the canvas first; reviewed from screenshots of the real
+app). It opens from a click anywhere on a Store card, the featured banner's View details,
+and the Library's mod settings; Back returns to the Store with its scroll position and
+filters. A small "View on GameBanana" link opens the mod's GameBanana page in the browser
+(after the native confirmation).
+
+**Slideshow**: built by hand (decided 2026-10-25, no carousel library). Arrow buttons,
+keyboard ←/→, a thumbnail strip, and a click opening a full-screen lightbox (a `<dialog>`).
+Images load lazily through the `gmmimg://` cache. With one image, there are no controls.
+With none, a placeholder. Sensitive previews follow the blur preference; description images
+on hosts GMM doesn't load show a quiet placeholder.
 
 **Field mapping** (from `Mod/{id}/ProfilePage` + `DownloadPage`):
 
@@ -136,12 +177,21 @@ Layout: [08](08-design-system.md#mods-library). Contents and actions:
 
 - Every installed mod for the selected game (or all games): GMM's mods and hand-installed
   ones ("Added by hand"), each with an on/off switch (the `DISABLED` rename).
-- Bulk: Enable all, Disable all, and Select mode for enabling or disabling a chosen set.
+- Bulk: Enable all, Disable all, and Select mode, whose bar has **Enable selected**, **Disable
+  selected** and **Delete selected** (decided 2026-10-25). Enabling and disabling need no
+  confirmation; deleting opens the itemized uninstall confirmation (`UninstallDialog`), then
+  deletes the folders for good (R8).
+- **Update all (N)** in the header (decided 2026-10-25) queues every update the startup check
+  found, one at a time through the install queue.
+- **Show sensitive** chip in the filters: the same preference as the Store's; it hides
+  installed mods GameBanana flags (their rating is stored at install).
 - **Mod settings** (the settings button on each card, [08](08-design-system.md#mod-settings)):
   on/off, versions (switch which one is on, install more from the cached archive, remove
   one), details (version, file, size, folder), actions (open folder, view on GameBanana,
   check for updates, reinstall), per-mod options as they arrive (key bindings, Phase 6),
-  uninstall (Recycle Bin; hand-installed mods only after the itemized confirmation, R8).
+  uninstall (built: the itemized confirmation says the delete is permanent and that GMM's
+  downloaded copy goes too; hand-installed folders get a red warning that GameBanana can't
+  give them back; R8).
   Adopt a hand-installed mod (match it on GameBanana; Phase 6, built). Update / roll back
   and key bindings are built too (2026-10-25).
 - **Profiles** (Phase 6, built): per game, from the Library toolbar. Save which mods are on,
@@ -185,17 +235,35 @@ Zenless Zone Zero ▾                        Drive C: 112 GB free of 1 TB
 
 - Game picker plus an "All games" overview (one bar per game).
 - Sortable columns. Checkbox multi-select, with select all / select disabled.
-- **Delete…** confirms with the count and total size, then moves to the Recycle Bin.
+- **Delete…** confirms with the count and total size, then deletes for good (R8).
   **Clear cache** removes only the cached archives.
-- "Last used" = last time it was enabled while XXMI launched from GMM. Unknown when launched
-  elsewhere.
+- Decided 2026-10-25 for Phase 5: the full breakdown (bar, table, multi-select disable and
+  delete) **without** the "Last used" column (GMM doesn't record it) and without the drive
+  line; both can come later.
 
 ## Settings
 
 Sections per [08](08-design-system.md#settings): Appearance, Mods Store (sensitive mods), XXMI
 Launcher, Games, Storage, About. Later: a download cache size cap, language (i18n-ready from
 the start). An About page with the
-third-party notices and the "not affiliated" disclaimer.
+third-party notices and the "not affiliated" disclaimer. Appearance and the sensitive-mods
+switches read and write the stored preferences (built 2026-10-25: `preferences` /
+`set_preferences`, `src/prefs.tsx`).
+
+## Documentation page
+
+Decided 2026-10-25: the guides are Markdown files in the repo (readable on GitHub too),
+turned into the app's pages at build time, so editing a guide updates the app in its next
+build (installed copies don't fetch anything). Drafted short and friendly, linking to the
+repo docs for detail; the project owner edits them.
+
+## Report a Bug
+
+Decided 2026-10-25 (Phase 6): a pre-filled GitHub issue opened in the browser through the
+confirmed opener (`github.com/clorece/gacha-mod-manager/issues/new?...`, the one link added);
+the user reviews GMM's local error log in the app and attaches it themselves. GMM itself
+never connects to GitHub (R2 unchanged), and no account or token is involved. GMM keeps a
+small local log for this (errors only, rotated, no paths that identify the user).
 
 ## Frontend quality bar
 

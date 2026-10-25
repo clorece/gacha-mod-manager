@@ -17,7 +17,7 @@ use std::time::SystemTime;
 
 use gmm_adapters::{GameManifest, Registry};
 use gmm_core::{
-    CoreError, DiskState, InstallOptions, ModMeta, Trash, Workspace, analyze, conflicts,
+    CoreError, DiskState, InstallOptions, ModMeta, Remover, Workspace, analyze, conflicts,
     game_storage, install_analyzed, install_gate, library, set_enabled, uninstall,
 };
 use gmm_db::{DB_FILE_NAME, Db};
@@ -47,10 +47,10 @@ impl Environment for NoEnv {
 }
 
 #[derive(Default)]
-struct FakeTrash(Mutex<Vec<String>>);
+struct FakeRemover(Mutex<Vec<String>>);
 
-impl Trash for FakeTrash {
-    fn trash(&self, guard: &Guard, path: &ScopedPath) -> Result<(), CoreError> {
+impl Remover for FakeRemover {
+    fn remove(&self, guard: &Guard, path: &ScopedPath) -> Result<(), CoreError> {
         self.0.lock().unwrap().push(path.rel().to_string());
         guard.remove_dir_all(path)?;
         Ok(())
@@ -271,11 +271,11 @@ async fn run_game(game: &GameManifest) {
     assert_eq!(storage.unmanaged.len(), 1);
 
     // Uninstall.
-    let trash = FakeTrash::default();
-    let out = uninstall(&db, &ws, mods, game, mod_id, &trash)
+    let remover = FakeRemover::default();
+    let out = uninstall(&db, &ws, mods, game, mod_id, &remover)
         .await
         .unwrap();
-    assert!(out.trashed);
+    assert!(out.removed);
     assert!(!folder.exists());
     assert!(db.installed_mods(Some(id)).await.unwrap().is_empty());
     assert!(

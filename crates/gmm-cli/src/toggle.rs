@@ -8,7 +8,7 @@ use std::io::{BufRead, IsTerminal, Write};
 
 use gmm_adapters::{GameManifest, Registry};
 use gmm_core::{
-    ModsTarget, RecycleBin, SetupHints, conflicts_for, conflicts_for_unmanaged, find_unmanaged,
+    DeleteForever, ModsTarget, SetupHints, conflicts_for, conflicts_for_unmanaged, find_unmanaged,
     library, set_enabled, set_unmanaged_enabled, uninstall, uninstall_unmanaged, unmanaged_size,
 };
 use gmm_db::Db;
@@ -25,7 +25,7 @@ pub enum Action {
         anyway: bool,
     },
     Disable,
-    /// `yes`: don't ask before moving hand-installed mods to the Recycle Bin.
+    /// `yes`: don't ask before deleting hand-installed mods.
     Uninstall {
         yes: bool,
     },
@@ -141,8 +141,7 @@ pub async fn apply(
         }
         if !listed.is_empty() && !confirm(&listed, yes, json)? {
             return Err(
-                "nothing was removed. To move these to the Recycle Bin, run again with --yes."
-                    .into(),
+                "nothing was removed. To delete these for good, run again with --yes.".into(),
             );
         }
     }
@@ -187,10 +186,10 @@ pub async fn apply(
                 serde_json::to_value(r)?
             }
             (Action::Uninstall { .. }, Target::Managed { id, .. }) => {
-                let u = uninstall(db, ws, mods, game, id, &RecycleBin).await?;
+                let u = uninstall(db, ws, mods, game, id, &DeleteForever).await?;
                 if !json {
-                    if u.trashed {
-                        println!("moved {:?} to the Recycle Bin", u.folder_name);
+                    if u.removed {
+                        println!("deleted {:?}", u.folder_name);
                     } else {
                         println!(
                             "{:?} was already gone from the Mods folder; forgot it",
@@ -201,11 +200,11 @@ pub async fn apply(
                 serde_json::to_value(u)?
             }
             (Action::Uninstall { .. }, Target::Unmanaged { path, .. }) => {
-                let gone = uninstall_unmanaged(db, ws, mods, game, &path, &RecycleBin).await?;
+                let gone = uninstall_unmanaged(db, ws, mods, game, &path, &DeleteForever).await?;
                 if !json {
-                    println!("moved {gone:?} to the Recycle Bin");
+                    println!("deleted {gone:?}");
                 }
-                serde_json::json!({ "path": gone, "trashed": true })
+                serde_json::json!({ "path": gone, "removed": true })
             }
         };
         results.push(value);
@@ -305,7 +304,7 @@ fn say_renamed(json: bool, r: &gmm_core::UnmanagedToggle) {
     }
 }
 
-/// Lists what would be moved to the Recycle Bin and asks. Without a terminal (or with
+/// Lists what would be deleted for good and asks. Without a terminal (or with
 /// `--json`), only `--yes` confirms.
 fn confirm(items: &[String], yes: bool, json: bool) -> Result<bool, AnyError> {
     if yes {
@@ -318,7 +317,9 @@ fn confirm(items: &[String], yes: bool, json: bool) -> Result<bool, AnyError> {
         }
         return Ok(false);
     }
-    println!("These mods weren't installed by GMM. They'll be moved to the Recycle Bin:");
+    println!(
+        "These mods weren't installed by GMM. They'll be deleted for good, not to the Recycle Bin:"
+    );
     for item in items {
         println!("  {item}");
     }

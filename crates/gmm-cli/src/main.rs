@@ -230,7 +230,7 @@ enum Command {
         /// Only this game (see `gmm games`).
         #[arg(long, value_parser = parse_game)]
         game: Option<&'static GameManifest>,
-        /// Move every cached download to the Recycle Bin (installed mods stay).
+        /// Delete every cached download for good (installed mods stay).
         #[arg(long)]
         clear_downloads: bool,
         #[command(flatten)]
@@ -248,15 +248,15 @@ enum Command {
         #[command(flatten)]
         setup: SetupArgs,
     },
-    /// Move mods to the Recycle Bin. GMM's mods by id (their downloaded archive stays in the
-    /// cache); hand-installed ones by name or path, after listing them and asking.
+    /// Delete mods for good. GMM's mods by id (their downloaded archives go too once no
+    /// version is left); hand-installed ones by name or path, after listing them and asking.
     Uninstall {
         #[arg(required = true)]
         mods: Vec<String>,
         /// Only look in this game for hand-installed mods (see `gmm games`).
         #[arg(long, value_parser = parse_game)]
         game: Option<&'static GameManifest>,
-        /// Don't ask before moving hand-installed mods to the Recycle Bin.
+        /// Don't ask before deleting hand-installed mods.
         #[arg(long)]
         yes: bool,
         #[command(flatten)]

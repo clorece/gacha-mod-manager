@@ -7,7 +7,7 @@
 //! The disk is the truth for on/off: if someone renamed a folder by hand, the database is
 //! updated to match. A managed mod whose folder is gone is reported as missing, never
 //! silently forgotten. Unmanaged mods are only touched when the user names one: on/off is the
-//! same `DISABLED ` rename, and uninstalling moves it to the Recycle Bin after the caller has
+//! same `DISABLED ` rename, and uninstalling deletes it for good after the caller has
 //! shown exactly what goes and got a yes (security rule R8).
 
 use std::path::PathBuf;
@@ -19,6 +19,7 @@ use serde::Serialize;
 
 use crate::error::CoreError;
 use crate::names::{DISABLED_PREFIX, GMM_DIR, STAGING_DIR, on_disk_name};
+use crate::toggles;
 use crate::workspace::Workspace;
 
 /// Where a managed mod's folder is.
@@ -173,7 +174,8 @@ pub struct ToggleOutcome {
 }
 
 /// Switches a managed mod on or off by renaming its folder with or without XXMI's
-/// `DISABLED ` prefix. Nothing else about the folder changes.
+/// `DISABLED ` prefix. Nothing else about the folder changes. Its saved in-game toggles are
+/// kept across the switch (see the `toggles` module).
 pub async fn set_enabled(
     db: &Db,
     ws: &Workspace,
@@ -203,6 +205,11 @@ pub async fn set_enabled(
         }
         return Ok(outcome(false));
     }
+    let rel_on = format!("{GMM_DIR}/{}", row.folder_name);
+    if !enabled {
+        // Best effort: a toggles file that can't be read never stops the switch.
+        let _ = toggles::save_before_off(db, ws, mods, game, &rel_on, true).await;
+    }
     let from = gmm_dir.join(&on_disk_name(&row.folder_name, current))?;
     let to = gmm_dir.join(&on_disk_name(&row.folder_name, enabled))?;
     guard.rename(&from, &to)?;
@@ -211,22 +218,26 @@ pub async fn set_enabled(
         let _ = guard.rename(&to, &from);
         return Err(e.into());
     }
+    if enabled {
+        let _ = toggles::restore_after_on(db, ws, mods, game, &rel_on).await;
+    }
     Ok(outcome(true))
 }
 
-/// How GMM deletes a mod folder. The app always uses [`RecycleBin`]; tests use a fake so
-/// they don't fill the real Recycle Bin.
-pub trait Trash: Send + Sync {
-    fn trash(&self, guard: &Guard, path: &ScopedPath) -> Result<(), CoreError>;
+/// How GMM deletes what the user confirmed deleting. The app always uses [`DeleteForever`];
+/// tests use a fake that also records what it was asked to delete.
+pub trait Remover: Send + Sync {
+    fn remove(&self, guard: &Guard, path: &ScopedPath) -> Result<(), CoreError>;
 }
 
-/// Moves folders to the Recycle Bin (security rule R8).
+/// Deletes for good, without the Recycle Bin (security rule R8, amended 2026-10-25: the
+/// user confirmed, and GameBanana mods can be downloaded again).
 #[derive(Debug, Default, Clone, Copy)]
-pub struct RecycleBin;
+pub struct DeleteForever;
 
-impl Trash for RecycleBin {
-    fn trash(&self, guard: &Guard, path: &ScopedPath) -> Result<(), CoreError> {
-        Ok(guard.move_to_trash(path)?)
+impl Remover for DeleteForever {
+    fn remove(&self, guard: &Guard, path: &ScopedPath) -> Result<(), CoreError> {
+        Ok(guard.delete(path)?)
     }
 }
 
@@ -237,38 +248,71 @@ pub struct UninstallOutcome {
     pub id: i64,
     pub folder_name: String,
     /// False when the folder was already gone and only the record was removed.
-    pub trashed: bool,
+    pub removed: bool,
+    /// Cached archives of this GameBanana mod deleted with it (only when this was the last
+    /// installed version; earlier files kept for a roll back go too).
+    pub archives_removed: u32,
 }
 
-/// Moves a managed mod's folder to the Recycle Bin and forgets it. The archive stays in the
-/// download cache.
+/// Deletes a managed mod's folder and forgets it. When no other version of the same
+/// GameBanana mod is left installed, its archives in the download cache are deleted too, so
+/// an uninstall leaves nothing behind.
 pub async fn uninstall(
     db: &Db,
     ws: &Workspace,
     mods: RootId,
     game: &GameManifest,
     id: i64,
-    trash: &dyn Trash,
+    remover: &dyn Remover,
 ) -> Result<UninstallOutcome, CoreError> {
     let guard = ws.guard();
     let row = managed_row(db, game, id).await?;
     let gmm_dir = guard.path(mods, GMM_DIR)?;
-    let trashed = match disk_state(guard, &gmm_dir, &row.folder_name)? {
+    let removed = match disk_state(guard, &gmm_dir, &row.folder_name)? {
         DiskState::Enabled | DiskState::Disabled => {
             let enabled = guard.exists(&gmm_dir.join(&row.folder_name)?)?;
             let path = gmm_dir.join(&on_disk_name(&row.folder_name, enabled))?;
-            trash.trash(guard, &path)?;
+            remover.remove(guard, &path)?;
             true
         }
         DiskState::Missing => false,
         DiskState::Ambiguous => return Err(CoreError::ModFolderAmbiguous(row.folder_name)),
     };
     db.delete_installed_mod(id).await?;
+    let _ = toggles::forget(db, game, &format!("{GMM_DIR}/{}", row.folder_name)).await;
+    let archives_removed = match row.gb_mod_id {
+        Some(gb) if db.installed_mods_for_gb(gb).await?.is_empty() => {
+            remove_cached_archives(db, ws, gb, remover).await?
+        }
+        _ => 0,
+    };
     Ok(UninstallOutcome {
         id,
         folder_name: row.folder_name,
-        trashed,
+        removed,
+        archives_removed,
     })
+}
+
+/// Deletes every cached archive of a GameBanana mod. An archive that can't be deleted keeps
+/// its record, so clearing the download cache still finds it.
+async fn remove_cached_archives(
+    db: &Db,
+    ws: &Workspace,
+    gb_mod_id: u64,
+    remover: &dyn Remover,
+) -> Result<u32, CoreError> {
+    let guard = ws.guard();
+    let mut removed = 0;
+    for d in db.cached_downloads_for_mod(gb_mod_id).await? {
+        let path = guard.path(ws.cache_root(), &d.path_rel)?;
+        let gone = !guard.exists(&path)? || remover.remove(guard, &path).is_ok();
+        if gone {
+            db.remove_download(&d.sha256).await?;
+            removed += 1;
+        }
+    }
+    Ok(removed)
 }
 
 /// Unmanaged mods matching what the user typed: the path from `gmm list` (`GMM/Phoenix`,
@@ -335,8 +379,8 @@ pub struct UnmanagedToggle {
 
 /// Switches a mod GMM didn't install on or off, by the same rename XXMI uses: adding
 /// `DISABLED ` in front of its name, or removing whatever `DISABLED` prefix it has. Nothing
-/// inside the folder changes. 3DMigoto saves in-game toggle choices by path, so the mod's
-/// saved choices start fresh afterwards.
+/// inside the folder changes. Its saved in-game toggles are kept across the switch (see the
+/// `toggles` module).
 pub async fn set_unmanaged_enabled(
     db: &Db,
     ws: &Workspace,
@@ -347,7 +391,7 @@ pub async fn set_unmanaged_enabled(
 ) -> Result<UnmanagedToggle, CoreError> {
     let lib = library(db, ws, mods, game).await?;
     let entry = one_unmanaged(&lib, game, query)?;
-    rename_unmanaged(ws, mods, entry, enabled)
+    rename_unmanaged(db, ws, mods, game, entry, enabled).await
 }
 
 /// [`set_unmanaged_enabled`] for the exact path from the listing (what the app passes), so
@@ -362,7 +406,7 @@ pub async fn set_unmanaged_enabled_at(
 ) -> Result<UnmanagedToggle, CoreError> {
     let lib = library(db, ws, mods, game).await?;
     let entry = listed_unmanaged(&lib, game, path)?;
-    rename_unmanaged(ws, mods, entry, enabled)
+    rename_unmanaged(db, ws, mods, game, entry, enabled).await
 }
 
 /// The unmanaged mod listed at exactly `path` (relative to `Mods/`, as [`library`] gives it).
@@ -437,9 +481,11 @@ pub(crate) async fn mod_location(
     })
 }
 
-fn rename_unmanaged(
+async fn rename_unmanaged(
+    db: &Db,
     ws: &Workspace,
     mods: RootId,
+    game: &GameManifest,
     entry: &UnmanagedMod,
     enabled: bool,
 ) -> Result<UnmanagedToggle, CoreError> {
@@ -474,7 +520,13 @@ fn rename_unmanaged(
     if guard.exists(&to_path)? {
         return Err(CoreError::FolderTaken { folder: to });
     }
+    if !enabled {
+        let _ = toggles::save_before_off(db, ws, mods, game, &entry.path, entry.is_dir).await;
+    }
     guard.rename(&from_path, &to_path)?;
+    if enabled {
+        let _ = toggles::restore_after_on(db, ws, mods, game, &to).await;
+    }
     Ok(UnmanagedToggle {
         from: entry.path.clone(),
         to,
@@ -483,7 +535,7 @@ fn rename_unmanaged(
     })
 }
 
-/// Moves a mod GMM didn't install to the Recycle Bin. The caller must have shown the user
+/// Deletes a mod GMM didn't install, for good. The caller must have shown the user
 /// exactly this path and got a yes (security rule R8); GMM never does this on its own.
 pub async fn uninstall_unmanaged(
     db: &Db,
@@ -491,12 +543,23 @@ pub async fn uninstall_unmanaged(
     mods: RootId,
     game: &GameManifest,
     path: &str,
-    trash: &dyn Trash,
+    remover: &dyn Remover,
 ) -> Result<String, CoreError> {
     let guard = ws.guard();
     let lib = library(db, ws, mods, game).await?;
     // Only an exact path from the listing: the confirmation showed this path, nothing looser.
     let entry = listed_unmanaged(&lib, game, path)?;
-    trash.trash(guard, &guard.path(mods, &entry.path)?)?;
+    remover.remove(guard, &guard.path(mods, &entry.path)?)?;
+    let rel_on = if entry.enabled {
+        entry.path.clone()
+    } else {
+        let parent = entry
+            .path
+            .rsplit_once('/')
+            .map(|(dir, _)| format!("{dir}/"))
+            .unwrap_or_default();
+        format!("{parent}{}", base_name(&entry.name))
+    };
+    let _ = toggles::forget(db, game, &rel_on).await;
     Ok(entry.path.clone())
 }

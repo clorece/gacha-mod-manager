@@ -11,7 +11,6 @@
 | Local DB | SQLite via `sqlx`, migrations in repo | One file in the app data dir |
 | Archives | `zip`, `sevenz-rust2` (pure Rust, in process); RAR through UnRAR 7.23 (vendored C++) in the sandboxed `gmm-extract` helper; all wrapped by our `gmm-archive` crate | All extraction goes through one hardened path, and GMM writes every file itself |
 | HTTP | `reqwest` (rustls), wrapped by our `gmm-net` crate | One place to enforce the host allowlist |
-| Recycle Bin | `trash` crate | Deletes are recoverable |
 | Tooling | pnpm (via corepack), Biome (lint + format), cargo workspace, `just` task runner | |
 
 The **`gmm` CLI** is built from the same core crates. Every backend feature ships in the CLI first
@@ -105,10 +104,11 @@ user data.
   picks the GameBanana mod it is, from GMM's suggestions; it then becomes a managed mod). It only touches one the user names: `gmm enable`/`gmm disable <name or path>` use
   the same `DISABLED ` rename (enabling removes any `DISABLED` prefix style, e.g.
   `DISABLED_Old` → `Old`; switching on checks conflicts first), and `gmm uninstall <name>`
-  lists the exact folder with its size and asks before moving it to the Recycle Bin. A bare
+  lists the exact folder with its size and asks before deleting it for good. A bare
   name matching two mods (`Dup` and `GMM/Dup`) is refused until the full path is given.
 - **Download cache**: original archives in `%LOCALAPPDATA%\GMM\cache\downloads`, kept for quick
-  reinstall/rollback. Size-capped and clearable from the Storage screen.
+  reinstall/rollback while the mod is installed; uninstalling its last version deletes them.
+  Clearable from the Storage screen.
 
 ## Install & toggle model
 
@@ -143,14 +143,16 @@ has `include_recursive = Mods`, so nested folders load:
   `DISABLED` or `.` is dropped, the name is capped at 80 characters and validated like any path
   component. GMM never overwrites: a name already in the DB, or an existing folder (enabled or
   `DISABLED`) GMM didn't install, stops the install.
-- **Uninstall** = move the mod folder to the Recycle Bin (`Guard::move_to_trash`, `trash`
-  crate) and remove the DB row. The archive stays in the download cache.
+- **Uninstall** = delete the mod folder for good (`Guard::delete`, R8 amended 2026-10-25) and
+  remove the DB row and its saved toggles. When it was the last installed version of that
+  GameBanana mod, every cached archive of the mod (earlier files kept for a roll back too) is
+  deleted as well, so nothing is left behind (`UninstallOutcome::archives_removed`).
 - **Update / roll back** (`gmm_core::change_file`, Phase 6) = every folder of the mod is
   rebuilt from the other file in staging and swapped in under the **same folder name and
   on/off state** (the current folder moves into staging, the new one is renamed into place,
   the row is pointed at the new file; a failure swaps that folder back). Versions are matched
-  by name. The previous folders go to the Recycle Bin; their archive stays cached, so a roll
-  back downloads nothing.
+  by name. The previous folders are deleted; their archive stays cached, so a roll back
+  downloads nothing.
 - **Profiles** (Phase 6) = named sets of switched-on mods per game (table `profiles`);
   applying one is a series of ordinary on/off renames. GMM's mods are kept by folder name,
   hand-installed ones by their path without a `DISABLED` prefix.
@@ -167,8 +169,19 @@ has `include_recursive = Mods`, so nested folders load:
   `$\mods\phoenix\resources\phoenix.ini\headband = 0`. Renaming or moving a mod folder,
   including adding the `DISABLED` prefix, orphans those keys, and 3DMigoto drops orphaned keys
   the next time it saves. So GMM picks a mod's folder name once at install and never renames
-  it except to toggle it. Profiles snapshot `d3dx_user.ini` (Phase 6) so toggle choices
-  survive a disable/enable cycle.
+  it except to toggle it.
+- **Saved toggles survive a switch** (2026-10-25, `gmm-core/src/toggles.rs`, R3 amendment).
+  Observed format (dev machine, 2026-10-25): CRLF text with a "generated, do not edit"
+  header, a `[Constants]` section, one `$\<path or namespace>\<variable> = <value>` line per
+  saved value, lowercase keys (`$\mods\gmm\<folder>\mod.ini\swapvar = 1`), next to XXMI's
+  own `$\zzmiv1\...` / `$\wwmiv1\...` keys. Before a mod is switched off (any switch: the
+  Library, Enable / Disable all, profiles, version switches, the CLI), GMM copies the lines
+  whose key starts with the mod's path or a namespace one of its `.ini` files declares into
+  `saved_toggles`. After it is switched on, the saved lines the file is missing are added at
+  the end of `[Constants]`; lines already there keep the file's value. A copy of the file
+  goes to `cache/backups/d3dx_user/` first (ten kept). While the game is running
+  (process-name check) the write-back is marked pending and done before GMM's next launch of
+  the game or at the next switch. Failures never block a switch.
 
 ## Conflict detection
 
@@ -212,9 +225,8 @@ leftover extraction folders, and the GameBanana responses in the database. Sizes
 disk each time without following links (a walk stops at 500,000 entries and reports "at
 least"); a managed mod's recorded size is corrected when it changed. Free space comes from
 `Guard::available_space` (`fs4`). `gmm storage --clear-downloads` moves every cached archive to
-the Recycle Bin and drops the records; installed mods stay. Planned for the Storage screen
-([07](07-frontend-design.md)): multi-select disable, delete (Recycle Bin), or clear one mod's
-cached archive.
+for good and drops the records; installed mods stay. Planned for the Storage screen
+([07](07-frontend-design.md)): multi-select disable and delete.
 
 ## Catalog flow (GameBanana apiv11)
 
@@ -292,7 +304,8 @@ only when neither list can be read.
 command per CLI action, in `src/commands.rs`: `games`, `statuses`, `catalog_list`,
 `catalog_search`, `catalog_mod`, `catalog_updates`, `catalog_categories`, `install`,
 `library`, `set_enabled`, `uninstall_preview`, `uninstall`, `conflicts`, `storage`,
-`clear_download_cache`, `launch_plan`, `launch`, `settings`, `pick_xxmi_folder`,
+`clear_download_cache`, `launch_plan`, `launch`, `settings`, `preferences`,
+`set_preferences`, `pick_xxmi_folder`,
 `clear_xxmi_folder`, `pick_game_folder`, `remove_game_folder`; plus, for the Phase 5
 screens, `prepare_install`, `switch_version`, `catalog_featured`, `catalog_stats` and
 `clear_http_cache` there, the queue in `src/queue.rs` (`queue_install`, `queue_jobs`,
@@ -353,8 +366,13 @@ and `network_status`. Phase 6 adds `queue_change_file` (queue), `rollback_files`
 - **Launch** is two steps: `launch_plan` shows the exe and whether it was confirmed;
   `launch(game, confirm)` records the confirmation and starts XXMI.
 - **Uninstall** is two steps: `uninstall_preview` returns each folder's full path (and size,
-  file count for hand-installed mods) for the confirmation dialog; `uninstall` then moves
-  exactly those to the Recycle Bin.
+  file count for hand-installed mods) for the confirmation dialog (`UninstallDialog`, shared
+  by Mod settings and the Library's select mode); `uninstall` then deletes exactly those.
+- **Preferences** (theme, show sensitive mods, blur their previews, first run done) live in
+  the `settings` table; `preferences` / `set_preferences` read and write them, and one React
+  context (`src/prefs.tsx`) shares them, so the first-run screen, Settings and the Store and
+  Library filters always agree. The theme is also cached in `localStorage`, only so the
+  first paint has it.
 - **Types**: everything that crosses the bridge derives `ts_rs::TS` behind each crate's
   `ts` feature (`gmm-catalog`, `gmm-detect`, `gmm-xxmi`, `gmm-core`), and
   `src-tauri/src/bindings.rs` writes them into `src/bindings.ts` (64-bit integers as
@@ -426,7 +444,9 @@ its "Add Desktop Shortcut" creates `<IMP> Quick Start.lnk` with exactly these ar
 when the game is `Ready`, only after re-checking that the exe is a regular file inside the XXMI
 root starting with `MZ`, and only once the user has confirmed that exact path (interactive
 prompt or `--yes`; stored as `xxmi.confirmed_exe`, asked again if the path changes). XXMI's
-launcher requires administrator rights, so on Windows GMM starts it through the shell
+Saved in-game toggles that waited for the game to close are written back first (see "Saved
+toggles survive a switch"). XXMI's launcher requires administrator rights, so on Windows GMM
+starts it through the shell
 (`ShellExecuteExW`, as Explorer does for the Quick Start shortcut) and Windows shows its UAC
 prompt. XXMI then starts the game (through Steam if its Game Launch says so) and injects. GMM doesn't watch or touch the game process.
 
@@ -446,11 +466,13 @@ matching Game Launch setting (`LaunchModeMismatch`).
 `crates/gmm-db/migrations/` and is applied when the database opens; an older GMM refuses a
 database that a newer one has migrated. sqlx 0.9 with SQLite bundled, WAL journal, foreign
 keys on, every query a static SQL string with bound parameters (sqlx rejects anything else).
-Times are Unix seconds. Built so far (migrations 0001 to 0003):
+Times are Unix seconds. Built so far (migrations 0001 to 0004):
 
 ```
 settings(key PK, value)                  -- xxmi.root (a folder the user picked),
-                                         -- xxmi.confirmed_exe (R7); typed accessors only
+                                         -- xxmi.confirmed_exe (R7), ui.theme,
+                                         -- ui.show_sensitive, ui.blur_sensitive,
+                                         -- ui.onboarded; typed accessors only
 manual_game_folders(game_id, folder, added_at, PK(game_id, folder))
 installed_mods(id PK, game_id, folder_name, name, gb_mod_id NULL, gb_file_id NULL,
                variant NULL, version NULL, file_date NULL, enabled BOOL, archive_sha256 NULL,
@@ -466,6 +488,10 @@ http_cache(url PK, body, fetched_at)     -- each endpoint passes its own max age
 game_activity(game_id PK, last_played)   -- 0002: when GMM's Launch last started each game
 profiles(id PK, game_id, name, entries_json, created_at, updated_at, UNIQUE(game_id, name))
                                          -- 0003: switched-on mods per profile (gmm-core JSON)
+saved_toggles(game_id, mod_path, lines, pending, saved_at, PK(game_id, mod_path))
+                                         -- 0004: a switched-off mod's d3dx_user.ini lines;
+                                         -- mod_path = its switched-on path under Mods/,
+                                         -- lowercase; pending = write-back waits for the game
 ```
 
 - `installed_mods.folder_name` never includes the `DISABLED ` prefix; `enabled` says which
@@ -485,7 +511,7 @@ queries the raw response cache can't answer.
 | Purpose | Path |
 |---|---|
 | Config + DB | `%APPDATA%\GMM\` |
-| Caches (downloads, images, HTTP) | `%LOCALAPPDATA%\GMM\cache\` |
+| Caches (downloads, images, HTTP), `d3dx_user.ini` backups | `%LOCALAPPDATA%\GMM\cache\` |
 | Logs (local only, home path redacted) | `%LOCALAPPDATA%\GMM\logs\` |
 
 On Linux these map to the XDG equivalents (`dirs`, through `gmm_core::AppDirs`, in both the

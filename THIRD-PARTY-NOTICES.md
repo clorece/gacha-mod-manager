@@ -5,6 +5,18 @@ other dependencies (Rust crates and npm packages) are generated into this file a
 (docs/06-licensing-and-provenance.md, release checklist); until then they are listed by
 `cargo deny` and `pnpm run check-licenses`.
 
+## Game banner art
+
+`apps/desktop/src/assets/banners/`: one banner per supported game, cropped (2:1, 1800 × 900)
+and recompressed from official key art. The ZZZ logo in the source image is cropped out.
+
+- `zzz.jpg`: Zenless Zone Zero key art, © COGNOSPHERE / HoYoverse. All rights reserved.
+- `wuwa.jpg`: Wuthering Waves key art, © Kuro Games. All rights reserved.
+
+These images are **not** covered by GMM's license (MIT OR Apache-2.0). They are used to
+identify each game, without endorsement, and will be removed or replaced at the request of
+their owners (contact: https://github.com/clorece/gacha-mod-manager/issues).
+
 ## Nunito (UI font)
 
 Bundled through the npm package `@fontsource-variable/nunito` (variable weight, normal

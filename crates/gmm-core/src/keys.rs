@@ -94,7 +94,7 @@ pub async fn mod_keybindings(
 }
 
 /// Every `.ini` below `dir`, with its path relative to `dir`, sorted.
-fn ini_files(
+pub(crate) fn ini_files(
     guard: &Guard,
     dir: &ScopedPath,
     notes: &mut Vec<String>,

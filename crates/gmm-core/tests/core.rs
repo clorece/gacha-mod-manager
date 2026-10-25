@@ -634,10 +634,10 @@ async fn stale_temporary_files_are_swept_on_open() {
 
 /// Deletes instead of using the real Recycle Bin, and remembers what it was asked to do.
 #[derive(Default)]
-struct FakeTrash(std::sync::Mutex<Vec<String>>);
+struct FakeRemover(std::sync::Mutex<Vec<String>>);
 
-impl gmm_core::Trash for FakeTrash {
-    fn trash(&self, guard: &gmm_fsguard::Guard, path: &ScopedPath) -> Result<(), CoreError> {
+impl gmm_core::Remover for FakeRemover {
+    fn remove(&self, guard: &gmm_fsguard::Guard, path: &ScopedPath) -> Result<(), CoreError> {
         self.0.lock().unwrap().push(path.rel().to_string());
         if guard.metadata(path)?.is_dir() {
             guard.remove_dir_all(path)?;
@@ -731,23 +731,127 @@ async fn library_follows_the_disk_and_lists_unmanaged_mods() {
 }
 
 #[tokio::test]
-async fn uninstall_trashes_the_folder_and_forgets_the_mod() {
+async fn uninstall_deletes_the_folder_and_forgets_the_mod() {
     let f = Fixture::new().await;
     let id = installed_one(&f).await;
     gmm_core::set_enabled(&f.db, &f.ws, f.mods, zzz(), id, false)
         .await
         .unwrap();
-    let trash = FakeTrash::default();
-    let out = gmm_core::uninstall(&f.db, &f.ws, f.mods, zzz(), id, &trash)
+    let remover = FakeRemover::default();
+    let out = gmm_core::uninstall(&f.db, &f.ws, f.mods, zzz(), id, &remover)
         .await
         .unwrap();
-    assert!(out.trashed);
+    assert!(out.removed);
     assert_eq!(
-        *trash.0.lock().unwrap(),
+        *remover.0.lock().unwrap(),
         ["GMM/DISABLED Ellen - Maid [gb-652373]"]
     );
     assert_eq!(f.db.installed_mod(id).await.unwrap(), None);
     assert!(f.tree().is_empty());
+}
+
+#[tokio::test]
+async fn uninstalling_the_last_version_deletes_its_cached_archives() {
+    let f = Fixture::new().await;
+    let id = installed_one(&f).await;
+    let gb = f.db.installed_mod(id).await.unwrap().unwrap().gb_mod_id;
+    let downloads = f.cache_dir.join("downloads");
+    fs::create_dir_all(&downloads).unwrap();
+    for (sha, name) in [("a1", "1-new.zip"), ("b2", "2-old.zip")] {
+        fs::write(downloads.join(name), b"PK").unwrap();
+        f.db.record_download(&gmm_db::NewCachedDownload {
+            sha256: sha.into(),
+            gb_mod_id: gb,
+            gb_file_id: Some(1),
+            path_rel: format!("downloads/{name}"),
+            size_bytes: 2,
+        })
+        .await
+        .unwrap();
+    }
+    fs::write(downloads.join("9-other.zip"), b"PK").unwrap();
+
+    let remover = FakeRemover::default();
+    let out = gmm_core::uninstall(&f.db, &f.ws, f.mods, zzz(), id, &remover)
+        .await
+        .unwrap();
+    assert_eq!(out.archives_removed, 2);
+    assert!(!downloads.join("1-new.zip").exists() && !downloads.join("2-old.zip").exists());
+    assert!(
+        downloads.join("9-other.zip").exists(),
+        "other mods' archives stay"
+    );
+    assert!(f.db.cached_downloads().await.unwrap().is_empty());
+}
+
+/// 3DMigoto drops a switched-off mod's keys from d3dx_user.ini; GMM puts them back.
+#[tokio::test]
+async fn switching_off_and_on_keeps_the_saved_in_game_toggles() {
+    let f = Fixture::new().await;
+    let id = installed_one(&f).await;
+    let user_ini = f.mods_dir.parent().unwrap().join("d3dx_user.ini");
+    let ours = r"$\mods\gmm\ellen - maid [gb-652373]\m.ini\swapvar = 2";
+    let xxmi = r"$\zzmiv1\shown = 1";
+    fs::write(
+        &user_ini,
+        format!(
+            "; generated
+[Constants]
+{xxmi}
+{ours}
+"
+        ),
+    )
+    .unwrap();
+
+    gmm_core::set_enabled(&f.db, &f.ws, f.mods, zzz(), id, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(&user_ini)
+            .unwrap()
+            .matches("swapvar")
+            .count(),
+        1,
+        "switching off doesn't edit the file"
+    );
+    // The game saves without the mod: its keys are gone.
+    fs::write(
+        &user_ini,
+        format!(
+            "; generated
+[Constants]
+{xxmi}
+"
+        ),
+    )
+    .unwrap();
+
+    gmm_core::set_enabled(&f.db, &f.ws, f.mods, zzz(), id, true)
+        .await
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(&user_ini).unwrap(),
+        format!(
+            "; generated
+[Constants]
+{xxmi}
+{ours}
+"
+        )
+    );
+    let backups: Vec<_> = fs::read_dir(f.cache_dir.join("backups").join("d3dx_user"))
+        .unwrap()
+        .collect();
+    assert_eq!(backups.len(), 1, "the old file was kept first");
+
+    // Nothing else in the importer folder was written.
+    let mut names: Vec<String> = fs::read_dir(f.mods_dir.parent().unwrap())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names, ["Mods", "d3dx_user.ini"]);
 }
 
 #[tokio::test]
@@ -764,12 +868,12 @@ async fn missing_folders_are_reported_not_guessed() {
         gmm_core::set_enabled(&f.db, &f.ws, f.mods, zzz(), id, false).await,
         Err(CoreError::ModFolderMissing(_))
     ));
-    let trash = FakeTrash::default();
-    let out = gmm_core::uninstall(&f.db, &f.ws, f.mods, zzz(), id, &trash)
+    let remover = FakeRemover::default();
+    let out = gmm_core::uninstall(&f.db, &f.ws, f.mods, zzz(), id, &remover)
         .await
         .unwrap();
-    assert!(!out.trashed, "only the record is removed");
-    assert!(trash.0.lock().unwrap().is_empty());
+    assert!(!out.removed, "only the record is removed");
+    assert!(remover.0.lock().unwrap().is_empty());
     assert_eq!(f.db.installed_mod(id).await.unwrap(), None);
 }
 
@@ -979,8 +1083,8 @@ async fn storage_measures_mods_cache_and_free_space() {
     assert!(c.downloads.bytes > 0, "the test archive sits in downloads/");
     assert_eq!(c.extract.bytes, 0, "extraction folders were cleaned up");
 
-    let trash = FakeTrash::default();
-    let cleared = gmm_core::clear_downloads(&f.db, &f.ws, &trash)
+    let remover = FakeRemover::default();
+    let cleared = gmm_core::clear_downloads(&f.db, &f.ws, &remover)
         .await
         .unwrap();
     assert_eq!(cleared.archives, 1);
@@ -1195,16 +1299,16 @@ async fn hand_installed_mods_can_be_switched_and_uninstalled() {
     assert_eq!(report.conflicts.len(), 4, "{partners:?}"); // Phoenix, Old, Dup, GMM/Dup
 
     // Uninstall takes only an exact listed path, and goes through the trash.
-    let trash = FakeTrash::default();
+    let remover = FakeRemover::default();
     assert!(matches!(
-        gmm_core::uninstall_unmanaged(&f.db, &f.ws, f.mods, zzz(), "phoenix", &trash).await,
+        gmm_core::uninstall_unmanaged(&f.db, &f.ws, f.mods, zzz(), "phoenix", &remover).await,
         Err(CoreError::NoSuchUnmanaged { .. })
     ));
-    let gone = gmm_core::uninstall_unmanaged(&f.db, &f.ws, f.mods, zzz(), "Phoenix", &trash)
+    let gone = gmm_core::uninstall_unmanaged(&f.db, &f.ws, f.mods, zzz(), "Phoenix", &remover)
         .await
         .unwrap();
     assert_eq!(gone, "Phoenix");
-    assert_eq!(*trash.0.lock().unwrap(), ["Phoenix"]);
+    assert_eq!(*remover.0.lock().unwrap(), ["Phoenix"]);
     assert!(!f.mods_dir.join("Phoenix").exists());
     assert!(f.gmm().join("Managed [gb-9]/m.ini").exists());
     assert!(f.db.installed_mod(managed).await.unwrap().is_some());

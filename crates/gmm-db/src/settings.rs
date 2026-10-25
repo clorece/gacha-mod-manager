@@ -14,6 +14,14 @@ enum Key {
     XxmiRoot,
     /// The XXMI Launcher exe the user confirmed before the first launch (R7).
     ConfirmedXxmiExe,
+    /// Dark, light or match Windows.
+    Theme,
+    /// Show mods GameBanana marks as sensitive (NSFW).
+    ShowSensitive,
+    /// Blur sensitive previews until hovered (only matters while they are shown).
+    BlurSensitive,
+    /// The first-run preferences screen was answered.
+    Onboarded,
 }
 
 impl Key {
@@ -21,6 +29,60 @@ impl Key {
         match self {
             Self::XxmiRoot => "xxmi.root",
             Self::ConfirmedXxmiExe => "xxmi.confirmed_exe",
+            Self::Theme => "ui.theme",
+            Self::ShowSensitive => "ui.show_sensitive",
+            Self::BlurSensitive => "ui.blur_sensitive",
+            Self::Onboarded => "ui.onboarded",
+        }
+    }
+}
+
+/// The app's look.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Theme {
+    #[default]
+    Dark,
+    Light,
+    /// Follow Windows' light or dark setting.
+    System,
+}
+
+impl Theme {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Dark => "dark",
+            Self::Light => "light",
+            Self::System => "system",
+        }
+    }
+
+    fn parse(s: &str) -> Option<Self> {
+        match s {
+            "dark" => Some(Self::Dark),
+            "light" => Some(Self::Light),
+            "system" => Some(Self::System),
+            _ => None,
+        }
+    }
+}
+
+/// What the user chose on the first-run screen, in Settings or in the Store and Library
+/// filters (one setting, shown in all three places).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Preferences {
+    pub theme: Theme,
+    pub show_sensitive: bool,
+    pub blur_sensitive: bool,
+    pub onboarded: bool,
+}
+
+impl Default for Preferences {
+    fn default() -> Self {
+        Self {
+            theme: Theme::Dark,
+            show_sensitive: false,
+            blur_sensitive: true,
+            onboarded: false,
         }
     }
 }
@@ -91,6 +153,39 @@ impl Db {
 
     pub async fn set_confirmed_xxmi_exe(&self, exe: Option<&Path>) -> Result<(), DbError> {
         self.set_path(Key::ConfirmedXxmiExe, exe).await
+    }
+
+    /// The saved preferences; anything never set (or unreadable) has its default.
+    pub async fn preferences(&self) -> Result<Preferences, DbError> {
+        let d = Preferences::default();
+        let flag = |v: Option<String>, default: bool| v.map_or(default, |v| v == "1");
+        Ok(Preferences {
+            theme: self
+                .get_setting(Key::Theme)
+                .await?
+                .and_then(|v| Theme::parse(&v))
+                .unwrap_or(d.theme),
+            show_sensitive: flag(
+                self.get_setting(Key::ShowSensitive).await?,
+                d.show_sensitive,
+            ),
+            blur_sensitive: flag(
+                self.get_setting(Key::BlurSensitive).await?,
+                d.blur_sensitive,
+            ),
+            onboarded: flag(self.get_setting(Key::Onboarded).await?, d.onboarded),
+        })
+    }
+
+    pub async fn set_preferences(&self, p: &Preferences) -> Result<(), DbError> {
+        let flag = |b: bool| if b { "1" } else { "0" };
+        self.set_setting(Key::Theme, Some(p.theme.as_str())).await?;
+        self.set_setting(Key::ShowSensitive, Some(flag(p.show_sensitive)))
+            .await?;
+        self.set_setting(Key::BlurSensitive, Some(flag(p.blur_sensitive)))
+            .await?;
+        self.set_setting(Key::Onboarded, Some(flag(p.onboarded)))
+            .await
     }
 
     /// Game folders the user named, oldest first.

@@ -286,7 +286,7 @@ pub struct UninstallItem {
 pub struct Uninstalled {
     pub key: ModKey,
     /// False when the folder was already gone and only GMM's record was removed.
-    pub trashed: bool,
+    pub removed: bool,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -333,6 +333,58 @@ pub struct Settings {
     pub http_cache_bytes: u64,
     pub download_cache_entries: u64,
     pub download_cache_bytes: u64,
+}
+
+/// The look of the app (`gmm_db::Theme`).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum ThemeChoice {
+    Dark,
+    Light,
+    System,
+}
+
+/// The user's preferences: the first-run screen, Settings, and the sensitive-mods switch in
+/// the Store and Library filters all read and write these.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS)]
+pub struct Preferences {
+    pub theme: ThemeChoice,
+    /// Show mods GameBanana marks as sensitive (NSFW). Off by default.
+    pub show_sensitive: bool,
+    /// Blur sensitive previews until hovered, while they are shown. On by default.
+    pub blur_sensitive: bool,
+    /// The first-run preferences screen was answered.
+    pub onboarded: bool,
+}
+
+impl From<gmm_db::Preferences> for Preferences {
+    fn from(p: gmm_db::Preferences) -> Self {
+        Self {
+            theme: match p.theme {
+                gmm_db::Theme::Dark => ThemeChoice::Dark,
+                gmm_db::Theme::Light => ThemeChoice::Light,
+                gmm_db::Theme::System => ThemeChoice::System,
+            },
+            show_sensitive: p.show_sensitive,
+            blur_sensitive: p.blur_sensitive,
+            onboarded: p.onboarded,
+        }
+    }
+}
+
+impl From<Preferences> for gmm_db::Preferences {
+    fn from(p: Preferences) -> Self {
+        Self {
+            theme: match p.theme {
+                ThemeChoice::Dark => gmm_db::Theme::Dark,
+                ThemeChoice::Light => gmm_db::Theme::Light,
+                ThemeChoice::System => gmm_db::Theme::System,
+            },
+            show_sensitive: p.show_sensitive,
+            blur_sensitive: p.blur_sensitive,
+            onboarded: p.onboarded,
+        }
+    }
 }
 
 fn rewrite_image(images: &ImageCache, image: Image) -> Option<Image> {

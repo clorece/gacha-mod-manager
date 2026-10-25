@@ -19,6 +19,9 @@
 //! file manager (Windows: `ShellExecuteExW` with the `open` / `explore` verb; elsewhere
 //! `xdg-open` with the one argument). They never run a file: a page must be an `http(s)`
 //! address, a folder must be an existing directory.
+//!
+//! [`game_running`] looks at running process names (Windows ToolHelp snapshot), so GMM can
+//! hold off writing `d3dx_user.ini` while the game is open.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -115,6 +118,14 @@ pub fn open_folder(dir: &Path) -> Result<(), String> {
     platform::shell_open(Shell::Folder, dir.as_os_str())
 }
 
+/// Whether one of the game's executables is running. Only process image names are
+/// compared (nothing else about other processes is read or kept). GMM writes 3DMigoto's
+/// `d3dx_user.ini` only while this is false, because the running game rewrites that file
+/// from memory. Outside Windows it is always false for now (Linux support comes later).
+pub fn game_running(game: &GameManifest) -> bool {
+    platform::any_running(&game.detect.exe_names)
+}
+
 #[derive(Clone, Copy)]
 enum Shell {
     Page,
@@ -131,9 +142,13 @@ mod platform {
     use std::os::windows::ffi::OsStrExt;
     use std::path::Path;
 
-    use windows_sys::Win32::Foundation::{CloseHandle, ERROR_CANCELLED};
+    use windows_sys::Win32::Foundation::{CloseHandle, ERROR_CANCELLED, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Com::{
         COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx,
+    };
+    use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
+        TH32CS_SNAPPROCESS,
     };
     use windows_sys::Win32::System::Threading::GetProcessId;
     use windows_sys::Win32::UI::Shell::{
@@ -176,6 +191,35 @@ mod platform {
             return Err(format!("couldn't open it: {}", io::Error::last_os_error()));
         }
         Ok(())
+    }
+
+    /// Walks a snapshot of the running processes and compares each image name.
+    pub fn any_running(exe_names: &[String]) -> bool {
+        // SAFETY: the snapshot handle is checked, used only with the ToolHelp calls below and
+        // closed exactly once; `entry` is zero-initialised with `dwSize` set as the API
+        // requires, and `szExeFile` is read only up to its NUL within the fixed buffer.
+        unsafe {
+            let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+            if snapshot == INVALID_HANDLE_VALUE {
+                return false;
+            }
+            let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+            entry.dwSize = u32::try_from(std::mem::size_of::<PROCESSENTRY32W>()).unwrap_or(0);
+            let mut found = false;
+            let mut more = Process32FirstW(snapshot, &mut entry) != 0;
+            while more && !found {
+                let len = entry
+                    .szExeFile
+                    .iter()
+                    .position(|&c| c == 0)
+                    .unwrap_or(entry.szExeFile.len());
+                let name = String::from_utf16_lossy(&entry.szExeFile[..len]);
+                found = exe_names.iter().any(|n| n.eq_ignore_ascii_case(&name));
+                more = Process32NextW(snapshot, &mut entry) != 0;
+            }
+            CloseHandle(snapshot);
+            found
+        }
     }
 
     pub fn start(command: &LaunchCommand, dir: &Path) -> Result<Option<u32>, String> {
@@ -250,6 +294,10 @@ mod platform {
                 std::thread::spawn(move || child.wait());
             })
             .map_err(|e| format!("couldn't open it: {e}"))
+    }
+
+    pub fn any_running(_exe_names: &[String]) -> bool {
+        false
     }
 
     pub fn start(command: &LaunchCommand, dir: &Path) -> Result<Option<u32>, String> {

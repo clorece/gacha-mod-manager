@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Game banners. Until the banner source is decided (docs/08, open decisions) a banner is the
-// game's colors with its short name as a faint watermark; text on it is always white.
+// Game banners: each known game has key art (styles.css, assets/banners); others get the
+// neutral banner. Text on a banner is always white over its fade.
 
 import type { GameStatus, SetupState } from "./api";
 import type { Tone } from "./ui";

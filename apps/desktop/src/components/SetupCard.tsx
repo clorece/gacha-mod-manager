@@ -1,16 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // One game's setup state with the steps to fix it, from gmm-xxmi (docs/07, "Setup &
-// onboarding"). Shown on the Dashboard instead of Launch for a game that isn't Ready. The
-// guided stepper with screenshots comes later.
+// onboarding"). Shown on the Dashboard instead of Launch for a game that isn't Ready, with
+// the step-by-step setup guide one click away.
 
 import { useState } from "react";
 import { api, asCmdError, type GameStatus } from "../api";
 import { setupLabel, sourceLabel } from "../games";
 import { Badge, Button, useToast } from "../ui";
+import { SetupGuide } from "./SetupGuide";
+
+/** The CLI's own "run `gmm status` again" lines; the app has Check again instead. */
+const cliOnly = (step: string) => step.startsWith("Run `gmm status`");
 
 export function SetupCard({ status, onRecheck }: { status: GameStatus; onRecheck: () => Promise<void> }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const [guide, setGuide] = useState(false);
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
@@ -26,6 +31,7 @@ export function SetupCard({ status, onRecheck }: { status: GameStatus; onRecheck
 
   const install = status.detected_installs[0];
   const state = setupLabel(status.state);
+  const steps = status.steps.filter((step) => !cliOnly(step));
   return (
     <section aria-label={`${status.game_name} setup`} className="card panel stack">
       <div className="flex items-center gap-3">
@@ -55,17 +61,20 @@ export function SetupCard({ status, onRecheck }: { status: GameStatus; onRecheck
           </b>
         </div>
       </div>
-      {status.steps.length > 0 && (
+      {steps.length > 0 && (
         <div>
           <h3 className="sec-h">Next steps</h3>
           <ol className="mt-2 list-decimal space-y-1 pl-5 leading-[1.45]">
-            {status.steps.map((step) => (
+            {steps.map((step) => (
               <li key={step}>{step}</li>
             ))}
           </ol>
         </div>
       )}
       <div className="flex flex-wrap gap-2">
+        <Button variant="primary" icon="book" onClick={() => setGuide(true)}>
+          Open setup guide
+        </Button>
         <Button icon="refresh" disabled={busy} onClick={() => run(async () => {})}>
           Check again
         </Button>
@@ -80,6 +89,16 @@ export function SetupCard({ status, onRecheck }: { status: GameStatus; onRecheck
           </Button>
         )}
       </div>
+      {guide && (
+        <SetupGuide
+          status={status}
+          onClose={() => setGuide(false)}
+          onRecheck={async () => {
+            await onRecheck();
+            return (await api.statuses()).find((s) => s.game_id === status.game_id);
+          }}
+        />
+      )}
     </section>
   );
 }

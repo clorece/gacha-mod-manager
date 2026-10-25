@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use gmm_adapters::{GameManifest, Registry};
 use gmm_catalog::GameBanana;
 use gmm_core::{
-    InstallEvent, ModsTarget, RecycleBin, SetupHints, StopSignal, change_file, check_updates,
+    DeleteForever, InstallEvent, ModsTarget, SetupHints, StopSignal, change_file, check_updates,
     rollback_choices,
 };
 use gmm_db::Db;
@@ -64,7 +64,7 @@ pub async fn run(
         game,
         gb_mod_id,
         file,
-        &RecycleBin,
+        &DeleteForever,
         &StopSignal::new(),
         |event| match event {
             InstallEvent::Fetch(e) => show_fetch(e),
@@ -105,9 +105,9 @@ pub async fn run(
                 "kept as it was: {kept:?} (its version isn't in this file, or it's already on it)\n"
             ));
         }
-        for folder in &report.not_trashed {
+        for folder in &report.not_removed {
             text.push_str(&format!(
-                "note: the previous {folder:?} couldn't go to the Recycle Bin; GMM removes it within an hour\n"
+                "note: the previous {folder:?} couldn't be deleted; GMM removes it within an hour\n"
             ));
         }
         if !report.changed.is_empty() {

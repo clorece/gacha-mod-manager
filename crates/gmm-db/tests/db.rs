@@ -33,7 +33,7 @@ async fn file_database_is_created_migrated_and_reopened() {
     let file = guard.path(data, DB_FILE_NAME).unwrap();
 
     let db = Db::open(&guard, &file).await.unwrap();
-    assert_eq!(db.schema_version().await.unwrap(), 3);
+    assert_eq!(db.schema_version().await.unwrap(), 4);
     db.set_xxmi_root(Some(Path::new(r"D:\XXMI Launcher")))
         .await
         .unwrap();
@@ -42,7 +42,7 @@ async fn file_database_is_created_migrated_and_reopened() {
 
     // Reopening runs no migration twice and keeps the data.
     let db = Db::open(&guard, &file).await.unwrap();
-    assert_eq!(db.schema_version().await.unwrap(), 3);
+    assert_eq!(db.schema_version().await.unwrap(), 4);
     assert_eq!(
         db.xxmi_root().await.unwrap().as_deref(),
         Some(Path::new(r"D:\XXMI Launcher"))
@@ -78,6 +78,25 @@ async fn settings_round_trip_and_clear() {
     db.set_confirmed_xxmi_exe(None).await.unwrap();
     assert_eq!(db.confirmed_xxmi_exe().await.unwrap(), None);
     assert_eq!(db.xxmi_root().await.unwrap(), None, "keys are independent");
+}
+
+#[tokio::test]
+async fn preferences_default_then_round_trip() {
+    let db = Db::open_in_memory().await.unwrap();
+    let d = db.preferences().await.unwrap();
+    assert_eq!(d, gmm_db::Preferences::default());
+    assert!(
+        !d.show_sensitive && d.blur_sensitive && !d.onboarded,
+        "safe defaults"
+    );
+    let chosen = gmm_db::Preferences {
+        theme: gmm_db::Theme::System,
+        show_sensitive: true,
+        blur_sensitive: false,
+        onboarded: true,
+    };
+    db.set_preferences(&chosen).await.unwrap();
+    assert_eq!(db.preferences().await.unwrap(), chosen);
 }
 
 #[tokio::test]

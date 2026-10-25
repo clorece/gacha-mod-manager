@@ -104,7 +104,7 @@ export type Uninstalled = { key: ModKey,
 /**
  * False when the folder was already gone and only GMM's record was removed.
  */
-trashed: boolean, };
+removed: boolean, };
 
 export type GameStorageView = { game: string, problem: string | null, storage: GameStorage | null, };
 
@@ -161,6 +161,22 @@ export type RollbackFile = { file_id: number, name: string,
  * Upload date (Unix seconds), when GameBanana still lists the file.
  */
 date_added: number | null, version: string | null, };
+
+export type ThemeChoice = "dark" | "light" | "system";
+
+export type Preferences = { theme: ThemeChoice, 
+/**
+ * Show mods GameBanana marks as sensitive (NSFW). Off by default.
+ */
+show_sensitive: boolean, 
+/**
+ * Blur sensitive previews until hovered, while they are shown. On by default.
+ */
+blur_sensitive: boolean, 
+/**
+ * The first-run preferences screen was answered.
+ */
+onboarded: boolean, };
 
 export type GameStatus = { game_id: string, game_name: string, state: SetupState, 
 /**
@@ -596,10 +612,10 @@ file: ModFile, changed: Array<ChangedFolder>,
  */
 kept: Array<string>, 
 /**
- * Previous folders that couldn't be moved to the Recycle Bin (left in the staging
+ * Previous folders that couldn't be deleted (left in the staging
  * folder, which GMM clears after an hour).
  */
-not_trashed: Array<string>, };
+not_removed: Array<string>, };
 
 export type ChangedFolder = { id: number, folder_name: string, enabled: boolean, files: number, bytes: number, 
 /**

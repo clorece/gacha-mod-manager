@@ -10,7 +10,7 @@
 //! toggle model"). The swap stays on one volume: the current folder moves into the staging
 //! folder, the new one is renamed into place, and the database row is pointed at the new file
 //! (same id). If any of that fails, that folder is swapped back. Afterwards the previous
-//! folders go to the Recycle Bin (R8). Their archive stays in the download cache, so rolling
+//! folders are deleted (R8). Their archive stays in the download cache, so rolling
 //! back is the same call with the older file and downloads nothing.
 //!
 //! A version the other file doesn't have is left as it is and reported. Blocked files in the
@@ -26,7 +26,7 @@ use serde::Serialize;
 use crate::analyze::Variant;
 use crate::error::CoreError;
 use crate::install::{InstallEvent, ModMeta, assemble_variant, prepare, variant_findings};
-use crate::library::Trash;
+use crate::library::Remover;
 use crate::names::{GMM_DIR, STAGING_DIR, on_disk_name};
 use crate::stop::StopSignal;
 use crate::workspace::{STALE_TEMP, Workspace, remove_stale, unique_id};
@@ -57,9 +57,9 @@ pub struct FileChangeReport {
     /// Folders left as they were: their version isn't in the new file, or they already
     /// were on it.
     pub kept: Vec<String>,
-    /// Previous folders that couldn't be moved to the Recycle Bin (left in the staging
+    /// Previous folders that couldn't be deleted (left in the staging
     /// folder, which GMM clears after an hour).
-    pub not_trashed: Vec<String>,
+    pub not_removed: Vec<String>,
 }
 
 /// The other files of an installed mod that are already in the download cache, newest
@@ -134,7 +134,7 @@ pub async fn change_file<C: CatalogSource>(
     game: &GameManifest,
     gb_mod_id: u64,
     file_id: Option<u64>,
-    trash: &dyn Trash,
+    remover: &dyn Remover,
     stop: &StopSignal,
     mut on_event: impl FnMut(InstallEvent),
 ) -> Result<FileChangeReport, CoreError> {
@@ -151,7 +151,7 @@ pub async fn change_file<C: CatalogSource>(
         &mut on_event,
     )
     .await?;
-    let result = swap_in(db, ws, mods, game, &rows, &prepared, trash, &mut on_event).await;
+    let result = swap_in(db, ws, mods, game, &rows, &prepared, remover, &mut on_event).await;
     prepared.discard(ws);
     result
 }
@@ -164,7 +164,7 @@ async fn swap_in(
     game: &GameManifest,
     rows: &[InstalledMod],
     prepared: &crate::install::Prepared,
-    trash: &dyn Trash,
+    remover: &dyn Remover,
     on_event: &mut impl FnMut(InstallEvent),
 ) -> Result<FileChangeReport, CoreError> {
     let analysis = &prepared.analysis;
@@ -196,7 +196,7 @@ async fn swap_in(
         file: fetched.file.clone(),
         changed: Vec::new(),
         kept: Vec::new(),
-        not_trashed: Vec::new(),
+        not_removed: Vec::new(),
     };
 
     // Which folders move, to which version. Nothing on disk changes yet.
@@ -313,11 +313,11 @@ async fn swap_in(
     }
 
     for (folder, path) in previous {
-        if trash.trash(guard, &path).is_err() {
-            report.not_trashed.push(folder);
+        if remover.remove(guard, &path).is_err() {
+            report.not_removed.push(folder);
         }
     }
-    if report.not_trashed.is_empty() {
+    if report.not_removed.is_empty() {
         let _ = guard.remove_dir_all(&stage);
     }
     match failure {

@@ -39,6 +39,8 @@
     "allow-launch-plan",
     "allow-launch",
     "allow-settings",
+    "allow-preferences",
+    "allow-set-preferences",
     "allow-pick-xxmi-folder",
     "allow-clear-xxmi-folder",
     "allow-pick-game-folder",

@@ -33,6 +33,7 @@ import type {
   ModUpdate,
   NetworkStatus,
   Page,
+  Preferences,
   ProfileApplied,
   ProfileImported,
   ProfileInfo,
@@ -169,6 +170,8 @@ export const api = {
   launch: (game: string, confirm: boolean) => invoke<Launched>("launch", { game, confirm }),
 
   settings: () => invoke<Settings>("settings"),
+  preferences: () => invoke<Preferences>("preferences"),
+  setPreferences: (preferences: Preferences) => invoke<Preferences>("set_preferences", { preferences }),
   pickXxmiFolder: () => invoke<string | null>("pick_xxmi_folder"),
   clearXxmiFolder: () => invoke<null>("clear_xxmi_folder"),
   pickGameFolder: (game: string) => invoke<string | null>("pick_game_folder", { game }),

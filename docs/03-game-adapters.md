@@ -147,8 +147,12 @@ output, JSON or `Debug`.
 ### In-app setup guide (our own wording)
 
 Bold names are XXMI's own English labels, taken from its locale files (`Locale/Strings/EN_*.toml`,
-XXMI 2.4.9). `gmm status` already prints these steps per state. Our own screenshots go next to
-each step before the setup guide ships in the app (see "Before Phase 2" in the roadmap).
+XXMI 2.4.9). `gmm status` prints these steps per state. The app's setup guide
+(`components/SetupGuide.tsx`, 2026-10-25) is text only and condenses them into four steps:
+install XXMI, select the game, press **Install**, follow XXMI's prompts. The project owner's
+experience setting up both games: XXMI itself asks for the game settings mods need when it
+installs and first starts a mod loader (for example HD instead of UHD for a Steam copy), so
+the guide doesn't list them; the detailed steps below stay for the CLI and the setup card.
 
 **Install XXMI**
 1. Open XXMI's releases page (link: `https://github.com/SpectrumQT/XXMI-Launcher/releases`).
