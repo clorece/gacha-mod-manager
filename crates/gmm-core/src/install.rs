@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use gmm_adapters::GameManifest;
 use gmm_archive::{Finding, Severity};
 use gmm_catalog::{CatalogSource, ModFile, ModFiles};
-use gmm_db::{Db, NewInstalledMod};
+use gmm_db::{Db, ModCategories, NewInstalledMod};
 use gmm_fsguard::{Guard, RelPath, RootId, ScopedPath};
 use gmm_net::Client;
 use gmm_xxmi::{GameStatus, SetupState};
@@ -69,6 +69,8 @@ pub struct ModMeta {
     pub file_date: Option<i64>,
     pub version: Option<String>,
     pub archive_sha256: String,
+    /// GameBanana's categories, stored for the library cards and filters.
+    pub categories: ModCategories,
 }
 
 impl ModMeta {
@@ -89,6 +91,7 @@ impl ModMeta {
                 .clone()
                 .or_else(|| mod_version.map(str::to_owned)),
             archive_sha256: sha256.to_owned(),
+            categories: ModCategories::default(),
         }
     }
 }
@@ -176,6 +179,7 @@ pub struct Prepared {
     pub mod_id: u64,
     pub mod_name: String,
     pub mod_version: Option<String>,
+    pub categories: ModCategories,
     /// The mod's files on GameBanana, for choosing another one.
     pub files: ModFiles,
     pub fetched: FetchedArchive,
@@ -246,6 +250,12 @@ pub async fn prepare<C: CatalogSource>(
     Ok(Prepared {
         mod_id,
         mod_name: profile.summary.name,
+        categories: ModCategories {
+            root_category_id: profile.summary.root_category.as_ref().and_then(|c| c.id),
+            root_category: profile.summary.root_category.map(|c| c.name),
+            category_id: profile.summary.category.as_ref().and_then(|c| c.id),
+            category: profile.summary.category.map(|c| c.name),
+        },
         mod_version: profile.summary.version,
         files: profile.files,
         fetched,
@@ -266,6 +276,7 @@ pub async fn install_prepared(
     let fetched = &prepared.fetched;
     let meta = ModMeta {
         gb_mod_id: Some(prepared.mod_id),
+        categories: prepared.categories.clone(),
         ..ModMeta::from_gamebanana(
             &prepared.mod_name,
             prepared.mod_version.as_deref(),
@@ -476,6 +487,7 @@ pub async fn install_analyzed(
                     archive_sha256: Some(meta.archive_sha256.clone()),
                     size_bytes: bytes,
                     scan_report_json: Some(serde_json::to_string(&report)?),
+                    categories: meta.categories.clone(),
                 },
                 InstalledFolder {
                     id: 0,

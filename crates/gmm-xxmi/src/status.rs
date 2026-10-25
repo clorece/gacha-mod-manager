@@ -13,7 +13,8 @@ use serde::Serialize;
 use crate::find::XxmiInstall;
 use crate::importer::{ImporterInfo, inspect_importer};
 
-const XXMI_RELEASES: &str = "https://github.com/SpectrumQT/XXMI-Launcher/releases";
+/// XXMI Launcher's official releases page (the setup steps and the app link to it).
+pub const XXMI_RELEASES: &str = "https://github.com/SpectrumQT/XXMI-Launcher/releases";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]

@@ -54,9 +54,9 @@ jobs:
           if [ "$found" != "$want" ]; then
             echo "allow(unsafe_code) found outside the reviewed files:"; echo "$found"; exit 1
           fi
-      # Security rule R7: GMM starts two kinds of process, each from one place: XXMI
-      # (gmm-xxmi/src/launch.rs) and its RAR helper (gmm-archive/src/helper.rs). Tests may
-      # start the helper directly.
+      # Security rule R7: GMM starts processes from two places only: XXMI and the OS shell's
+      # "open page" / "open folder" (gmm-xxmi/src/launch.rs) and its RAR helper
+      # (gmm-archive/src/helper.rs). Tests may start the helper directly.
       - name: Process launching only in its two places
         if: runner.os == 'Linux'
         shell: bash

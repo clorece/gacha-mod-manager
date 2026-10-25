@@ -87,7 +87,17 @@ does is the failure we design out.
   archive (opened read-only through `gmm-fsguard`) as its stdin; never a path from a download.
   The helper is started only in `crates/gmm-archive/src/helper.rs` and sandboxed (see
   "Archive hardening" below).
-  "Open folder" uses the OS shell to open a directory, never a file. Nothing from a mod archive is
+  Two more things are handed to the OS shell, from the same module: `open_folder` opens a
+  directory in the file manager (Windows: `ShellExecuteExW` with the `explore` verb, which
+  doesn't apply to files; elsewhere `xdg-open` with the one argument), and it refuses
+  anything but an existing absolute directory; the app only asks for a mod's folder inside a
+  Mods folder, resolved with `Guard::os_path_of_dir`. `open_page` opens an `http(s)` address
+  in the default browser (verb `open`); it refuses other schemes, addresses without a host,
+  spaces, quotes, angle brackets, control characters and anything over 2,048 characters.
+  The app builds those addresses itself (`gamebanana.com/mods/<id>`, XXMI's releases page)
+  or looks them up from a link key it handed out in a rewritten description, and shows each
+  one in a native dialog from Rust first; the webview can neither name the address nor answer
+  the dialog. Nothing from a mod archive is
   ever executed. All launching is in `crates/gmm-xxmi/src/launch.rs`; the exe path is fixed
   relative to the validated root and the arguments come from the importer id in code (refused
   if one would need quoting). `gmm-core::start` refuses an exe the user hasn't confirmed
@@ -167,10 +177,21 @@ does is the failure we design out.
 
 ## Catalogue / UI hardening
 
-- `_sText` and `_sLicense` HTML will be sanitized with DOMPurify (strict allowlist: no
-  `style`, no iframes, no forms, no event handlers) when the mod page is built. Links will
-  open in the system browser after a confirmation. Biome's `noDangerouslySetInnerHtml` is an
-  error until then (Phase 5).
+- `_sText`, `_sLicense` and update HTML go through two layers before display (T3). In Rust
+  (`src-tauri/src/html.rs`) every address leaves the HTML: image `src`s become `gmmimg`
+  URLs (GameBanana's image host only; other images lose their `src`), `http(s)` link
+  `href`s become `#gmm-link:<key>`, other `href`s and every `srcset` are dropped; values are
+  entity-decoded before they're judged and escaped when written back. Unit tests cover
+  entity-encoded `javascript:`, unquoted and single-quoted values, comments, broken tags and
+  escaping. In the webview, `components/RichText.tsx` runs DOMPurify 3.4.17 on its own
+  instance with an allowlist (text formatting, lists, headings, tables, `a`, `img`;
+  attributes `href`, `src`, `alt`, `title`, sizes; no `style`, `class`, data or ARIA
+  attributes, no forms, frames or scripts), a URI pattern that only admits those two
+  shapes, and a hook that removes any `img` whose `src` isn't exactly a `gmmimg` key and
+  any `href` that isn't exactly a link key. Clicks never navigate: a link key goes to
+  `open_link`, which shows the real address before opening it (R7). `RichText` is the one
+  place allowed past Biome's `noDangerouslySetInnerHtml` (with a reason). The CSP stays the
+  last line. Still to come: the Vitest XSS corpus through `sanitize` (Phase 5 tests).
 - **Capability** (`apps/desktop/src-tauri/capabilities/main.json`): the main window gets
   exactly GMM's own commands (`allow-<command>`, generated from the list in `build.rs`), and
   nothing else: not `core:default`, no event, window, `fs`, `shell`, `http` or `dialog`
@@ -212,11 +233,12 @@ does is the failure we design out.
 | 0b | Detection on a fake machine (✅ done): Steam libraries, HoYoPlay data with a default path for an uninstalled game, Epic manifest, hostile `installdir` (`..\..\Windows`), planted `loginusers.vdf` canary | R3/R4, correct detection |
 | 2 | **Egress harness** (✅ done, `crates/gmm-cli/tests/privacy.rs`): the real `gmm` binary runs every network command behind an in-test proxy that logs and refuses each request. Every `CONNECT` target must pass `Allowlist::production()` on port 443, at least one must be seen, and local commands (detect, status, config, list, conflicts, storage, launch) must make none. On Linux CI each `gmm` process also runs under `strace`, and any IPv4/IPv6 connection that isn't loopback (traffic bypassing the proxy) fails the run. ⏳ a Windows equivalent of the bypass check (firewall rule) | R2 |
 | 2 | **File-access harness** (✅ done, same test): a fake profile with canary files (Steam `loginusers.vdf`, `config.vdf`, `userdata/`, a game `Player.log`, a browser `logins.json`, `~/.ssh/id_rsa`) and secrets in XXMI's config; GMM's folders redirected with `GMM_HOME`. Asserts nothing in the profile outside `Mods/` changed and no canary content reached GMM's files. Under `strace` (Linux CI) it also fails if any canary is opened or stat-ed, or any write lands outside `GMM_HOME` and `Mods/`. ⏳ Process Monitor on Windows | R3/R4 |
-| 5 | IPC fuzz: hostile args to every Tauri command. ⏳ Not automated yet; checked by hand in the running app (2026-10-24): an unknown game id (`../../etc`), an unmanaged key `../XXMI Launcher Config.json`, an image key GMM never issued, and plugin commands are all refused | R5 |
+| 5 | IPC fuzz: hostile args to every Tauri command. ⏳ Not automated yet; checked by hand in the running app (2026-10-24): an unknown game id (`../../etc`), an unmanaged key `../XXMI Launcher Config.json`, an image key GMM never issued, and plugin commands are all refused; 2026-10-25: `open_mod_folder` with an unmanaged key `../../Windows` and an unknown mod id is refused | R5 |
 | 3 | Image cache tests (✅ done, `gmm-core/src/images.rs`): only `images.gamebanana.com` HTTPS URLs get keys; bad keys, SVG/HTML bodies and HTTP errors are refused and nothing is written; cache survives restarts; oldest images pruned at the cap | R2, R5 |
 | 3 | `bindings_are_current` (✅ done, `gmm-desktop`): the TypeScript types match the Rust types | Bridge types can't drift |
 | 2 | Adapter conformance suite on fixtures (✅ done: per-state fixtures in 0b; `gmm-core/tests/conformance.rs` runs detect → install → toggle → conflicts → storage → uninstall per game, asserts no file outside `Mods/` changed and no XXMI config canary reached GMM's database, cache or mod folders) | Correct detection, no writes outside `Mods/`, R4 for the database |
-| 5 | XSS corpus through the description renderer | T3 |
+| 5 | XSS corpus through the description renderer. Rust side ✅ (`src-tauri/src/html.rs` unit tests: entity-encoded schemes, quoting styles, comments, broken tags, escaping); checked live 2026-10-25 on ten real descriptions (no outside address left in any attribute). ⏳ the DOMPurify side (`RichText.sanitize`) in Vitest | T3 |
+| 5 | Shell openers (✅ `gmm-xxmi/src/launch.rs` unit tests): `open_page` refuses `file:`, `javascript:`, `ms-settings:`, Windows paths, host-less addresses, spaces, quotes, control characters and over-long addresses; `open_folder` refuses relative paths, files and missing folders | R7 |
 | 6 | Hostile deep-link URLs | T6 |
 | 7 | Release checks: feature-flag assertion (R6), update signature verification, installer contents review | T7/T8 |
 

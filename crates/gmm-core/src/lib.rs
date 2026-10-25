@@ -33,6 +33,7 @@ mod queue;
 mod setup;
 mod stop;
 mod storage;
+mod store;
 mod updates;
 mod versions;
 mod workspace;
@@ -52,21 +53,23 @@ pub use install::{
 };
 pub use launch::{LaunchPlan, confirm_exe, plan_launch, start};
 pub use library::{
-    DiskState, Library, ManagedMod, RecycleBin, ToggleOutcome, Trash, UninstallOutcome,
-    UnmanagedMod, UnmanagedToggle, find_unmanaged, library, listed_unmanaged, one_unmanaged,
-    set_enabled, set_unmanaged_enabled, set_unmanaged_enabled_at, uninstall, uninstall_unmanaged,
+    DiskState, Library, ManagedMod, ModFolder, RecycleBin, ToggleOutcome, Trash, UninstallOutcome,
+    UnmanagedMod, UnmanagedToggle, find_unmanaged, library, listed_unmanaged, mod_folder,
+    one_unmanaged, set_enabled, set_unmanaged_enabled, set_unmanaged_enabled_at, uninstall,
+    uninstall_unmanaged,
 };
 pub use names::{
     DISABLED_PREFIX, GMM_DIR, SIDECAR_FILE, STAGING_DIR, mod_folder_name, on_disk_name,
 };
 pub use plan::{InstallPlan, VersionPlan, install_plan};
-pub use queue::{InstallQueue, Job, JobId, JobRequest, JobState, NextJob};
+pub use queue::{InstallQueue, Job, JobId, JobLabel, JobRequest, JobState, NextJob};
 pub use setup::{Machine, ModsTarget, SetupHints, game_for_mod, saved_setup};
 pub use stop::{StopReason, StopSignal};
 pub use storage::{
     CacheStorage, ClearedCache, GameStorage, ModUsage, Size, cache_storage, clear_downloads,
     game_storage, unmanaged_size,
 };
+pub use store::{FEATURED_COUNT, FeaturedMod, featured};
 pub use updates::{ModUpdateInfo, UpdateCheck, check_updates, refresh_catalog};
 pub use versions::{switch_version, version_group};
 pub use workspace::{AppDirs, Workspace, open_db};

@@ -13,8 +13,9 @@ line: browse GameBanana, check your setup (`gmm status`), install mods into XXMI
 with a safety scan (`gmm install`), switch them on and off, uninstall them to the Recycle Bin,
 spot conflicts, show disk use, and start a game with mods through XXMI (`gmm launch`). Zip,
 7z and RAR mods are supported. The app
-window has the designed sidebar shell with the Dashboard (Launch) and the Mods Library; the
-remaining screens come next.
+window has the designed sidebar shell with the startup check, the Dashboard (Launch), the
+Mods Library, Downloads (the install queue) and the install confirmation; the Mods Store and
+the remaining screens come next.
 Progress and plans: [docs/README.md](docs/README.md).
 
 First games: Zenless Zone Zero and Wuthering Waves.

@@ -8,6 +8,8 @@
 
 mod commands;
 mod error;
+mod html;
+mod open;
 mod queue;
 mod startup;
 mod views;
@@ -29,7 +31,12 @@ pub struct AppState {
     pub db: Db,
     pub net: Client,
     pub gb: GameBanana,
+    /// For background reads (download counts on cards): its own slow rate limit, the same
+    /// response cache.
+    pub gb_background: GameBanana,
     pub images: Arc<ImageCache>,
+    /// Link keys handed out in rewritten descriptions (`open_link`).
+    pub links: html::Links,
     pub dirs: AppDirs,
     /// The Downloads page's installs, run one at a time by `queue::spawn_worker`.
     pub queue: InstallQueue,
@@ -44,6 +51,14 @@ impl AppState {
         let db = open_db(&dirs).await?;
         let net = Client::new(NetConfig::production())?;
         let gb = GameBanana::new(net.clone(), Arc::new(db.clone()));
+        let background_net = Client::new(NetConfig {
+            rate_limit: RateLimit {
+                per_second: 2.0,
+                burst: 4,
+            },
+            ..NetConfig::production()
+        })?;
+        let gb_background = GameBanana::new(background_net, Arc::new(db.clone()));
         // Images get their own rate limit so a page of thumbnails doesn't hold up API calls.
         let image_net = Client::new(NetConfig {
             rate_limit: RateLimit {
@@ -57,7 +72,9 @@ impl AppState {
             db,
             net,
             gb,
+            gb_background,
             images,
+            links: html::Links::default(),
             dirs,
             queue: InstallQueue::new(),
             wake: tokio::sync::Notify::new(),
@@ -135,6 +152,8 @@ fn main() {
             commands::catalog_mod,
             commands::catalog_updates,
             commands::catalog_categories,
+            commands::catalog_featured,
+            commands::catalog_stats,
             commands::prepare_install,
             commands::install,
             queue::queue_install,
@@ -154,6 +173,7 @@ fn main() {
             commands::conflicts,
             commands::storage,
             commands::clear_download_cache,
+            commands::clear_http_cache,
             commands::launch_plan,
             commands::launch,
             commands::settings,
@@ -161,6 +181,10 @@ fn main() {
             commands::clear_xxmi_folder,
             commands::pick_game_folder,
             commands::remove_game_folder,
+            open::open_mod_page,
+            open::open_xxmi_releases,
+            open::open_link,
+            open::open_mod_folder,
         ])
         .run(tauri::generate_context!());
     if let Err(e) = result {

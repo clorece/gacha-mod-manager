@@ -1,0 +1,38 @@
+[
+    {
+        "_idRow": 900001,
+        "_sModelName": "Mod",
+        "_sName": "Sample Outfit Today",
+        "_sProfileUrl": "https:\/\/gamebanana.com\/mods\/900001",
+        "_sImageUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods\/800-90_sample1.jpg",
+        "_sThumbnailUrl": "https:\/\/images.gamebanana.com\/img\/ss\/mods\/220-90_sample1.jpg",
+        "_sInitialVisibility": "show",
+        "_sPeriod": "today",
+        "_aSubmitter": {"_idRow": 1001, "_sName": "Example Author"},
+        "_nLikeCount": 42,
+        "_nPostCount": 3,
+        "_aRootCategory": {"_sName": "Character Skins"}
+    },
+    {
+        "_idRow": "900002",
+        "_sModelName": "Mod",
+        "_sName": "Flagged Outfit",
+        "_sInitialVisibility": "hide",
+        "_sPeriod": "3month",
+        "_nLikeCount": "1200"
+    },
+    {
+        "_idRow": 900003,
+        "_sModelName": "Wip",
+        "_sName": "Not a mod",
+        "_sPeriod": "week"
+    },
+    {
+        "_idRow": 900004,
+        "_sModelName": "Mod",
+        "_sName": "Future Period",
+        "_sInitialVisibility": "warn",
+        "_sPeriod": "decade",
+        "_nLikeCount": 7
+    }
+]

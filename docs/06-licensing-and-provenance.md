@@ -111,8 +111,10 @@ LGPL or AGPL dependency fails the build. Watch out for:
   (Apache-2.0 OR MIT; Rust-side folder pickers only), `ts-rs` 12 (MIT; behind each crate's `ts`
   feature, generates the TypeScript types). On Linux Tauri brings gtk-rs 0.18; its build-time
   `proc-macro-error` is flagged unmaintained (RUSTSEC-2024-0370, not a vulnerability) and
-  ignored in `deny.toml` with that reason. npm (45 packages): `react`, `react-dom`,
-  `@tauri-apps/api` (runtime); `@fontsource-variable/nunito` 5.3 (the UI font, OFL-1.1, font
+  ignored in `deny.toml` with that reason. The desktop crate also uses `sha2` and `hex`
+  (workspace dependencies already listed) for description link keys. npm (47 packages):
+  `react`, `react-dom`, `@tauri-apps/api`, `dompurify` 3.4.17 (MPL-2.0 OR Apache-2.0,
+  taken as Apache-2.0; sanitizes GameBanana HTML, Phase 5) (runtime); `@fontsource-variable/nunito` 5.3 (the UI font, OFL-1.1, font
   files only: the one exception in `scripts/check-npm-licenses.mjs`, see below); `vite`, `@vitejs/plugin-react`, `tailwindcss`,
   `@tailwindcss/vite`, `typescript`, `@biomejs/biome`, `@tauri-apps/cli`, `@types/react*`
   (build/dev only). Every npm package must be older than pnpm's minimum release age (one day);

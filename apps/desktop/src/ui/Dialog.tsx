@@ -29,6 +29,7 @@ function backdropClose(onClose: () => void) {
 export function Dialog({
   title,
   eyebrow,
+  subtitle,
   media,
   onClose,
   footer,
@@ -37,6 +38,8 @@ export function Dialog({
   title: ReactNode;
   /** Small accent line above the title ("Install"). */
   eyebrow?: string;
+  /** A muted line under the title ("by author · character · game"). */
+  subtitle?: ReactNode;
   /** A thumbnail before the title. */
   media?: ReactNode;
   onClose: () => void;
@@ -64,6 +67,7 @@ export function Dialog({
           <h2 id={titleId} className="modal-title">
             {title}
           </h2>
+          {subtitle && <div className="sub">{subtitle}</div>}
         </div>
       </div>
       <div className="modal-body">{children}</div>

@@ -48,7 +48,7 @@ pub async fn run(
         confirm_exe(db, &mut plan).await?;
     }
 
-    let pid = start(&plan)?;
+    let pid = start(db, game, &plan).await?;
     if json {
         println!(
             "{}",

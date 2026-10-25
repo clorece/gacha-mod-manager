@@ -6,10 +6,6 @@ import logo from "../assets/gmm-logo.svg";
 import { Button } from "../ui";
 
 const upcoming = {
-  downloads: {
-    title: "Downloads",
-    line: "Active and recent installs, grouped by game. Arrives with the install queue.",
-  },
   settings: {
     title: "Settings",
     line: "Appearance, the Mods Store, the XXMI folder, your games and storage. Stored on this computer only.",

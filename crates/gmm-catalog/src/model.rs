@@ -189,6 +189,48 @@ impl ModSummary {
     }
 }
 
+/// The window a top submission was counted over (`TopSubs`' `_sPeriod`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum TopPeriod {
+    Today,
+    Week,
+    Month,
+    ThreeMonths,
+    SixMonths,
+    Year,
+    AllTime,
+}
+
+impl TopPeriod {
+    pub(crate) fn from_gb(s: &str) -> Option<Self> {
+        Some(match s {
+            "today" => Self::Today,
+            "week" => Self::Week,
+            "month" => Self::Month,
+            "3month" => Self::ThreeMonths,
+            "6month" => Self::SixMonths,
+            "year" => Self::Year,
+            "alltime" => Self::AllTime,
+            _ => return None,
+        })
+    }
+}
+
+/// One of a game's top submissions. GameBanana's record is short (no views, downloads,
+/// character or image sizes), so the featured gallery reads each mod's page for the rest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct TopSub {
+    pub mod_id: u64,
+    pub name: String,
+    /// `None` for a period name GMM doesn't know yet.
+    pub period: Option<TopPeriod>,
+    pub visibility: Visibility,
+    pub likes: u64,
+}
+
 impl Page<ModSummary> {
     /// Drops sensitive mods (see [`ModSummary::is_sensitive`]) and returns how many.
     pub fn hide_sensitive(&mut self) -> usize {

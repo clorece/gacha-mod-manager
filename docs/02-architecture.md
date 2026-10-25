@@ -216,6 +216,8 @@ on 2026-10-22 and are implemented in `crates/gmm-catalog`:
 | Mod page | `GET /apiv11/Mod/{id}/ProfilePage` (404 `NO_SUCH_RECORD` if missing) |
 | Files | `GET /apiv11/Mod/{id}/DownloadPage` |
 | Updates/changelog | `GET /apiv11/Mod/{id}/Updates?_nPage=N&_nPerpage=N` (`_aChangeLog[]` of `{text, cat}`) |
+| Trending | `GET /apiv11/Game/{gameId}/TopSubs`: a plain array, three per period (`_sPeriod`: `today`, `week`, `month`, `3month`, `6month`, `year`, `alltime`), each with `_idRow`, `_sName`, `_sInitialVisibility`, `_nLikeCount`, a 220/800 px image and the root category (no views, downloads or subcategory). Observed 2026-10-25 |
+| Counters only | `GET /apiv11/Mod/{id}?_csvProperties=_nLikeCount,_nViewCount,_nPostCount,_nDownloadCount` returns just those fields (observed 2026-10-25); used for download counts on cards |
 
 Downloads: `_sDownloadUrl` (`https://gamebanana.com/dl/<fileId>`) redirects to
 `files.gamebanana.com`, then to a numbered mirror such as `filecache42.gamebanana.com`. Range
@@ -244,9 +246,24 @@ fetched through `gmm-net` (its own client with its own rate limit, 8/s with burs
 page of thumbnails doesn't hold up API calls; 8 MiB per image), kept as
 `cache/images/<key>`, and served only if its first bytes are JPEG, PNG, WebP or GIF (with
 `X-Content-Type-Options: nosniff`). An unknown key gets a 404; keys cached by an earlier run
-are still served. The cache is capped at 512 MiB, and the oldest images go first. Images
-inside description HTML are not rewritten yet (the CSP blocks them); the mod page screen
-will sanitize and rewrite that HTML.
+are still served. The cache is capped at 512 MiB, and the oldest images go first.
+
+**Description HTML** (`_sText`, `_sLicense`, update text) is rewritten in Rust before it
+reaches the webview (`apps/desktop/src-tauri/src/html.rs`, called from `catalog_mod` and
+`catalog_updates`): a scanner walks the start tags and replaces every `src` with a `gmmimg`
+URL (or drops it when the image isn't on `images.gamebanana.com`), every `href` with
+`#gmm-link:<key>` for an `http(s)` address (or drops it), and drops `srcset`. Link keys
+(first 16 bytes of the address's SHA-256, hex) live in `AppState.links` for the run. The
+webview then sanitizes with DOMPurify (`components/RichText.tsx`) and opens a link only
+through `open_link`. Observed 2026-10-25 across ten mods: description images are as often
+on `filecacheNN.gamebanana.com`, `files.gamebanana.com` or third-party hosts (imgur,
+i.meee.com.tw) as on `images.gamebanana.com`; only the last are shown.
+
+**Featured gallery** (`gmm_core::featured`): the top submissions in GameBanana's order,
+minus sensitive ones unless the user opted in, each read from its mod page (which adds views,
+downloads, the character and the content-rating flag, checked again), backfilled with the
+most liked of the newest 50 mods up to five. A mod page that fails is skipped; the call fails
+only when neither list can be read.
 
 ## Desktop app (`apps/desktop`)
 
@@ -256,10 +273,12 @@ command per CLI action, in `src/commands.rs`: `games`, `statuses`, `catalog_list
 `library`, `set_enabled`, `uninstall_preview`, `uninstall`, `conflicts`, `storage`,
 `clear_download_cache`, `launch_plan`, `launch`, `settings`, `pick_xxmi_folder`,
 `clear_xxmi_folder`, `pick_game_folder`, `remove_game_folder`; plus, for the Phase 5
-screens, `prepare_install` and `switch_version` there, the queue in `src/queue.rs`
-(`queue_install`, `queue_jobs`, `queue_watch`, `queue_pause`, `queue_resume`,
-`queue_cancel`, `queue_dismiss`, `queue_clear_finished`) and `startup_check` in
-`src/startup.rs`. Each calls the same `gmm-core` functions as the CLI.
+screens, `prepare_install`, `switch_version`, `catalog_featured`, `catalog_stats` and
+`clear_http_cache` there, the queue in `src/queue.rs` (`queue_install`, `queue_jobs`,
+`queue_watch`, `queue_pause`, `queue_resume`, `queue_cancel`, `queue_dismiss`,
+`queue_clear_finished`), `startup_check` in `src/startup.rs`, and the openers in
+`src/open.rs` (`open_mod_page`, `open_xxmi_releases`, `open_link`, `open_mod_folder`).
+Each calls the same `gmm-core` functions as the CLI.
 
 - **Arguments are ids**: game ids, GameBanana ids, GMM mod ids, and `ModKey`
   (`{type: "managed", id}` or `{type: "unmanaged", path}`, where `path` must exactly match an
@@ -272,15 +291,30 @@ screens, `prepare_install` and `switch_version` there, the queue in `src/queue.r
   `blocked` (with the file names) from `install`, `conflicts` from `set_enabled` (with the
   conflicts; call again with `anyway`), `not_ready`, and `other`.
 - **Install progress** goes over a Tauri `Channel` passed to `install` and
-  `prepare_install` (no event permissions needed); `queue_watch` and `startup_check` use
-  channels the same way.
+  `prepare_install` (no event permissions needed), at most every 200 ms for download
+  progress (`ProgressThrottle`; the download reports every chunk); `queue_watch`,
+  `startup_check` and `catalog_stats` use channels the same way.
 - **Install confirmation, then the queue**: `prepare_install` fetches the file into the
   download cache, analyses it and returns a `gmm_core::InstallPlan` (versions, blocked files,
   installed versions, conflicts between versions, target folder), then removes the
   extraction folder; nothing is installed. The confirmed choice goes to `queue_install`. One
   worker task (`queue::spawn_worker`) runs queued installs in order through `gmm_core::install`
   (the archive comes from the cache), with the job's `StopSignal` for pause and cancel, and
-  sends the list to every watcher when it changes (progress at most every 200 ms).
+  sends the list to every watcher when it changes (progress at most every 200 ms). A job
+  carries what the Downloads row shows (`JobLabel`: name, author, file, size, preview).
+  After a multi-version install that should start switched on, the worker runs
+  `switch_version` on the first version picked, so the ones that clash with it are off.
+  `gmm_core::fetch_archive` lets one download per GameBanana file run at a time (a
+  process-wide lock per file id): a second fetch of the same file waits, then finds it in
+  the cache or resumes the partial file.
+- **Openers** (`src/open.rs`): a page address is built in Rust from an id (or looked up from a
+  link key) and shown in a native dialog (`tauri-plugin-dialog`, Rust side) before
+  `gmm_xxmi::open_page` hands it to the browser; `open_mod_folder` resolves the folder with
+  `gmm_core::mod_folder` (a directory inside the Mods folder, through
+  `Guard::os_path_of_dir`) and `gmm_xxmi::open_folder` opens it.
+- **Background reads**: `catalog_stats` uses `AppState.gb_background`, a second
+  `GameBanana` on its own client (2 requests/s, bursts of 4) sharing the response cache, so
+  filling in card counters never delays what the user clicked.
 - **Launch** is two steps: `launch_plan` shows the exe and whether it was confirmed;
   `launch(game, confirm)` records the confirmation and starts XXMI.
 - **Uninstall** is two steps: `uninstall_preview` returns each folder's full path (and size,
@@ -298,19 +332,25 @@ screens, `prepare_install` and `switch_version` there, the queue in `src/queue.r
   - `ui/`: the primitives (`Button`, `IconButton`, `Switch`, `Checkbox`, `Radio`,
     `Segmented`, `Dropdown`, `Badge`, `Chip`, `Notice`, `Dialog` and `SidePanel` on the
     native `<dialog>`, `ToastProvider` / `useToast`, `ProgressBar`, `Spinner`, `Icon`).
-  - `App.tsx` + `shell/`: the sidebar (`Sidebar`, `GamePicker`) and page switching;
-    `data.ts` loads games, setup states and every game's library once for all pages.
-  - `pages/`: `Dashboard` (bubbles, Launch, recently installed, setup), `Library` (game
-    cards, search, enable / disable all, mod cards, conflict prompt), `Placeholders` (the
-    Phase 5 pages and Report a Bug), `StyleGuide` (dev builds only, dropped from release
-    builds by `import.meta.env.DEV`).
-  - `components/`: `Launch` (exe confirmation dialog), `SetupCard`, `ModSettings` (side
-    panel: switch, details, Uninstall with the itemized confirmation).
+  - `App.tsx` + `shell/`: the startup check first, then the sidebar (`Sidebar` with the
+    active-download count, `GamePicker`), page switching and the install confirmation;
+    `data.ts` loads games, setup states and every game's library once for all pages;
+    `queue.ts` keeps the install queue (`queue_watch`), refreshes a game's library when one
+    of its installs finishes and dismisses installed rows after 5 s.
+  - `pages/`: `Startup` (the startup check), `Dashboard` (bubbles, Launch, recently
+    installed, setup), `Downloads` (the queue by game, with Pause / Resume / Cancel),
+    `Library` (game cards, search, enable / disable all, mod cards, conflict prompt),
+    `Placeholders` (the remaining Phase 5 pages and Report a Bug), `StyleGuide` (dev builds
+    only, dropped from release builds by `import.meta.env.DEV`; also opens the real install
+    confirmation by mod id until the Store exists).
+  - `components/`: `InstallDialog` (the install confirmation from `InstallPlan`), `RichText`
+    (GameBanana HTML through DOMPurify), `Launch` (exe confirmation dialog), `SetupCard`,
+    `ModSettings` (side panel: switch, details, Uninstall with the itemized confirmation).
 - Logic both front ends need lives below them, not in either: `Page::hide_sensitive`
   (`gmm-catalog`, the NSFW filter), `game_for_mod`, `Machine::launch_plan` and
   `conflicts_after_install` (`gmm-core`).
 - The app uses `AppDirs::system()` like the CLI (so `GMM_HOME` works for both), one shared
-  `Db`, one API `gmm_net::Client` and the image cache's own client.
+  `Db`, one API `gmm_net::Client`, the background client and the image cache's own client.
 
 Security wiring (capability, CSP, navigation guard, devtools) is in
 [04](04-security.md#catalogue--ui-hardening).
@@ -368,7 +408,7 @@ matching Game Launch setting (`LaunchModeMismatch`).
 `crates/gmm-db/migrations/` and is applied when the database opens; an older GMM refuses a
 database that a newer one has migrated. sqlx 0.9 with SQLite bundled, WAL journal, foreign
 keys on, every query a static SQL string with bound parameters (sqlx rejects anything else).
-Times are Unix seconds. Built so far (migration 0001):
+Times are Unix seconds. Built so far (migrations 0001 and 0002):
 
 ```
 settings(key PK, value)                  -- xxmi.root (a folder the user picked),
@@ -376,12 +416,16 @@ settings(key PK, value)                  -- xxmi.root (a folder the user picked)
 manual_game_folders(game_id, folder, added_at, PK(game_id, folder))
 installed_mods(id PK, game_id, folder_name, name, gb_mod_id NULL, gb_file_id NULL,
                variant NULL, version NULL, file_date NULL, enabled BOOL, archive_sha256 NULL,
-               size_bytes, installed_at, scan_report_json NULL, UNIQUE(game_id, folder_name))
+               size_bytes, installed_at, scan_report_json NULL,
+               root_category_id NULL, root_category NULL,   -- 0002: GameBanana's categories
+               category_id NULL, category NULL,             -- at install (category = character)
+               UNIQUE(game_id, folder_name))
 download_cache(sha256 PK, gb_mod_id NULL, gb_file_id NULL, path_rel UNIQUE, size_bytes,
                added_at, last_used_at)
 http_cache(url PK, body, fetched_at)     -- each endpoint passes its own max age on read;
                                          -- rows older than 7 days, or beyond 5,000, are
                                          -- pruned on open
+game_activity(game_id PK, last_played)   -- 0002: when GMM's Launch last started each game
 ```
 
 - `installed_mods.folder_name` never includes the `DISABLED ` prefix; `enabled` says which
@@ -414,4 +458,7 @@ Observed 2026-10-24: a `gmm` started from inside a packaged (MSIX) app that virt
 `%LOCALAPPDATA%\Packages\<app>\LocalCache\Roaming\GMM\`. Once a normal run has also created
 the real `%APPDATA%\GMM`, the folder and the database resolve to different places and fsguard
 refuses the database as "resolves outside its root" (correctly: it can't tell this apart from a
-planted link). Run `gmm` from a normal terminal, or set `GMM_HOME`.
+planted link). Run `gmm` from a normal terminal, or set `GMM_HOME`. Checked again 2026-10-25:
+the dev machine itself has no junction there; it is only that redirect. Writes into XXMI's
+existing `Mods` folders are not redirected, so installs from such a shell land in the real
+folders.

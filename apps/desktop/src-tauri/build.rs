@@ -11,6 +11,8 @@ const COMMANDS: &[&str] = &[
     "catalog_mod",
     "catalog_updates",
     "catalog_categories",
+    "catalog_featured",
+    "catalog_stats",
     "prepare_install",
     "install",
     "queue_install",
@@ -30,6 +32,7 @@ const COMMANDS: &[&str] = &[
     "conflicts",
     "storage",
     "clear_download_cache",
+    "clear_http_cache",
     "launch_plan",
     "launch",
     "settings",
@@ -37,6 +40,10 @@ const COMMANDS: &[&str] = &[
     "clear_xxmi_folder",
     "pick_game_folder",
     "remove_game_folder",
+    "open_mod_page",
+    "open_xxmi_releases",
+    "open_link",
+    "open_mod_folder",
 ];
 
 fn main() {

@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use gmm_catalog::{
     CatalogError, CatalogSource, GameBanana, ListQuery, MemoryCache, NoCache, SearchQuery, Sort,
-    Visibility,
+    TopPeriod, Visibility,
 };
 use gmm_net::{Allowlist, Client, NetConfig, RateLimit, Url};
 use wiremock::matchers::{method, path, query_param};
@@ -241,6 +241,49 @@ async fn search_filters_to_mods() {
 }
 
 #[tokio::test]
+async fn top_subs_keep_order_and_drop_other_models() {
+    let server = MockServer::start().await;
+    serve(&server, "/apiv11/Game/19567/TopSubs", "top_subs.json").await;
+    let top = catalog(&server, Arc::new(NoCache))
+        .top_subs(19567)
+        .await
+        .unwrap();
+    let ids: Vec<u64> = top.iter().map(|t| t.mod_id).collect();
+    assert_eq!(ids, [900001, 900002, 900004]);
+    assert_eq!(top[0].period, Some(TopPeriod::Today));
+    assert_eq!(top[0].visibility, Visibility::Show);
+    assert_eq!(top[1].period, Some(TopPeriod::ThreeMonths));
+    assert_eq!(
+        (top[1].visibility.clone(), top[1].likes),
+        (Visibility::Hide, 1200)
+    );
+    assert_eq!(top[2].period, None);
+}
+
+#[tokio::test]
+async fn mod_stats_asks_for_the_counters_only() {
+    let server = MockServer::start().await;
+    Mock::given(path("/apiv11/Mod/900001"))
+        .and(query_param(
+            "_csvProperties",
+            "_nLikeCount,_nViewCount,_nPostCount,_nDownloadCount",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_string(
+            r#"{"_nDownloadCount": 504, "_nViewCount": "6242", "_nLikeCount": 63}"#,
+        ))
+        .mount(&server)
+        .await;
+    let stats = catalog(&server, Arc::new(NoCache))
+        .mod_stats(900001)
+        .await
+        .unwrap();
+    assert_eq!(
+        (stats.likes, stats.views, stats.posts, stats.downloads),
+        (63, 6242, 0, Some(504))
+    );
+}
+
+#[tokio::test]
 async fn errors_are_mapped() {
     let server = MockServer::start().await;
     Mock::given(path("/apiv11/Mod/1/ProfilePage"))
@@ -333,5 +376,18 @@ async fn live_list_and_profile_for_both_games() {
         assert_eq!(profile.summary.id, first.id);
         let cats = gb.categories(game_id).await.unwrap();
         assert!(!cats.is_empty());
+    }
+}
+
+#[tokio::test]
+#[ignore = "hits the live GameBanana API"]
+async fn live_top_subs_and_stats() {
+    let gb = live();
+    for game_id in [19567, 20357] {
+        let top = gb.top_subs(game_id).await.unwrap();
+        assert!(!top.is_empty(), "game {game_id}");
+        assert!(top.iter().all(|t| t.period.is_some()), "{top:?}");
+        let stats = gb.mod_stats(top[0].mod_id).await.unwrap();
+        assert!(stats.downloads.is_some());
     }
 }

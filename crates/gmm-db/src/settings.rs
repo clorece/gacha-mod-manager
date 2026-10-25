@@ -149,6 +149,29 @@ impl Db {
             .await?;
         Ok(result.rows_affected() > 0)
     }
+
+    /// Records that GMM's Launch button started `game_id` now.
+    pub async fn record_played(&self, game_id: &str) -> Result<(), DbError> {
+        sqlx::query(
+            "INSERT INTO game_activity (game_id, last_played) VALUES (?, ?)
+             ON CONFLICT (game_id) DO UPDATE SET last_played = excluded.last_played",
+        )
+        .bind(game_id)
+        .bind(now())
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// When GMM last started each game (Unix seconds), by game id.
+    pub async fn last_played(&self) -> Result<Vec<(String, i64)>, DbError> {
+        let rows = sqlx::query("SELECT game_id, last_played FROM game_activity ORDER BY game_id")
+            .fetch_all(&self.pool)
+            .await?;
+        rows.iter()
+            .map(|row| Ok((row.try_get("game_id")?, row.try_get("last_played")?)))
+            .collect()
+    }
 }
 
 fn path_str(path: &Path) -> Result<&str, DbError> {

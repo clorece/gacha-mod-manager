@@ -31,9 +31,11 @@ on you: the game banner source (08); the banners are the game's colors until the
 ## Phase 5 — Screens (in progress)
 
 Every screen sits on commands that exist or are small additions. Order: what unblocks
-installs first, then the screens in the order users meet them. Started 2026-10-24: RAR
-and the backend for the install flow are done; the next work is the rest of the backend
-list, then the screens.
+installs first, then the screens in the order users meet them. Started 2026-10-24. Done so
+far: RAR, the whole backend list (2026-10-25), and the first three screens (startup check,
+Downloads, install confirmation), each checked in a real `tauri dev` window against the
+real XXMI setup. Next: the Dashboard and setup guide polish, then the Mods Store (which
+gives the install confirmation its Download buttons).
 
 **Carried over from Phase 4**
 - [ ] Game banner source (your decision, 08): swap the styled banners for it once chosen
@@ -64,29 +66,45 @@ list, then the screens.
       (skipped until the Phase 7 updater), the newest catalogue page per game
       (`refresh_catalog`), and the update check of GMM-installed mods (`check_updates`: a
       newer clean file than the installed one; failures become notes)
-- [ ] Trending: `CatalogSource::top_subs` over `apiv11/Game/{id}/TopSubs` (safe-for-work
-      entries first, backfilled)
-- [ ] Download counts for cards: the mod pages of visible cards in the background
-      (rate-limited, cached)
-- [ ] Store each mod's category and character at install; record "last played" on launch
-- [ ] Commands: open a GameBanana page or the XXMI releases page in the system browser (after
-      a confirmation, ids only), open a mod's folder (R7 allows folders only), clear the HTTP
-      cache (`gmm_db::clear_http_cache` exists)
-- [ ] Rewrite and sanitize description HTML (DOMPurify; images through `gmmimg`)
-- [ ] Look again at GameBanana's `File/{id}/RawFileList` (could list versions without
-      downloading)
+- [x] Trending (2026-10-25): `CatalogSource::top_subs` over `apiv11/Game/{id}/TopSubs`;
+      `gmm_core::featured` keeps the safe-for-work entries in GameBanana's order, reads each
+      mod page (views, downloads, character, content rating) and backfills with the most liked
+      of the newest 50 to five; command `catalog_featured`
+- [x] Download counts for cards (2026-10-25): `CatalogSource::mod_stats`
+      (`Mod/{id}?_csvProperties=...`, just the counters, cached an hour); command
+      `catalog_stats` streams them for up to 60 cards on its own slow client (2/s)
+- [x] Categories and "last played" (2026-10-25): migration 0002 stores the root category and
+      subcategory (character) with each installed mod (`ModRow` has them);
+      `game_activity` records when GMM's Launch started a game (`GameInfo.last_played`)
+- [x] Commands (2026-10-25): `open_mod_page`, `open_xxmi_releases`, `open_link` (a native
+      dialog shows the address and asks first; ids or link keys only), `open_mod_folder`
+      (folders only, through `Guard::os_path_of_dir`), `clear_http_cache`; the openers live in
+      `gmm-xxmi/src/launch.rs` (R7)
+- [x] Description HTML (2026-10-25): Rust replaces every address (images → `gmmimg` keys on
+      GameBanana's image host, links → `#gmm-link:<key>`, `srcset` dropped; `html.rs`), then
+      `RichText` sanitizes with DOMPurify 3.4.17 (strict allowlist) and opens links through
+      `open_link`
+- [x] `File/{id}/RawFileList` looked at again (2026-10-25): still an empty body (200,
+      `Content-Length: 0`), even for files GameBanana flags `_bHasContents`; GMM keeps
+      fetching the archive before showing versions
 
 **Screens** (in order)
-- [ ] Startup check screen
-- [ ] App shell: sidebar (Select Game, theme switch); Downloads page on the install queue
+- [x] Startup check screen (2026-10-25): `pages/Startup.tsx` on `startup_check`; opens the
+      app on its own when done, Skip for now; failures shown, the app opens anyway
+- [x] App shell: sidebar (Select Game, theme switch, active-download count); Downloads page on
+      the install queue (2026-10-25): grouped by game, progress with Pause / Resume / Cancel,
+      failed rows with View on GameBanana, installed rows clear after 5 s
 - [ ] Dashboard: game bubbles with Launch, setup cards for games that aren't Ready, recently
       installed
 - [ ] Setup guide: the failing row highlighted per `SetupState`, a stepper with your
       screenshots
 - [ ] Mods Store: featured gallery, sticky toolbar, virtualized grid, filters (category,
       character, sort), state badges (installed, disabled, update available, conflict)
-- [ ] Install confirmation: one version, choose a file, choose versions, add versions,
-      blocked files, RAR / unsupported notices
+- [x] Install confirmation (2026-10-25): `components/InstallDialog.tsx` from `InstallPlan`:
+      one version, choose a file, choose versions (installed ones locked), the clash note,
+      blocked files, "no mod found" and unsupported-file notices; the first version picked
+      stays on and clashing ones are switched off after install (queue worker). Opened from
+      the dev style guide until the Store's Download buttons exist
 - [ ] Mod page: hero + slideshow + lightbox, header / stats / license, Description, Files
       (archived files), Credits, Updates
 - [ ] Mods Library: grid, sticky toolbar, switches, filters, select mode, enable / disable
@@ -99,7 +117,8 @@ list, then the screens.
 
 **Tests**
 - [ ] Vitest component tests and fixture-based snapshots
-- [ ] XSS corpus through the description renderer (T3)
+- [ ] XSS corpus through the description renderer (T3): the Rust rewrite has unit tests
+      (`html.rs`); the DOMPurify side (`RichText.sanitize`) still needs the Vitest corpus
 - [ ] IPC fuzz harness: hostile arguments to every command (R5; so far checked by hand)
 - [ ] The contrast and overlap audit from Phase 4, run against the real app in CI
 
@@ -154,6 +173,16 @@ Epic install to confirm the Epic reader (fixture-tested only).
   integrity rather than in an AppContainer (it could still read the user's files or open a
   connection if UnRAR were exploited). Phase 7 hardening.
 - RAR "file copy" entries (identical files stored once, `rar -oi`) are refused, not copied.
+- The install confirmation fetches the archive before showing it (versions are only known
+  from inside), so the Downloads page mostly shows the install step; download progress
+  appears there only for files that weren't fetched first.
+- Description images hosted outside `images.gamebanana.com` aren't shown: third-party
+  hosts (imgur and others) never will be (R2), and GameBanana's own file hosts
+  (`filecacheNN.gamebanana.com`, `files.gamebanana.com`, common in descriptions) wait on
+  your decision.
+- The browser openers (`open_mod_page`, `open_link`, `open_xxmi_releases`) need a click
+  in their native dialog, so they haven't been driven end to end yet; their address checks
+  have unit tests.
 
 ## Open questions
 

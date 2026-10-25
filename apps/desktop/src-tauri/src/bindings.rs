@@ -29,7 +29,7 @@ fn render() -> String {
         CmdError, GameInfo, CatalogQuery, CatalogPage, ModRow, LibraryView, ModKey, VariantPick,
         InstallArgs, InstallProgress, InstallResult, Toggled, UninstallItem, Uninstalled,
         GameStorageView, StorageView, LaunchInfo, Launched, FolderRow, Settings, StepState,
-        StartupStep, StartupReport,
+        StartupStep, StartupReport, CardStats,
         // Setup (gmm-xxmi, gmm-detect).
         gmm_xxmi::GameStatus, gmm_xxmi::SetupState, gmm_xxmi::ImporterInfo,
         gmm_xxmi::ModsSummary, gmm_detect::GameInstall, gmm_detect::InstallSource,
@@ -40,6 +40,7 @@ fn render() -> String {
         gmm_catalog::ModFile, gmm_catalog::ModFiles, gmm_catalog::LicenseChecklist,
         gmm_catalog::Credit, gmm_catalog::CreditGroup, gmm_catalog::ModProfile,
         gmm_catalog::ChangeEntry, gmm_catalog::ModUpdate, gmm_catalog::Category,
+        gmm_catalog::TopPeriod,
         // Library, conflicts, storage, install (gmm-core).
         gmm_core::DiskState, gmm_core::UnmanagedMod, gmm_core::ModRef, gmm_core::Conflict,
         gmm_core::ConflictReport, gmm_core::Size, gmm_core::ModUsage, gmm_core::GameStorage,
@@ -47,7 +48,7 @@ fn render() -> String {
         gmm_core::InstallReport, gmm_core::ToggleOutcome,
         // Two-step install, versions, queue, update check (gmm-core, Phase 5).
         gmm_core::InstallPlan, gmm_core::VersionPlan, gmm_core::VersionConflict,
-        gmm_core::Job, gmm_core::JobState, gmm_core::ModUpdateInfo,
+        gmm_core::Job, gmm_core::JobState, gmm_core::ModUpdateInfo, gmm_core::FeaturedMod,
     ];
     let mut out = String::from(
         "// SPDX-License-Identifier: MIT OR Apache-2.0\n\

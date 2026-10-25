@@ -11,6 +11,8 @@
     "allow-catalog-mod",
     "allow-catalog-updates",
     "allow-catalog-categories",
+    "allow-catalog-featured",
+    "allow-catalog-stats",
     "allow-prepare-install",
     "allow-install",
     "allow-queue-install",
@@ -30,12 +32,17 @@
     "allow-conflicts",
     "allow-storage",
     "allow-clear-download-cache",
+    "allow-clear-http-cache",
     "allow-launch-plan",
     "allow-launch",
     "allow-settings",
     "allow-pick-xxmi-folder",
     "allow-clear-xxmi-folder",
     "allow-pick-game-folder",
-    "allow-remove-game-folder"
+    "allow-remove-game-folder",
+    "allow-open-mod-page",
+    "allow-open-xxmi-releases",
+    "allow-open-link",
+    "allow-open-mod-folder"
   ]
 }

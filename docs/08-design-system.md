@@ -262,10 +262,14 @@ All colors are CSS custom properties on the app root; `.t-dark` and `.t-light` s
   count, and the featured gallery must filter and backfill (below).
 - **Trending exists**: `apiv11/Game/{id}/TopSubs` returns the top 3 per period (today,
   week, month, 3 / 6 months, year, all time). Featured = its safe-for-work entries in that
-  order, backfilled with popular recent mods to 5. Needs a small `gmm-catalog` addition.
+  order, backfilled with popular recent mods to 5 (built 2026-10-25: `gmm_core::featured`,
+  backfill = the most liked of the newest 50; command `catalog_featured`). On 2026-10-25,
+  18 of ZZZ's 21 entries were flagged sensitive.
 - **Download counts aren't in listings** (only on mod pages; checked that list endpoints don't
   offer them). Cards show likes and views at once and fill in downloads as each visible mod's
-  page loads (cached for an hour); the mockup shows that loading state.
+  numbers arrive (cached for an hour); the mockup shows that loading state. GMM asks for just
+  the counters (`Mod/{id}?_csvProperties=...`, a fraction of the mod page) on a slow
+  background client (`catalog_stats`).
 - **RAR is common**: of 15 mod files sampled across both games (2026-10-24/25), 9 were zip,
   4 rar and 2 7z. RAR support landed first in Phase 5 (2026-10-24), so these install like
   any other mod. Details: [09](09-archive-formats.md).
@@ -273,9 +277,10 @@ All colors are CSS custom properties on the app root; `.t-dark` and `.t-light` s
   three zips with descriptions), or as several mod folders inside one archive (Fixed Yae
   Sakura Sword Pack: 8). The first is known from the API; the second only after looking inside
   the archive. GameBanana has a `File/{id}/RawFileList` route and a `_bHasContents` flag on
-  files, but the route returned nothing in tests (2026-10-25); worth another look, since it
-  could list versions without downloading. Until then GMM fetches the archive into its cache
-  before showing the versions.
+  files, but the route returns an empty body (200, `Content-Length: 0`), even for files
+  flagged `_bHasContents` and with browser-like headers (checked twice, 2026-10-25). So GMM
+  fetches the archive into its cache before showing the versions, which also means the
+  confirmation fetches single-version files too.
 - **Versions often exclude each other**: the 8 sword versions all replace Anby's weapon, so
   only one can be on. Conflict detection between versions decides this, not names.
 - **Characters have icons** on GameBanana (subcategory icons); Bangboo don't (initials).
@@ -283,10 +288,15 @@ All colors are CSS custom properties on the app root; `.t-dark` and `.t-light` s
   art can't be bundled (trademark, [06](06-licensing-and-provenance.md)). Until decided, the
   banners are the game's colors and name. Options: a banner you provide per game under a
   clear license, a top mod's preview image loaded live, or plain styled banners.
-- **"Last played"** isn't tracked; GMM can record it when its Launch button starts a game
-  (a new settings row per game).
-- **Character for library cards** needs the mod's category stored at install (not stored
-  today); hand-installed mods have none.
+- **"Last played"** is recorded when GMM's Launch button starts a game (`game_activity`,
+  2026-10-25); launches from elsewhere aren't seen.
+- **Character for library cards** comes from the mod's categories, stored at install since
+  2026-10-25 (root category and subcategory; WuWa's root is "Skins", ZZZ's "Character
+  Skins"); earlier and hand-installed mods have none.
+- **Description images are often off GameBanana's image host**: across ten mods (2026-10-25)
+  they were as often on `filecacheNN.gamebanana.com` / `files.gamebanana.com` or imgur-like
+  hosts as on `images.gamebanana.com`. Only the last are shown; the mod page needs a quiet
+  placeholder for the rest.
 - **Report a Bug** will need a destination host (GitHub issues or similar), which the network
   allowlist (R2) doesn't allow today; that's part of building it, after the beta.
 

@@ -10,6 +10,8 @@
 //! same `DISABLED ` rename, and uninstalling moves it to the Recycle Bin after the caller has
 //! shown exactly what goes and got a yes (security rule R8).
 
+use std::path::PathBuf;
+
 use gmm_adapters::GameManifest;
 use gmm_db::{Db, InstalledMod};
 use gmm_fsguard::{Guard, RootId, ScopedPath};
@@ -376,6 +378,47 @@ pub fn listed_unmanaged<'a>(
             query: path.to_owned(),
             game: game.game.name.clone(),
         })
+}
+
+/// Which mod's folder to show in the file manager.
+#[derive(Debug, Clone, Copy)]
+pub enum ModFolder<'a> {
+    /// A GMM mod, by id.
+    Managed(i64),
+    /// A hand-installed mod, by the exact path [`library`] listed.
+    Unmanaged(&'a str),
+}
+
+/// The folder to open for a mod: a GMM mod's folder (as it is on disk now), a hand-installed
+/// mod's folder, or for a loose `.ini` the folder it sits in. Always an existing directory
+/// inside the Mods folder, checked through the guard (security rule R7: folders only).
+pub async fn mod_folder(
+    db: &Db,
+    ws: &Workspace,
+    mods: RootId,
+    game: &GameManifest,
+    which: ModFolder<'_>,
+) -> Result<PathBuf, CoreError> {
+    let guard = ws.guard();
+    let dir = match which {
+        ModFolder::Managed(id) => {
+            let row = managed_row(db, game, id).await?;
+            let gmm_dir = guard.path(mods, GMM_DIR)?;
+            let enabled = guard.exists(&gmm_dir.join(&row.folder_name)?)?;
+            gmm_dir.join(&on_disk_name(&row.folder_name, enabled))?
+        }
+        ModFolder::Unmanaged(path) => {
+            let lib = library(db, ws, mods, game).await?;
+            let entry = listed_unmanaged(&lib, game, path)?;
+            let at = guard.path(mods, &entry.path)?;
+            if entry.is_dir {
+                at
+            } else {
+                at.parent().unwrap_or(guard.path(mods, "")?)
+            }
+        }
+    };
+    Ok(guard.os_path_of_dir(&dir)?)
 }
 
 fn rename_unmanaged(

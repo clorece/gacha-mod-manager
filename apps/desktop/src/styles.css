@@ -1601,6 +1601,403 @@ dialog.drawer[open] {
   font-weight: 800;
 }
 
+/* ---- Install confirmation (08, "Install confirmation") ---- */
+
+.cf-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  object-fit: cover;
+}
+.cf-h-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cf-h {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 900;
+}
+/* Scrolls past about five rows. */
+.cf-vlist {
+  max-height: 264px;
+  overflow-y: auto;
+  padding: 4px;
+  margin: 0 -4px;
+}
+.tag-on,
+.tag-done {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+}
+.tag-on {
+  background: var(--ok);
+  color: var(--on-ok);
+}
+.tag-done {
+  background: var(--raised);
+  border: 1px solid var(--line);
+  color: var(--text2);
+}
+.cf-switch {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px 0;
+}
+.cf-switch b {
+  font-weight: 800;
+}
+.cf-looking {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---- Downloads (08, "Downloads") ---- */
+
+.dl-group {
+  margin-bottom: 26px;
+}
+.dl-group-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.dl-group-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+}
+.dl-group-chip {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+}
+.dl {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.dl-thumb {
+  width: 72px;
+  height: 56px;
+  object-fit: cover;
+}
+.dl-sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dl .bar {
+  margin-top: 8px;
+}
+.dl-state {
+  margin-top: 2px;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+.st-run {
+  color: var(--accent);
+}
+.st-ok {
+  color: var(--ok);
+}
+.st-bad {
+  color: var(--bad);
+}
+.st-wait {
+  color: var(--muted);
+}
+/* Finished rows change their background; nothing with text is dimmed (08, contrast rules). */
+.dl.is-done {
+  background: var(--raised);
+}
+.dl.is-done .dl-thumb {
+  filter: brightness(0.6);
+}
+
+/* ---- Startup check (08, "Startup check") ---- */
+
+.su {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+  background: var(--ground);
+}
+.su-glow {
+  position: absolute;
+  width: 760px;
+  height: 760px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--su-glow) 0%, transparent 62%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -62%);
+  pointer-events: none;
+}
+.t-dark {
+  --su-glow: rgba(58, 123, 255, 0.16);
+}
+.t-light {
+  --su-glow: rgba(111, 211, 255, 0.28);
+}
+.su-col {
+  position: relative;
+  width: 520px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+.su-logo {
+  width: 112px;
+  height: 112px;
+  filter: var(--glow);
+  animation: bob 2.8s ease-in-out infinite;
+}
+@keyframes bob {
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.su-title {
+  font-weight: 900;
+  font-size: 26px;
+  line-height: 34px;
+  letter-spacing: -0.012em;
+  background: linear-gradient(180deg, var(--title-a), var(--title-b));
+  background-clip: text;
+  color: transparent;
+}
+.su-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: -8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--pill);
+  color: var(--pill-ink);
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.su-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--yellow);
+}
+.su-card {
+  width: 100%;
+  margin-top: 10px;
+  padding: 22px 22px 18px;
+  border-radius: var(--r-lg);
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.su-h {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+}
+.su-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.su-status.is-warn {
+  color: var(--warn);
+}
+.su-status.is-done {
+  color: var(--ok);
+}
+.su-card .bar {
+  height: 10px;
+}
+.su-bar-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.su-steps {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+}
+.su-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.su-step:last-child {
+  border-bottom: 0;
+}
+.su-step b {
+  font-weight: 800;
+}
+.su-step .sub {
+  display: block;
+  font-size: 12px;
+}
+.su-ic {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 13px;
+}
+.su-ic-done {
+  background: var(--ok);
+  color: var(--on-ok);
+}
+.su-ic-wait {
+  border: 2px solid var(--line);
+}
+.su-ic-skip {
+  border: 2px solid var(--line);
+  color: var(--muted);
+}
+.su-ic-run {
+  border: 2.5px solid var(--line);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+.su-ic-up {
+  background: var(--yellow);
+  color: var(--ink-on-yellow);
+}
+.su-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.su-foot > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- GameBanana HTML (descriptions, licenses, update notes; RichText.tsx) ---- */
+
+.rich-text {
+  color: var(--text2);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.rich-text > * + * {
+  margin-top: 0.75em;
+}
+.rich-text :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--text);
+  font-weight: 800;
+  line-height: 1.3;
+}
+.rich-text h1 {
+  font-size: 1.35rem;
+}
+.rich-text h2 {
+  font-size: 1.2rem;
+}
+.rich-text :is(h3, h4, h5, h6) {
+  font-size: 1.05rem;
+}
+.rich-text :is(ul, ol) {
+  padding-left: 1.4em;
+}
+.rich-text ul {
+  list-style: disc;
+}
+.rich-text ol {
+  list-style: decimal;
+}
+.rich-text a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rich-text a:not([href]) {
+  color: inherit;
+  text-decoration: none;
+}
+/* `[src]`: every image left after sanitizing has one (and it keeps the selector order lint quiet). */
+.rich-text img[src] {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--r-nav);
+}
+.rich-text blockquote {
+  border-left: 3px solid var(--line);
+  padding-left: 0.9em;
+  color: var(--muted);
+}
+.rich-text :is(code, pre) {
+  background: var(--raised);
+  border-radius: 8px;
+  font-size: 0.9em;
+}
+.rich-text code {
+  padding: 0.1em 0.35em;
+}
+.rich-text pre {
+  padding: 0.75em 1em;
+  overflow-x: auto;
+}
+.rich-text hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.rich-text table {
+  border-collapse: collapse;
+}
+.rich-text :is(th, td) {
+  border: 1px solid var(--line);
+  padding: 0.35em 0.6em;
+}
+
 /* ---- Work-in-progress pages ---- */
 
 .wip-wrap {

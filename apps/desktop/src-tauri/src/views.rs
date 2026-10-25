@@ -6,14 +6,19 @@
 //! or requests, an outside address.
 
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
-use gmm_catalog::{Category, Image, ImageVariant, Member, ModProfile, ModSummary, Page};
+use gmm_catalog::{
+    Category, Image, ImageVariant, Member, ModProfile, ModStats, ModSummary, ModUpdate, Page,
+};
 use gmm_core::{
     CacheStorage, Conflict, DiskState, FetchEvent, GameStorage, ImageCache, InstallEvent,
     InstallReport, ModUpdateInfo, UnmanagedMod, VariantChoice,
 };
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
+
+use crate::html::{self, Links};
 
 /// The custom protocol that serves cached images (registered in `main.rs`).
 pub const IMAGE_SCHEME: &str = "gmmimg";
@@ -35,6 +40,8 @@ pub struct GameInfo {
     pub short_name: String,
     pub importer: String,
     pub gamebanana_id: u64,
+    /// When GMM's Launch button last started it (Unix seconds).
+    pub last_played: Option<i64>,
 }
 
 /// A page of catalogue cards. `hidden` counts mods left out as sensitive (NSFW) because the
@@ -74,6 +81,19 @@ pub struct ModRow {
     pub version: Option<String>,
     pub size_bytes: u64,
     pub installed_at: i64,
+    /// GameBanana's root category at install, e.g. "Character Skins".
+    pub root_category: Option<String>,
+    pub root_category_id: Option<u64>,
+    /// The subcategory at install: for skins, the character.
+    pub category: Option<String>,
+    pub category_id: Option<u64>,
+}
+
+/// A card's counters, sent as each mod's numbers arrive (`catalog_stats`).
+#[derive(Debug, Clone, Serialize, TS)]
+pub struct CardStats {
+    pub mod_id: u64,
+    pub stats: ModStats,
 }
 
 #[derive(Debug, Serialize, TS)]
@@ -157,6 +177,27 @@ impl From<InstallEvent> for InstallProgress {
             InstallEvent::Extracting => Self::Extracting,
             InstallEvent::Installing { folder } => Self::Installing { folder },
         }
+    }
+}
+
+/// Lets every step event through, and download progress at most every 200 ms: the download
+/// reports each chunk (thousands per file), far more than a progress bar needs over IPC.
+#[derive(Default)]
+pub struct ProgressThrottle {
+    last: Option<Instant>,
+}
+
+impl ProgressThrottle {
+    const EVERY: Duration = Duration::from_millis(200);
+
+    /// Whether `event` should be sent now.
+    pub fn pass(&mut self, event: &InstallEvent) -> bool {
+        let progress = matches!(event, InstallEvent::Fetch(FetchEvent::Progress(_)));
+        if progress && self.last.is_some_and(|t| t.elapsed() < Self::EVERY) {
+            return false;
+        }
+        self.last = Some(Instant::now());
+        true
     }
 }
 
@@ -306,10 +347,26 @@ pub fn rewrite_summary(images: &ImageCache, summary: &mut ModSummary) {
     rewrite_member(images, &mut summary.submitter);
 }
 
-/// Images in the description HTML are left as they are: the CSP keeps the webview from
-/// loading them, and the mod page sanitizes and rewrites that HTML when it's built.
-pub fn rewrite_profile(images: &ImageCache, profile: &mut ModProfile) {
+/// GameBanana HTML with its addresses replaced (see `html.rs`). Still untrusted: the webview
+/// sanitizes it with DOMPurify before showing it.
+pub fn rewrite_html(images: &ImageCache, links: &Links, html: &str) -> String {
+    html::rewrite(
+        html,
+        |url| images.register(url).map(|k| image_src(&k)),
+        links,
+    )
+}
+
+pub fn rewrite_profile(images: &ImageCache, links: &Links, profile: &mut ModProfile) {
     rewrite_summary(images, &mut profile.summary);
+    profile.description_html = rewrite_html(images, links, &profile.description_html);
+    profile.license_html = rewrite_html(images, links, &profile.license_html);
+}
+
+pub fn rewrite_updates(images: &ImageCache, links: &Links, updates: &mut Page<ModUpdate>) {
+    for update in &mut updates.items {
+        update.text_html = rewrite_html(images, links, &update.text_html);
+    }
 }
 
 pub fn rewrite_categories(images: &ImageCache, categories: &mut [Category]) {

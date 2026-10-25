@@ -176,6 +176,36 @@ impl CatalogSource for GameBanana {
         let raw: Vec<RawCategory> = self.fetch(url, TTL_CATEGORIES, "subcategories").await?;
         Ok(raw.into_iter().map(RawCategory::into_category).collect())
     }
+
+    async fn top_subs(&self, game_id: u64) -> Result<Vec<TopSub>, CatalogError> {
+        let url = self.endpoint(&format!("Game/{game_id}/TopSubs"), &[])?;
+        let raw: Vec<RawTopSub> = self.fetch(url, TTL_LIST, "top submissions").await?;
+        Ok(raw
+            .into_iter()
+            .filter(|r| r.model_name.is_empty() || r.model_name == "Mod")
+            .filter(|r| r.id != 0)
+            .map(RawTopSub::into_top_sub)
+            .collect())
+    }
+
+    async fn mod_stats(&self, mod_id: u64) -> Result<ModStats, CatalogError> {
+        // `_csvProperties` returns just these fields (observed 2026-10-25), a fraction of
+        // the mod page.
+        let url = self.endpoint(
+            &format!("Mod/{mod_id}"),
+            &[(
+                "_csvProperties",
+                "_nLikeCount,_nViewCount,_nPostCount,_nDownloadCount".to_owned(),
+            )],
+        )?;
+        let raw: RawStats = self.fetch(url, TTL_DETAIL, "mod stats").await?;
+        Ok(ModStats {
+            likes: raw.likes,
+            views: raw.views,
+            posts: raw.posts,
+            downloads: Some(raw.downloads),
+        })
+    }
 }
 
 fn sort_alias(sort: Sort) -> Option<&'static str> {
@@ -431,6 +461,50 @@ impl RawCategoryRef {
             name,
         })
     }
+}
+
+/// An entry of `Game/{id}/TopSubs` (observed 2026-10-25: three per period, 21 in all).
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+struct RawTopSub {
+    #[serde(rename = "_idRow", deserialize_with = "de_u64")]
+    id: u64,
+    #[serde(rename = "_sModelName", deserialize_with = "de_string")]
+    model_name: String,
+    #[serde(rename = "_sName", deserialize_with = "de_string")]
+    name: String,
+    #[serde(rename = "_sPeriod", deserialize_with = "de_string")]
+    period: String,
+    #[serde(rename = "_sInitialVisibility", deserialize_with = "de_string")]
+    visibility: String,
+    #[serde(rename = "_nLikeCount", deserialize_with = "de_u64")]
+    likes: u64,
+}
+
+impl RawTopSub {
+    fn into_top_sub(self) -> TopSub {
+        TopSub {
+            mod_id: self.id,
+            name: self.name,
+            period: TopPeriod::from_gb(&self.period),
+            visibility: Visibility::from_gb(&self.visibility),
+            likes: self.likes,
+        }
+    }
+}
+
+/// `Mod/{id}?_csvProperties=...`: only the counters.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+struct RawStats {
+    #[serde(rename = "_nLikeCount", deserialize_with = "de_u64")]
+    likes: u64,
+    #[serde(rename = "_nViewCount", deserialize_with = "de_u64")]
+    views: u64,
+    #[serde(rename = "_nPostCount", deserialize_with = "de_u64")]
+    posts: u64,
+    #[serde(rename = "_nDownloadCount", deserialize_with = "de_u64")]
+    downloads: u64,
 }
 
 /// A mod as it appears in listings and search results.

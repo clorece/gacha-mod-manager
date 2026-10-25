@@ -59,4 +59,16 @@ pub trait CatalogSource: Send + Sync {
         &self,
         category_id: u64,
     ) -> impl Future<Output = Result<Vec<Category>, CatalogError>> + Send;
+
+    /// A game's top submissions: the top few per period (today, this week, ... all time),
+    /// in GameBanana's order. Sensitive entries are included; callers filter.
+    fn top_subs(
+        &self,
+        game_id: u64,
+    ) -> impl Future<Output = Result<Vec<TopSub>, CatalogError>> + Send;
+
+    /// Likes, views, posts and downloads of one mod, without the rest of its page (for the
+    /// download counts on catalogue cards, which listings don't include).
+    fn mod_stats(&self, mod_id: u64)
+    -> impl Future<Output = Result<ModStats, CatalogError>> + Send;
 }

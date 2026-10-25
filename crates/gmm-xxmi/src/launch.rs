@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Starting XXMI: the only place in GMM that launches a process (security rule R7).
+//! Starting XXMI, and handing a web page or a folder to the OS shell: the only place in GMM
+//! that launches a process (security rule R7).
 //!
 //! The program is always `<XXMI root>/Resources/Bin/XXMI Launcher.exe` of a validated XXMI
 //! install, and the arguments are always `--nogui --xxmi <importer>`, built in code from the
@@ -12,10 +13,15 @@
 //! XXMI's launcher asks to run as administrator (its manifest says `requireAdministrator`,
 //! observed 2026-10-24), and a plain process start can't do that (Windows error 740). On
 //! Windows it is therefore started the way Explorer starts a shortcut: `ShellExecuteExW` with
-//! the default verb, which shows the usual UAC prompt. This is the one `unsafe` block in GMM.
+//! the default verb, which shows the usual UAC prompt.
+//!
+//! [`open_page`] and [`open_folder`] hand an address to the user's browser or a folder to the
+//! file manager (Windows: `ShellExecuteExW` with the `open` / `explore` verb; elsewhere
+//! `xdg-open` with the one argument). They never run a file: a page must be an `http(s)`
+//! address, a folder must be an existing directory.
 
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use gmm_adapters::GameManifest;
 
@@ -76,6 +82,45 @@ pub fn launch(command: &LaunchCommand) -> Result<Option<u32>, String> {
     platform::start(command, &dir)
 }
 
+/// Longest address [`open_page`] accepts.
+pub const MAX_PAGE_URL: usize = 2048;
+
+/// Opens a web page in the user's default browser. The caller has shown the address and the
+/// user agreed. Only `https://` and `http://` addresses, without spaces, quotes or control
+/// characters, up to [`MAX_PAGE_URL`] long.
+pub fn open_page(url: &str) -> Result<(), String> {
+    let lower = url.get(..8).unwrap_or(url).to_ascii_lowercase();
+    let scheme_ok = lower.starts_with("https://") || lower.starts_with("http://");
+    let host_ok = url
+        .split_once("://")
+        .is_some_and(|(_, rest)| !rest.is_empty() && !rest.starts_with('/'));
+    if !scheme_ok
+        || !host_ok
+        || url.len() > MAX_PAGE_URL
+        || url
+            .chars()
+            .any(|c| c.is_whitespace() || c.is_control() || c == '"' || c == '<' || c == '>')
+    {
+        return Err("only plain web addresses can be opened".to_owned());
+    }
+    platform::shell_open(Shell::Page, url.as_ref())
+}
+
+/// Opens a folder in the file manager. Refuses anything but an absolute path to an existing
+/// directory (security rule R7: folders only, never a file).
+pub fn open_folder(dir: &Path) -> Result<(), String> {
+    if !dir.is_absolute() || !dir.is_dir() {
+        return Err(format!("{} is not a folder", dir.display()));
+    }
+    platform::shell_open(Shell::Folder, dir.as_os_str())
+}
+
+#[derive(Clone, Copy)]
+enum Shell {
+    Page,
+    Folder,
+}
+
 #[cfg(windows)]
 mod platform {
     // The single exception to `unsafe_code = "deny"` (CI checks that no other file allows it).
@@ -96,10 +141,41 @@ mod platform {
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
-    use super::LaunchCommand;
+    use super::{LaunchCommand, Shell};
 
     fn wide(s: &OsStr) -> Vec<u16> {
         s.encode_wide().chain(Some(0)).collect()
+    }
+
+    pub fn shell_open(what: Shell, target: &OsStr) -> Result<(), String> {
+        // `explore` only applies to folders, so a file swapped in can't be run.
+        let verb = wide(OsStr::new(match what {
+            Shell::Page => "open",
+            Shell::Folder => "explore",
+        }));
+        let file = wide(target);
+        let mut info = SHELLEXECUTEINFOW {
+            cbSize: u32::try_from(std::mem::size_of::<SHELLEXECUTEINFOW>()).unwrap_or(0),
+            fMask: SEE_MASK_NOASYNC,
+            lpVerb: verb.as_ptr(),
+            lpFile: file.as_ptr(),
+            nShow: SW_SHOWNORMAL,
+            ..SHELLEXECUTEINFOW::default()
+        };
+        // SAFETY: as in `start`: `info` is fully initialised, `cbSize` matches, and the
+        // string pointers refer to NUL-terminated buffers that outlive the call. No process
+        // handle is requested, so there is nothing to close.
+        let ok = unsafe {
+            let _ = CoInitializeEx(
+                std::ptr::null(),
+                (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
+            );
+            ShellExecuteExW(&mut info)
+        };
+        if ok == 0 {
+            return Err(format!("couldn't open it: {}", io::Error::last_os_error()));
+        }
+        Ok(())
     }
 
     pub fn start(command: &LaunchCommand, dir: &Path) -> Result<Option<u32>, String> {
@@ -154,10 +230,27 @@ mod platform {
     // The one exception to the `Command::new` ban in clippy.toml.
     #![allow(clippy::disallowed_methods)]
 
+    use std::ffi::OsStr;
     use std::path::Path;
     use std::process::{Command, Stdio};
 
-    use super::LaunchCommand;
+    use super::{LaunchCommand, Shell};
+
+    /// `xdg-open` with the address or folder as its only argument (both start with
+    /// `http` or `/`, so neither reads as an option).
+    pub fn shell_open(_what: Shell, target: &OsStr) -> Result<(), String> {
+        Command::new("xdg-open")
+            .arg(target)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map(|mut child| {
+                // Reap it when it exits (xdg-open hands off and quits).
+                std::thread::spawn(move || child.wait());
+            })
+            .map_err(|e| format!("couldn't open it: {e}"))
+    }
 
     pub fn start(command: &LaunchCommand, dir: &Path) -> Result<Option<u32>, String> {
         let child = Command::new(&command.exe)
@@ -169,5 +262,43 @@ mod platform {
             .spawn()
             .map_err(|e| format!("couldn't start XXMI Launcher: {e}"))?;
         Ok(Some(child.id()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_plain_web_addresses_are_opened() {
+        for bad in [
+            "",
+            "file:///C:/Windows/System32/calc.exe",
+            r"C:\Windows\notepad.exe",
+            "javascript:alert(1)",
+            "ms-settings:privacy",
+            "https://",
+            "https:///etc/passwd",
+            "https://gamebanana.com/mods/1 --flag",
+            "https://gamebanana.com/\"quoted\"",
+            "https://gamebanana.com/
+",
+            "-https://gamebanana.com",
+        ] {
+            assert!(open_page(bad).is_err(), "{bad:?}");
+        }
+        let long = format!("https://gamebanana.com/{}", "a".repeat(MAX_PAGE_URL));
+        assert!(open_page(&long).is_err());
+    }
+
+    #[test]
+    #[allow(clippy::disallowed_methods)] // writing the test file
+    fn folders_only() {
+        assert!(open_folder(Path::new("relative/dir")).is_err());
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("mod.ini");
+        std::fs::write(&file, b"x").unwrap();
+        assert!(open_folder(&file).is_err());
+        assert!(open_folder(&dir.path().join("missing")).is_err());
     }
 }

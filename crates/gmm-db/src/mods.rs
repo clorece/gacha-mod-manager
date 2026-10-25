@@ -25,6 +25,19 @@ pub struct InstalledMod {
     pub size_bytes: u64,
     pub installed_at: i64,
     pub scan_report_json: Option<String>,
+    pub categories: ModCategories,
+}
+
+/// The mod's GameBanana categories when it was installed (empty for mods installed before
+/// GMM recorded them).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ModCategories {
+    pub root_category_id: Option<u64>,
+    /// e.g. "Character Skins".
+    pub root_category: Option<String>,
+    pub category_id: Option<u64>,
+    /// The subcategory: for skins, the character.
+    pub category: Option<String>,
 }
 
 /// What the install pipeline records for a new mod. It starts enabled.
@@ -41,6 +54,7 @@ pub struct NewInstalledMod {
     pub archive_sha256: Option<String>,
     pub size_bytes: u64,
     pub scan_report_json: Option<String>,
+    pub categories: ModCategories,
 }
 
 /// `SELECT <every column> FROM installed_mods <rest>`, as a static string (sqlx only takes
@@ -49,7 +63,8 @@ macro_rules! select {
     ($rest:literal) => {
         concat!(
             "SELECT id, game_id, folder_name, name, gb_mod_id, gb_file_id, variant, version, ",
-            "file_date, enabled, archive_sha256, size_bytes, installed_at, scan_report_json ",
+            "file_date, enabled, archive_sha256, size_bytes, installed_at, scan_report_json, ",
+            "root_category_id, root_category, category_id, category ",
             "FROM installed_mods ",
             $rest
         )
@@ -63,8 +78,9 @@ impl Db {
         let result = sqlx::query(
             "INSERT INTO installed_mods (game_id, folder_name, name, gb_mod_id, gb_file_id,
                  variant, version, file_date, enabled, archive_sha256, size_bytes,
-                 installed_at, scan_report_json)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)",
+                 installed_at, scan_report_json, root_category_id, root_category, category_id,
+                 category)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&m.game_id)
         .bind(&m.folder_name)
@@ -78,6 +94,13 @@ impl Db {
         .bind(to_db(m.size_bytes, "size_bytes")?)
         .bind(now())
         .bind(&m.scan_report_json)
+        .bind(opt_to_db(
+            m.categories.root_category_id,
+            "root_category_id",
+        )?)
+        .bind(&m.categories.root_category)
+        .bind(opt_to_db(m.categories.category_id, "category_id")?)
+        .bind(&m.categories.category)
         .execute(&self.pool)
         .await?;
         Ok(result.last_insert_rowid())
@@ -177,5 +200,11 @@ fn map_row(row: &SqliteRow) -> Result<InstalledMod, DbError> {
         size_bytes: from_db(row.try_get("size_bytes")?, "size_bytes")?,
         installed_at: row.try_get("installed_at")?,
         scan_report_json: row.try_get("scan_report_json")?,
+        categories: ModCategories {
+            root_category_id: opt_from_db(row.try_get("root_category_id")?, "root_category_id")?,
+            root_category: row.try_get("root_category")?,
+            category_id: opt_from_db(row.try_get("category_id")?, "category_id")?,
+            category: row.try_get("category")?,
+        },
     })
 }

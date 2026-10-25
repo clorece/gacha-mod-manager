@@ -73,13 +73,36 @@ pub struct Job {
     pub game: String,
     pub mod_id: u64,
     pub mod_name: String,
+    pub author: Option<String>,
     pub file_name: Option<String>,
+    pub file_size: Option<u64>,
+    /// The mod's preview, as the caller wants it shown (the app passes a `gmmimg` URL).
+    pub image: Option<String>,
     /// How many versions were chosen (0 when the archive holds one mod).
     pub versions: usize,
     pub state: JobState,
     /// Unix seconds.
     pub queued_at: i64,
     pub finished_at: Option<i64>,
+}
+
+/// What the Downloads page shows for a job, from the mod page when it was queued.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct JobLabel {
+    pub mod_name: String,
+    pub author: Option<String>,
+    pub file_name: Option<String>,
+    pub file_size: Option<u64>,
+    pub image: Option<String>,
+}
+
+impl JobLabel {
+    pub fn named(mod_name: impl Into<String>) -> Self {
+        Self {
+            mod_name: mod_name.into(),
+            ..Self::default()
+        }
+    }
 }
 
 struct Entry {
@@ -119,7 +142,7 @@ impl InstallQueue {
     }
 
     /// Adds an install at the end of the queue.
-    pub fn push(&self, request: JobRequest, mod_name: String, file_name: Option<String>) -> JobId {
+    pub fn push(&self, request: JobRequest, label: JobLabel) -> JobId {
         let mut inner = self.lock();
         inner.next_id += 1;
         let id = inner.next_id;
@@ -132,8 +155,11 @@ impl InstallQueue {
                 id,
                 game: request.game.clone(),
                 mod_id: request.mod_id,
-                mod_name,
-                file_name,
+                mod_name: label.mod_name,
+                author: label.author,
+                file_name: label.file_name,
+                file_size: label.file_size,
+                image: label.image,
                 versions,
                 state: JobState::Queued,
                 queued_at: now(),
@@ -295,8 +321,14 @@ mod tests {
     #[test]
     fn runs_one_at_a_time_in_order() {
         let q = InstallQueue::new();
-        let a = q.push(request(1), "A".into(), None);
-        let b = q.push(request(2), "B".into(), Some("b.rar".into()));
+        let a = q.push(request(1), JobLabel::named("A"));
+        let b = q.push(
+            request(2),
+            JobLabel {
+                file_name: Some("b.rar".into()),
+                ..JobLabel::named("B")
+            },
+        );
         assert_eq!(q.active(), 2);
         let first = q.next().unwrap();
         assert_eq!(first.id, a);
@@ -322,8 +354,8 @@ mod tests {
     #[test]
     fn pause_resume_and_cancel() {
         let q = InstallQueue::new();
-        let a = q.push(request(1), "A".into(), None);
-        let b = q.push(request(2), "B".into(), None);
+        let a = q.push(request(1), JobLabel::named("A"));
+        let b = q.push(request(2), JobLabel::named("B"));
 
         // A queued job pauses at once and is skipped by the worker.
         assert!(q.pause(b));
@@ -356,7 +388,7 @@ mod tests {
         let q = InstallQueue::new();
         let mut r = request(1);
         r.options.variants = crate::install::VariantChoice::Named(vec!["A".into(), "B".into()]);
-        q.push(r, "Pack".into(), None);
+        q.push(r, JobLabel::named("Pack"));
         assert_eq!(q.snapshot()[0].versions, 2);
     }
 }

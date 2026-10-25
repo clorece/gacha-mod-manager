@@ -30,7 +30,7 @@ use sqlx::sqlite::{
 
 pub use downloads::{CachedDownload, NewCachedDownload};
 pub use error::DbError;
-pub use mods::{InstalledMod, NewInstalledMod};
+pub use mods::{InstalledMod, ModCategories, NewInstalledMod};
 pub use settings::ManualGameFolder;
 
 /// The database's file name inside GMM's data folder.
@@ -42,8 +42,14 @@ const HTTP_CACHE_KEEP: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 /// At most this many cached API responses are kept; the oldest go first.
 const HTTP_CACHE_MAX_ROWS: i64 = 5_000;
 
-const MIGRATIONS: &[(i64, &str, &str)] =
-    &[(1, "initial", include_str!("../migrations/0001_initial.sql"))];
+const MIGRATIONS: &[(i64, &str, &str)] = &[
+    (1, "initial", include_str!("../migrations/0001_initial.sql")),
+    (
+        2,
+        "categories_last_played",
+        include_str!("../migrations/0002_categories_last_played.sql"),
+    ),
+];
 
 /// A handle to the database. Cheap to clone; clones share one connection pool.
 #[derive(Debug, Clone)]

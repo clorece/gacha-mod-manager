@@ -136,6 +136,7 @@ fn meta(name: &str, id: u64) -> ModMeta {
         file_date: Some(1_790_000_000),
         version: Some("1.0".to_owned()),
         archive_sha256: "ab".repeat(32),
+        categories: gmm_db::ModCategories::default(),
     }
 }
 
@@ -424,6 +425,8 @@ async fn mock_gamebanana(game_id: u64, av: &str, archive: &[u8]) -> (MockServer,
         "_sName": "Test Outfit A",
         "_aGame": { "_idRow": game_id, "_sName": "Some Game" },
         "_sVersion": "2.0",
+        "_aCategory": { "_sName": "Ellen", "_sProfileUrl": "https://gamebanana.com/mods/cats/43004" },
+        "_aSuperCategory": { "_sName": "Character Skins", "_sProfileUrl": "https://gamebanana.com/mods/cats/30305" },
     });
     let files = serde_json::json!({
         "_aFiles": [{
@@ -459,6 +462,26 @@ fn request() -> InstallRequest {
         mod_id: 900001,
         ..InstallRequest::default()
     }
+}
+
+#[tokio::test]
+async fn the_same_file_fetched_twice_at_once_downloads_once() {
+    // The install confirmation and the queue (or a double-run effect) can ask together.
+    let f = Fixture::new().await;
+    let archive = zip_of(&[("Outfit/outfit.ini", INI)]);
+    let (_server, gb) = mock_gamebanana(19567, "clean", &archive).await;
+    let stop = StopSignal::new();
+    let net = net();
+    let (a, b) = tokio::join!(
+        fetch_archive(&gb, &net, &f.db, &f.ws, 900001, None, &stop, |_| {}),
+        fetch_archive(&gb, &net, &f.db, &f.ws, 900001, None, &stop, |_| {}),
+    );
+    let (a, b) = (a.unwrap(), b.unwrap());
+    assert_eq!(a.sha256, b.sha256);
+    assert!(
+        a.from_cache != b.from_cache,
+        "one downloads, the other finds it in the cache"
+    );
 }
 
 #[tokio::test]
@@ -506,6 +529,16 @@ async fn end_to_end_install_and_cache_reuse() {
     assert_eq!(
         row.archive_sha256.as_deref(),
         Some(report.archive_sha256.as_str())
+    );
+    assert_eq!(
+        row.categories,
+        gmm_db::ModCategories {
+            root_category_id: Some(30_305),
+            root_category: Some("Character Skins".to_owned()),
+            category_id: Some(43_004),
+            category: Some("Ellen".to_owned()),
+        },
+        "categories from the mod page"
     );
 
     // The archive is cached and recorded; fetching again doesn't download.
@@ -1019,9 +1052,13 @@ async fn launch_needs_ready_and_a_confirmed_exe() {
     assert_eq!(plan.command.args, ["--nogui", "--xxmi", "ZZMI"]);
     assert!(!plan.confirmed);
     assert!(matches!(
-        gmm_core::start(&plan),
+        gmm_core::start(&db, zzz(), &plan).await,
         Err(CoreError::ExeNotConfirmed(_))
     ));
+    assert!(
+        db.last_played().await.unwrap().is_empty(),
+        "nothing started"
+    );
 
     gmm_core::confirm_exe(&db, &mut plan).await.unwrap();
     let again = gmm_core::plan_launch(&db, &xxmi, &status(SetupState::Ready), zzz())

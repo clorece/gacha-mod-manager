@@ -11,10 +11,10 @@ use std::path::PathBuf;
 use gmm_adapters::{GameManifest, Registry};
 use gmm_catalog::{CatalogSource, Category, ListQuery, ModProfile, ModUpdate, Page, SearchQuery};
 use gmm_core::{
-    ClearedCache, ConflictReport, InstallOptions, InstallPlan, InstallRequest, Machine, ModsTarget,
-    RecycleBin, SetupHints, StopSignal, ToggleOutcome, cache_storage, clear_downloads, confirm_exe,
-    conflicts_after_install, conflicts_for, conflicts_for_unmanaged, game_storage,
-    library as core_library, listed_unmanaged, set_enabled as core_set_enabled,
+    ClearedCache, ConflictReport, FeaturedMod, InstallOptions, InstallPlan, InstallRequest,
+    Machine, ModsTarget, RecycleBin, SetupHints, StopSignal, ToggleOutcome, cache_storage,
+    clear_downloads, confirm_exe, conflicts_after_install, conflicts_for, conflicts_for_unmanaged,
+    game_storage, library as core_library, listed_unmanaged, set_enabled as core_set_enabled,
     set_unmanaged_enabled_at, start, uninstall as core_uninstall, uninstall_unmanaged,
     unmanaged_size,
 };
@@ -26,9 +26,10 @@ use tauri_plugin_dialog::DialogExt;
 use crate::AppState;
 use crate::error::{CmdError, CmdResult};
 use crate::views::{
-    CatalogPage, CatalogQuery, FolderRow, GameInfo, GameStorageView, InstallArgs, InstallProgress,
-    InstallResult, LaunchInfo, Launched, LibraryView, ModKey, ModRow, Settings, StorageView,
-    Toggled, UninstallItem, Uninstalled, rewrite_categories, rewrite_profile, rewrite_summary,
+    CardStats, CatalogPage, CatalogQuery, FolderRow, GameInfo, GameStorageView, InstallArgs,
+    InstallProgress, InstallResult, LaunchInfo, Launched, LibraryView, ModKey, ModRow,
+    ProgressThrottle, Settings, StorageView, Toggled, UninstallItem, Uninstalled,
+    rewrite_categories, rewrite_profile, rewrite_summary, rewrite_updates,
 };
 
 pub(crate) fn registry() -> CmdResult<&'static Registry> {
@@ -45,9 +46,10 @@ pub(crate) async fn mods_target(state: &AppState, game: &GameManifest) -> CmdRes
     Ok(ModsTarget::open(&state.db, game, SetupHints::default()).await?)
 }
 
-/// The supported games, in display order.
+/// The supported games, in display order, with when GMM last started each.
 #[tauri::command]
-pub fn games() -> CmdResult<Vec<GameInfo>> {
+pub async fn games(state: State<'_, AppState>) -> CmdResult<Vec<GameInfo>> {
+    let played = state.db.last_played().await?;
     Ok(registry()?
         .games()
         .iter()
@@ -57,6 +59,7 @@ pub fn games() -> CmdResult<Vec<GameInfo>> {
             short_name: g.game.short_name.clone(),
             importer: g.xxmi.importer.as_str().to_owned(),
             gamebanana_id: g.gamebanana.game_id,
+            last_played: played.iter().find(|(id, _)| id == g.id()).map(|(_, t)| *t),
         })
         .collect())
 }
@@ -126,7 +129,7 @@ pub async fn catalog_search(
 #[tauri::command]
 pub async fn catalog_mod(state: State<'_, AppState>, mod_id: u64) -> CmdResult<ModProfile> {
     let mut profile = state.gb.mod_profile(mod_id).await?;
-    rewrite_profile(&state.images, &mut profile);
+    rewrite_profile(&state.images, &state.links, &mut profile);
     Ok(profile)
 }
 
@@ -137,7 +140,48 @@ pub async fn catalog_updates(
     mod_id: u64,
     page: u32,
 ) -> CmdResult<Page<ModUpdate>> {
-    Ok(state.gb.mod_updates(mod_id, page.max(1)).await?)
+    let mut updates = state.gb.mod_updates(mod_id, page.max(1)).await?;
+    rewrite_updates(&state.images, &state.links, &mut updates);
+    Ok(updates)
+}
+
+/// The Mods Store's featured gallery: trending mods, safe-for-work first unless
+/// `show_nsfw`, backfilled to five (`gmm_core::featured`).
+#[tauri::command]
+pub async fn catalog_featured(
+    state: State<'_, AppState>,
+    game: String,
+    show_nsfw: bool,
+) -> CmdResult<Vec<FeaturedMod>> {
+    let game = game_by_id(&game)?;
+    let mut picks = gmm_core::featured(&state.gb, game, show_nsfw).await?;
+    for pick in &mut picks {
+        rewrite_summary(&state.images, &mut pick.summary);
+    }
+    Ok(picks)
+}
+
+/// Most mods asked for at once by [`catalog_stats`] (a screenful of cards).
+const MAX_STATS_PER_CALL: usize = 60;
+
+/// Download counts (and the other counters) for catalogue cards, which listings don't
+/// include. Each mod's numbers go to `on_stats` as they arrive. Runs on its own slow,
+/// cached client (`AppState::gb_background`), so it never holds up what the user clicked.
+#[tauri::command]
+pub async fn catalog_stats(
+    state: State<'_, AppState>,
+    mod_ids: Vec<u64>,
+    on_stats: Channel<CardStats>,
+) -> CmdResult<()> {
+    for mod_id in mod_ids.into_iter().take(MAX_STATS_PER_CALL) {
+        // A mod that fails (removed, offline) just keeps its placeholder.
+        if let Ok(stats) = state.gb_background.mod_stats(mod_id).await
+            && on_stats.send(CardStats { mod_id, stats }).is_err()
+        {
+            break; // The page went away.
+        }
+    }
+    Ok(())
 }
 
 /// A game's root categories, or the children of `parent` (for skins: one per character).
@@ -169,6 +213,7 @@ pub async fn prepare_install(
 ) -> CmdResult<InstallPlan> {
     let game = gmm_core::game_for_mod(&state.gb.mod_profile(mod_id).await?)?;
     let target = mods_target(&state, game).await?;
+    let mut throttle = ProgressThrottle::default();
     let prepared = gmm_core::prepare(
         &state.gb,
         &state.net,
@@ -178,7 +223,11 @@ pub async fn prepare_install(
         mod_id,
         file_id,
         &StopSignal::new(),
-        |event| drop(on_progress.send(event.into())),
+        |event| {
+            if throttle.pass(&event) {
+                drop(on_progress.send(event.into()));
+            }
+        },
     )
     .await?;
     let plan = gmm_core::install_plan(&state.db, game, &prepared).await;
@@ -220,6 +269,7 @@ pub async fn install(
             start_disabled: args.start_disabled,
         },
     };
+    let mut throttle = ProgressThrottle::default();
     let report = gmm_core::install(
         &state.gb,
         &state.net,
@@ -230,7 +280,11 @@ pub async fn install(
         &request,
         &StopSignal::new(),
         // The window may have closed; installing carries on regardless.
-        |event| drop(on_progress.send(event.into())),
+        |event| {
+            if throttle.pass(&event) {
+                drop(on_progress.send(event.into()));
+            }
+        },
     )
     .await?;
 
@@ -279,6 +333,10 @@ pub async fn library(state: State<'_, AppState>, game: String) -> CmdResult<Libr
             version: m.row.version,
             size_bytes: m.row.size_bytes,
             installed_at: m.row.installed_at,
+            root_category: m.row.categories.root_category,
+            root_category_id: m.row.categories.root_category_id,
+            category: m.row.categories.category,
+            category_id: m.row.categories.category_id,
         })
         .collect();
     view.unmanaged = lib.unmanaged;
@@ -450,6 +508,13 @@ pub async fn clear_download_cache(state: State<'_, AppState>) -> CmdResult<Clear
     Ok(clear_downloads(&state.db, &ws, &RecycleBin).await?)
 }
 
+/// Empties the cache of GameBanana responses (the next pages load fresh). Returns how many
+/// entries were removed.
+#[tauri::command]
+pub async fn clear_http_cache(state: State<'_, AppState>) -> CmdResult<u64> {
+    Ok(state.db.clear_http_cache().await?)
+}
+
 async fn plan(state: &AppState, game: &GameManifest) -> CmdResult<gmm_core::LaunchPlan> {
     let machine = Machine::scan(&state.db, SetupHints::default()).await?;
     Ok(machine.launch_plan(&state.db, game).await?)
@@ -474,11 +539,14 @@ pub async fn launch(
     game: String,
     confirm: bool,
 ) -> CmdResult<Launched> {
-    let mut plan = plan(&state, game_by_id(&game)?).await?;
+    let game = game_by_id(&game)?;
+    let mut plan = plan(&state, game).await?;
     if !plan.confirmed && confirm {
         confirm_exe(&state.db, &mut plan).await?;
     }
-    Ok(Launched { pid: start(&plan)? })
+    Ok(Launched {
+        pid: start(&state.db, game, &plan).await?,
+    })
 }
 
 /// What GMM remembers between runs.

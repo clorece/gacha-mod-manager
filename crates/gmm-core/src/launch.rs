@@ -65,11 +65,19 @@ pub async fn confirm_exe(db: &Db, plan: &mut LaunchPlan) -> Result<(), CoreError
 
 /// Starts XXMI, which then starts the game with mods. Returns the launcher's process id when
 /// Windows reports one. On Windows the user may first see XXMI's administrator prompt.
-pub fn start(plan: &LaunchPlan) -> Result<Option<u32>, CoreError> {
+/// Records the time as `game`'s "last played" (shown on the Dashboard).
+pub async fn start(
+    db: &Db,
+    game: &GameManifest,
+    plan: &LaunchPlan,
+) -> Result<Option<u32>, CoreError> {
     if !plan.confirmed {
         return Err(CoreError::ExeNotConfirmed(plan.command.exe.clone()));
     }
-    launch(&plan.command).map_err(CoreError::Launch)
+    let pid = launch(&plan.command).map_err(CoreError::Launch)?;
+    // The game is starting either way; a failed write only loses the timestamp.
+    let _ = db.record_played(game.id()).await;
+    Ok(pid)
 }
 
 /// Windows paths compare case-insensitively.

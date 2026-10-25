@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
+use std::collections::HashMap;
 use std::ops::ControlFlow;
+use std::sync::{Arc, Mutex, OnceLock, PoisonError, Weak};
 
 use gmm_catalog::{CatalogSource, ModFile, ModFiles};
 use gmm_db::{Db, NewCachedDownload};
@@ -72,6 +74,25 @@ pub fn choose_file(
     Ok(file.clone())
 }
 
+/// One download per GameBanana file at a time, across the process: a second fetch of the
+/// same file (the install confirmation while the queue downloads it, say) waits for the
+/// first, then finds the file in the cache or resumes its partial download.
+fn file_lock(file_id: u64) -> Arc<tokio::sync::Mutex<()>> {
+    type Locks = Mutex<HashMap<u64, Weak<tokio::sync::Mutex<()>>>>;
+    static LOCKS: OnceLock<Locks> = OnceLock::new();
+    let mut locks = LOCKS
+        .get_or_init(Locks::default)
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    locks.retain(|_, held| held.strong_count() > 0);
+    if let Some(lock) = locks.get(&file_id).and_then(Weak::upgrade) {
+        return lock;
+    }
+    let lock = Arc::new(tokio::sync::Mutex::new(()));
+    locks.insert(file_id, Arc::downgrade(&lock));
+    lock
+}
+
 /// Puts a GameBanana file into the download cache (or finds it there) and records it in the
 /// database. The file list is fetched fresh, since it's read right before a download. A pause
 /// or cancel on `stop` ends the download early ([`CoreError::Stopped`]); the partial file is
@@ -90,6 +111,9 @@ pub async fn fetch_archive<C: CatalogSource>(
     stop.check()?;
     let files = catalog.mod_files(mod_id).await?;
     let file = choose_file(&files, mod_id, file_id)?;
+    let lock = file_lock(file.id);
+    let _one_at_a_time = lock.lock().await;
+    stop.check()?;
     let guard = ws.guard();
     let dest = ws.download_path(&file)?;
     let path_rel = dest.rel().to_string();

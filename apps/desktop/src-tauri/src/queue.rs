@@ -3,15 +3,14 @@
 //! The install queue behind the Downloads page: commands to add, pause, resume, cancel and
 //! clear installs, and the one worker task that runs them in order
 //! (`gmm_core::InstallQueue` keeps the list). Watchers get the whole list over a channel
-//! whenever it changes; download progress is sent at most every 200 ms.
+//! whenever it changes; download progress is sent at most every 200 ms (`ProgressThrottle`).
 
 use std::sync::{Mutex, PoisonError};
-use std::time::{Duration, Instant};
 
 use gmm_catalog::CatalogSource;
 use gmm_core::{
-    CoreError, FetchEvent, InstallEvent, InstallOptions, InstallRequest, Job, JobId, JobRequest,
-    JobState, NextJob, StopReason,
+    CoreError, FetchEvent, InstallEvent, InstallOptions, InstallRequest, Job, JobId, JobLabel,
+    JobRequest, JobState, NextJob, StopReason,
 };
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State};
@@ -19,9 +18,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::AppState;
 use crate::commands::{game_by_id, mods_target};
 use crate::error::CmdResult;
-use crate::views::InstallArgs;
-
-const PROGRESS_EVERY: Duration = Duration::from_millis(200);
+use crate::views::{InstallArgs, ProgressThrottle, rewrite_summary};
 
 /// Who gets the list when it changes.
 #[derive(Default)]
@@ -91,7 +88,7 @@ async fn install(
         file_id: job.request.file_id,
         options: job.request.options.clone(),
     };
-    let mut last_sent: Option<Instant> = None;
+    let mut throttle = ProgressThrottle::default();
     let report = gmm_core::install(
         &state.gb,
         &state.net,
@@ -102,33 +99,39 @@ async fn install(
         &request,
         &job.stop,
         |event| {
-            let (next, always) = match event {
-                InstallEvent::Fetch(FetchEvent::UsingCache) => (JobState::Extracting, true),
-                InstallEvent::Fetch(FetchEvent::Downloading { size }) => (
-                    JobState::Downloading {
-                        downloaded: 0,
-                        total: Some(size),
-                    },
-                    true,
-                ),
-                InstallEvent::Fetch(FetchEvent::Progress(p)) => (
-                    JobState::Downloading {
-                        downloaded: p.downloaded,
-                        total: p.total,
-                    },
-                    false,
-                ),
-                InstallEvent::Extracting => (JobState::Extracting, true),
-                InstallEvent::Installing { folder } => (JobState::Installing { folder }, true),
+            let send = throttle.pass(&event);
+            let next = match event {
+                InstallEvent::Fetch(FetchEvent::UsingCache) => JobState::Extracting,
+                InstallEvent::Fetch(FetchEvent::Downloading { size }) => JobState::Downloading {
+                    downloaded: 0,
+                    total: Some(size),
+                },
+                InstallEvent::Fetch(FetchEvent::Progress(p)) => JobState::Downloading {
+                    downloaded: p.downloaded,
+                    total: p.total,
+                },
+                InstallEvent::Extracting => JobState::Extracting,
+                InstallEvent::Installing { folder } => JobState::Installing { folder },
             };
             state.queue.set_state(job.id, next);
-            if always || last_sent.is_none_or(|t| t.elapsed() >= PROGRESS_EVERY) {
-                last_sent = Some(Instant::now());
+            if send {
                 broadcast(state);
             }
         },
     )
     .await?;
+    // Versions that replace the same things can't all be on: the first one picked stays on
+    // and the ones clashing with it are switched off (docs/08, "Install confirmation").
+    if !job.request.options.start_disabled && report.installed.len() > 1 {
+        gmm_core::switch_version(
+            &state.db,
+            &target.ws,
+            target.mods,
+            game,
+            report.installed[0].id,
+        )
+        .await?;
+    }
     Ok(report.installed)
 }
 
@@ -139,7 +142,7 @@ pub async fn queue_install(state: State<'_, AppState>, args: InstallArgs) -> Cmd
     let game = gmm_core::game_for_mod(&profile)?;
     // Refuse now, not in the queue, when there's no Mods folder to install into.
     mods_target(&state, game).await?;
-    let file_name = match args.file_id {
+    let file = match args.file_id {
         Some(id) => profile
             .files
             .files
@@ -147,8 +150,16 @@ pub async fn queue_install(state: State<'_, AppState>, args: InstallArgs) -> Cmd
             .chain(&profile.files.archived_files)
             .find(|f| f.id == id),
         None => profile.files.default_choice(),
-    }
-    .map(|f| f.name.clone());
+    };
+    let mut summary = profile.summary.clone();
+    rewrite_summary(&state.images, &mut summary);
+    let label = JobLabel {
+        mod_name: profile.summary.name.clone(),
+        author: Some(profile.summary.submitter.name.clone()).filter(|n| !n.is_empty()),
+        file_name: file.map(|f| f.name.clone()),
+        file_size: file.map(|f| f.size),
+        image: summary.banner().map(|b| b.url_for_width(220).to_owned()),
+    };
     let id = state.queue.push(
         JobRequest {
             game: game.id().to_owned(),
@@ -160,8 +171,7 @@ pub async fn queue_install(state: State<'_, AppState>, args: InstallArgs) -> Cmd
                 start_disabled: args.start_disabled,
             },
         },
-        profile.summary.name,
-        file_name,
+        label,
     );
     state.wake.notify_one();
     broadcast(&state);

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use gmm_catalog::HttpCache;
-use gmm_db::{DB_FILE_NAME, Db, DbError, NewCachedDownload, NewInstalledMod};
+use gmm_db::{DB_FILE_NAME, Db, DbError, ModCategories, NewCachedDownload, NewInstalledMod};
 use gmm_fsguard::{Access, FsError, Guard};
 
 const HOUR: Duration = Duration::from_secs(3600);
@@ -33,7 +33,7 @@ async fn file_database_is_created_migrated_and_reopened() {
     let file = guard.path(data, DB_FILE_NAME).unwrap();
 
     let db = Db::open(&guard, &file).await.unwrap();
-    assert_eq!(db.schema_version().await.unwrap(), 1);
+    assert_eq!(db.schema_version().await.unwrap(), 2);
     db.set_xxmi_root(Some(Path::new(r"D:\XXMI Launcher")))
         .await
         .unwrap();
@@ -42,7 +42,7 @@ async fn file_database_is_created_migrated_and_reopened() {
 
     // Reopening runs no migration twice and keeps the data.
     let db = Db::open(&guard, &file).await.unwrap();
-    assert_eq!(db.schema_version().await.unwrap(), 1);
+    assert_eq!(db.schema_version().await.unwrap(), 2);
     assert_eq!(
         db.xxmi_root().await.unwrap().as_deref(),
         Some(Path::new(r"D:\XXMI Launcher"))
@@ -174,6 +174,49 @@ async fn installed_mods_lifecycle() {
     assert!(!db.delete_installed_mod(a).await.unwrap());
     assert!(!db.set_mod_enabled(a, true).await.unwrap());
     assert_eq!(db.installed_mod(a).await.unwrap(), None);
+}
+
+#[tokio::test]
+async fn categories_are_stored_with_the_mod() {
+    let db = Db::open_in_memory().await.unwrap();
+    let categories = ModCategories {
+        root_category_id: Some(30_305),
+        root_category: Some("Character Skins".to_owned()),
+        category_id: Some(43_004),
+        category: Some("Ellen".to_owned()),
+    };
+    let id = db
+        .insert_installed_mod(&NewInstalledMod {
+            categories: categories.clone(),
+            ..new_mod("zzz", "Ellen - Maid [gb-652373]")
+        })
+        .await
+        .unwrap();
+    let plain = db
+        .insert_installed_mod(&new_mod("zzz", "No categories"))
+        .await
+        .unwrap();
+    assert_eq!(
+        db.installed_mod(id).await.unwrap().unwrap().categories,
+        categories
+    );
+    assert_eq!(
+        db.installed_mod(plain).await.unwrap().unwrap().categories,
+        ModCategories::default()
+    );
+}
+
+#[tokio::test]
+async fn last_played_per_game() {
+    let db = Db::open_in_memory().await.unwrap();
+    assert!(db.last_played().await.unwrap().is_empty());
+    db.record_played("zzz").await.unwrap();
+    db.record_played("wuwa").await.unwrap();
+    db.record_played("zzz").await.unwrap();
+    let played = db.last_played().await.unwrap();
+    let games: Vec<&str> = played.iter().map(|(g, _)| g.as_str()).collect();
+    assert_eq!(games, ["wuwa", "zzz"]);
+    assert!(played.iter().all(|(_, t)| *t > 0));
 }
 
 #[tokio::test]

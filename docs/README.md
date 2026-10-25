@@ -36,8 +36,8 @@ design canvas is in the code: tokens for both themes, bundled Nunito, hand-built
 | `gmm-xxmi` | Reads XXMI's setup (allowlisted config fields only) and works out each game's setup state |
 | `gmm-migoto` | Reads 3DMigoto mod `.ini` files: override hashes, what they replace, namespaces, key bindings |
 | `gmm-db` | SQLite database (`%APPDATA%\GMM\gmm.db`): settings, manual game folders, installed mods, download cache, GameBanana response cache |
-| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`, in one go or in two steps with an install plan), the install queue and stop signal, versions (grouping, switching), the update check, the library (list with disk state, unmanaged mods, enable/disable, uninstall to the Recycle Bin), conflict detection, storage accounting, launching through XXMI (with exe confirmation), app folders, the image cache behind `gmmimg` |
-| `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, a command per CLI action plus the install confirmation, queue, versions and startup check (ids only), the queue worker, the `gmmimg` protocol, navigation guard; the React UI is in `apps/desktop/src` |
+| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`, in one go or in two steps with an install plan; one download per file at a time), the install queue and stop signal, versions (grouping, switching), the update check, the featured gallery (trending, backfilled), the library (list with disk state, unmanaged mods, enable/disable, open folder, uninstall to the Recycle Bin), conflict detection, storage accounting, launching through XXMI (with exe confirmation, recording "last played"), app folders, the image cache behind `gmmimg` |
+| `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, a command per CLI action plus the install confirmation, queue, versions, startup check, featured mods, card stats and the confirmed openers (ids only), the queue worker, the `gmmimg` protocol, the description address rewrite, navigation guard; the React UI is in `apps/desktop/src` |
 | `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm list`, `gmm enable/disable/uninstall`, `gmm conflicts`, `gmm storage`, `gmm launch`, `gmm detect`, `gmm status`, `gmm config` |
 
 On the dev machine, `gmm status` and the app report ZZZ `Ready` (HoYoPlay install) and WuWa
@@ -47,8 +47,10 @@ On the dev machine, `gmm status` and the app report ZZZ `Ready` (HoYoPlay instal
 2026-10-25) is written up in [08-design-system.md](08-design-system.md); file formats and the
 RAR plan in [09-archive-formats.md](09-archive-formats.md).
 
-**Waiting on you:** the game banner source (see 08); screenshots of each XXMI setup step, for
-the setup guide; the product name, if it changes.
+**Waiting on you:** the game banner source (see 08); whether description images on
+GameBanana's own file hosts (`filecacheNN.gamebanana.com`, `files.gamebanana.com`) may be
+shown (only `images.gamebanana.com` is today); screenshots of each XXMI setup step, for the
+setup guide; the product name, if it changes.
 
 **Phase 5** (started 2026-10-24): **RAR works.** GMM extracts RAR4 and RAR5 through
 `gmm-extract`, a separate sandboxed helper with RARLAB's UnRAR 7.23 that streams entries
@@ -60,10 +62,23 @@ versions as one mod (grouping, installing more from the cache, `switch_version`)
 install queue with pause, resume and cancel, and the startup check (newest catalogue pages,
 update check of installed mods).
 
-**Next:** the rest of the Phase 5 backend list (trending, download counts, stored
-categories, open-in-browser / open-folder commands, description sanitizing), then the
-screens, starting with the startup check, Downloads and the install confirmation. See the
-roadmap.
+On 2026-10-25 the rest of the backend list landed: trending for the Store's featured
+gallery, download counts for cards, categories stored with each mod, "last played", the
+confirmed openers (GameBanana page, XXMI releases, description links, mod folder), clearing
+the HTTP cache, and description HTML with every address replaced in Rust and sanitized by
+DOMPurify. Three screens followed: the **startup check**, **Downloads** (the queue with
+pause, resume and cancel) and the **install confirmation** (file choice, versions, blocked
+files). The app was smoke-tested in a real `tauri dev` window: `prepare_install`, the
+queue, `startup_check`, a RAR install into the real WWMI Mods folder, an 8-version pack
+(first version on, the clashing one off), open folder, uninstall. Two bugs found that way
+are fixed: progress events flooded the IPC channel (now at most every 200 ms), and two
+fetches of the same file at once collided on its partial file (now one download per file).
+The first Linux CI run (2026-10-25) built the RAR helper with g++ and passed its 19 RAR
+cases.
+
+**Next:** the Dashboard and setup guide polish, then the Mods Store, which gives the
+install confirmation its Download buttons (today it opens from the dev style guide). See
+the roadmap.
 
 ## Docs
 

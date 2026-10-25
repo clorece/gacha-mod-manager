@@ -236,6 +236,18 @@ impl Guard {
         fs::metadata(&path).map_err(|e| FsError::io("metadata", path, e))
     }
 
+    /// The checked absolute path of an existing directory, to hand to the OS shell's "open
+    /// folder" (security rule R7: folders only). Fails for files and missing paths.
+    pub fn os_path_of_dir(&self, p: &ScopedPath) -> Result<PathBuf, FsError> {
+        let path = self.resolve(p, Access::ReadOnly)?;
+        let meta = fs::metadata(&path).map_err(|e| FsError::io("open folder", &path, e))?;
+        if !meta.is_dir() {
+            let not_dir = io::Error::new(io::ErrorKind::InvalidInput, "not a folder");
+            return Err(FsError::io("open folder", path, not_dir));
+        }
+        Ok(path)
+    }
+
     pub fn exists(&self, p: &ScopedPath) -> Result<bool, FsError> {
         let path = self.resolve(p, Access::ReadOnly)?;
         Ok(fs::symlink_metadata(path).is_ok())

@@ -116,8 +116,9 @@ cache. With one image, there are no controls. With none, a placeholder.
 | Updates tab | `Mod/{id}/Updates` (verified): title, version, date, changelog entries (`text`, `cat`), file ids |
 
 **Choosing what to install** happens in the install confirmation, which every Download and
-Install button opens ([08](08-design-system.md#install-confirmation)); nothing downloads before
-it's confirmed:
+Install button opens ([08](08-design-system.md#install-confirmation)); nothing is installed
+before it's confirmed. To show versions it fetches the file into the download cache first
+(GameBanana can't list an archive's contents), so the confirmed install starts from the cache:
 1. **File** (GameBanana level): when the mod has several files, a radio list with each file's
    description, size and date; the newest clean file is pre-selected. Files with an AV result
    other than `clean` can't be chosen. The Files tab on the mod page shows the same list,

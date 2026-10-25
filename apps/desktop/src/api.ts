@@ -5,12 +5,14 @@
 
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type {
+  CardStats,
   CatalogPage,
   CatalogQuery,
   Category,
   ClearedCache,
   CmdError,
   ConflictReport,
+  FeaturedMod,
   GameInfo,
   GameStatus,
   InstallArgs,
@@ -56,6 +58,14 @@ export const api = {
   catalogUpdates: (modId: number, page: number) => invoke<Page<ModUpdate>>("catalog_updates", { modId, page }),
   catalogCategories: (game: string, parent: number | null) =>
     invoke<Category[]>("catalog_categories", { game, parent }),
+  /** Trending mods for the featured gallery (safe-for-work first unless `showNsfw`). */
+  catalogFeatured: (game: string, showNsfw: boolean) => invoke<FeaturedMod[]>("catalog_featured", { game, showNsfw }),
+  /** Download counts for cards, sent to `onStats` one mod at a time (at most 60 ids). */
+  catalogStats: (modIds: number[], onStats: (s: CardStats) => void) => {
+    const channel = new Channel<CardStats>();
+    channel.onmessage = onStats;
+    return invoke<null>("catalog_stats", { modIds, onStats: channel });
+  },
 
   /** Fetches the file into the cache and looks inside, for the install confirmation. */
   prepareInstall: (modId: number, fileId: number | null, onProgress: (p: InstallProgress) => void) => {
@@ -102,6 +112,14 @@ export const api = {
 
   storage: () => invoke<StorageView>("storage"),
   clearDownloadCache: () => invoke<ClearedCache>("clear_download_cache"),
+  clearHttpCache: () => invoke<number>("clear_http_cache"),
+
+  /** Each asks in a native dialog first; resolves false when the user cancels. */
+  openModPage: (modId: number) => invoke<boolean>("open_mod_page", { modId }),
+  openXxmiReleases: () => invoke<boolean>("open_xxmi_releases"),
+  /** A link from rewritten description HTML (`#gmm-link:<key>`). */
+  openLink: (key: string) => invoke<boolean>("open_link", { key }),
+  openModFolder: (game: string, key: ModKey) => invoke<null>("open_mod_folder", { game, key }),
 
   launchPlan: (game: string) => invoke<LaunchInfo>("launch_plan", { game }),
   launch: (game: string, confirm: boolean) => invoke<Launched>("launch", { game, confirm }),

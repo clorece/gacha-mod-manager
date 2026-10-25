@@ -4,7 +4,11 @@
 
 export type CmdError = { "kind": "choose_variant", message: string, variants: Array<string>, } | { "kind": "blocked", message: string, files: Array<string>, } | { "kind": "conflicts", message: string, conflicts: Array<Conflict>, } | { "kind": "not_ready", message: string, } | { "kind": "other", message: string, };
 
-export type GameInfo = { id: string, name: string, short_name: string, importer: string, gamebanana_id: number, };
+export type GameInfo = { id: string, name: string, short_name: string, importer: string, gamebanana_id: number, 
+/**
+ * When GMM's Launch button last started it (Unix seconds).
+ */
+last_played: number | null, };
 
 export type CatalogQuery = { game: string, 
 /**
@@ -26,7 +30,15 @@ folder: string, enabled: boolean, disk: DiskState, variant: string | null, gb_mo
 /**
  * Folders with the same group are versions of one mod (same GameBanana mod and file).
  */
-group: string | null, version: string | null, size_bytes: number, installed_at: number, };
+group: string | null, version: string | null, size_bytes: number, installed_at: number, 
+/**
+ * GameBanana's root category at install, e.g. "Character Skins".
+ */
+root_category: string | null, root_category_id: number | null, 
+/**
+ * The subcategory at install: for skins, the character.
+ */
+category: string | null, category_id: number | null, };
 
 export type LibraryView = { game: string, 
 /**
@@ -131,6 +143,8 @@ checked: number, updates: Array<ModUpdateInfo>,
  * Mods or games that couldn't be checked.
  */
 notes: Array<string>, };
+
+export type CardStats = { mod_id: number, stats: ModStats, };
 
 export type GameStatus = { game_id: string, game_name: string, state: SetupState, 
 /**
@@ -303,6 +317,8 @@ text_html: string, file_ids: Array<number>, };
 
 export type Category = { id: number, name: string, item_count: number, subcategory_count: number, icon_url: string | null, obsolete: boolean, };
 
+export type TopPeriod = "today" | "week" | "month" | "three_months" | "six_months" | "year" | "all_time";
+
 export type DiskState = "enabled" | "disabled" | "missing" | "ambiguous";
 
 export type UnmanagedMod = { name: string, 
@@ -449,7 +465,11 @@ a: number, b: number,
  */
 hashes: number, };
 
-export type Job = { id: number, game: string, mod_id: number, mod_name: string, file_name: string | null, 
+export type Job = { id: number, game: string, mod_id: number, mod_name: string, author: string | null, file_name: string | null, file_size: number | null, 
+/**
+ * The mod's preview, as the caller wants it shown (the app passes a `gmmimg` URL).
+ */
+image: string | null, 
 /**
  * How many versions were chosen (0 when the archive holds one mod).
  */
@@ -474,3 +494,13 @@ installed_file_date: number | null,
  * The newest file GameBanana scanned as clean.
  */
 newest: ModFile, };
+
+export type FeaturedMod = { 
+/**
+ * From the mod page, so the stats include downloads.
+ */
+summary: ModSummary, 
+/**
+ * The trending window it was picked from; `None` for a backfilled mod.
+ */
+period: TopPeriod | null, };

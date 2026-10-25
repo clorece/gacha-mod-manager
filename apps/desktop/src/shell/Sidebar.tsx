@@ -44,6 +44,7 @@ export function Sidebar({
   onScope,
   theme,
   onToggleTheme,
+  activeDownloads,
 }: {
   page: Page;
   onGo: (page: Page) => void;
@@ -52,6 +53,8 @@ export function Sidebar({
   onScope: (scope: Scope) => void;
   theme: "dark" | "light";
   onToggleTheme: () => void;
+  /** Installs queued or running, shown on the Downloads item. */
+  activeDownloads: number;
 }) {
   const other = theme === "dark" ? "light" : "dark";
   return (
@@ -74,6 +77,11 @@ export function Sidebar({
         </NavItem>
         <NavItem page="downloads" current={page} icon="download" onGo={onGo}>
           Downloads
+          {activeDownloads > 0 && (
+            <Badge tone="yellow" title={`${activeDownloads} in the queue`}>
+              {activeDownloads}
+            </Badge>
+          )}
         </NavItem>
         <NavItem page="settings" current={page} icon="sliders" onGo={onGo}>
           Settings
