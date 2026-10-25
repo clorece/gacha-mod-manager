@@ -15,10 +15,13 @@ export function Downloads({
   jobs,
   games,
   onShowLibrary,
+  onInstallFile,
 }: {
   jobs: Job[];
   games: GameInfo[];
   onShowLibrary: (game: string) => void;
+  /** Opens a file dialog for a local archive. */
+  onInstallFile: () => Promise<void>;
 }) {
   const toast = useToast();
   const finished = jobs.filter((j) => ["done", "failed", "cancelled"].includes(j.state.type)).length;
@@ -41,13 +44,21 @@ export function Downloads({
           <h1>Downloads</h1>
           <p>Active and recent installs, grouped by game. Finished ones clear themselves after a few seconds.</p>
         </div>
-        <Button disabled={finished === 0} onClick={() => act(api.queueClearFinished())}>
-          Clear finished
-        </Button>
+        <div className="chips">
+          <Button icon="plus" onClick={() => act(onInstallFile())}>
+            Install from a file
+          </Button>
+          <Button disabled={finished === 0} onClick={() => act(api.queueClearFinished())}>
+            Clear finished
+          </Button>
+        </div>
       </div>
 
       {groups.length === 0 && (
-        <div className="card empty">Nothing downloading. Mods you install from the Mods Store show up here.</div>
+        <div className="card empty">
+          Nothing downloading. Mods you install from the Mods Store show up here. You can also drop a .zip, .7z or .rar
+          on the window.
+        </div>
       )}
 
       {groups.map(({ game, jobs: list }) => (
@@ -110,12 +121,17 @@ function DownloadRow({
     case "installing":
       [line, tone, bar] = [`Installing · ${s.folder}`, "run", "ind"];
       break;
+    case "waiting": {
+      const at = new Date(s.until * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      [line, tone] = [`Waiting · GameBanana asked GMM to slow down · carries on at ${at}`, "wait"];
+      break;
+    }
     case "paused":
       [line, tone] = ["Paused · the part already downloaded is kept", "wait"];
       break;
     case "done":
       [line, tone] = [
-        `Installed · just now${s.installed.length > 1 ? ` · ${plural(s.installed.length, "version")}` : ""} · clears in ${CLEAR_DONE_AFTER_MS / 1000} s`,
+        `${job.action === "change_file" ? "Updated" : "Installed"} · just now${s.installed.length > 1 ? ` · ${plural(s.installed.length, "version")}` : ""} · clears in ${CLEAR_DONE_AFTER_MS / 1000} s`,
         "ok",
       ];
       break;
@@ -151,9 +167,9 @@ function DownloadRow({
         <div className={`dl-state st-${tone}`}>{line}</div>
         {bar !== null && <ProgressBar value={bar === "ind" ? undefined : bar} label={`${job.mod_name}: ${line}`} />}
       </div>
-      {(s.type === "queued" || s.type === "downloading") && (
+      {(s.type === "queued" || s.type === "downloading" || s.type === "waiting") && (
         <>
-          {s.type === "downloading" && (
+          {(s.type === "downloading" || s.type === "waiting") && (
             <IconButton icon="pause" label="Pause" onClick={() => act(api.queuePause(job.id))} />
           )}
           <IconButton icon="close" label="Cancel" onClick={() => act(api.queueCancel(job.id))} />

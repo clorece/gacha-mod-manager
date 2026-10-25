@@ -7,8 +7,9 @@
 //! object is often serialized as `[]`. The raw types below therefore deserialize every field
 //! leniently and fall back to defaults instead of failing the whole response.
 
-use std::sync::Arc;
-use std::time::Duration;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, PoisonError, Weak};
+use std::time::{Duration, Instant};
 
 use gmm_net::Client;
 use serde::de::DeserializeOwned;
@@ -28,10 +29,20 @@ const TTL_DETAIL: Duration = Duration::from_secs(60 * 60);
 const TTL_FILES: Duration = Duration::from_secs(2 * 60);
 const TTL_CATEGORIES: Duration = Duration::from_secs(24 * 60 * 60);
 
+/// The oldest saved answer served while GameBanana is unreachable, failing or has asked GMM
+/// to slow down (the database keeps responses this long).
+const STALE_MAX: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+
+type UrlLocks = Mutex<HashMap<String, Weak<tokio::sync::Mutex<()>>>>;
+
 pub struct GameBanana {
     net: Client,
     base: Url,
     cache: Arc<dyn HttpCache>,
+    /// One request per URL at a time (see [`GameBanana::fetch`]).
+    in_flight: UrlLocks,
+    /// When a saved answer was last served instead of a fresh one.
+    served_saved: Mutex<Option<Instant>>,
 }
 
 impl GameBanana {
@@ -46,7 +57,56 @@ impl GameBanana {
     /// For tests against a mock server. The network client's allowlist still applies, so
     /// this cannot point GMM anywhere a release build couldn't already reach.
     pub fn with_base_url(net: Client, cache: Arc<dyn HttpCache>, base: Url) -> Self {
-        Self { net, base, cache }
+        Self {
+            net,
+            base,
+            cache,
+            in_flight: UrlLocks::default(),
+            served_saved: Mutex::new(None),
+        }
+    }
+
+    /// Whether a saved answer stood in for a fresh one within `window` (the app shows a
+    /// notice then).
+    pub fn served_saved_data_within(&self, window: Duration) -> bool {
+        self.served_saved
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .is_some_and(|at| at.elapsed() <= window)
+    }
+
+    /// How long GMM still holds off GameBanana, if it was asked to slow down.
+    pub fn cooldown_remaining(&self) -> Option<Duration> {
+        self.net.cooldown_remaining()
+    }
+
+    fn url_lock(&self, url: &str) -> Arc<tokio::sync::Mutex<()>> {
+        let mut locks = self
+            .in_flight
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        locks.retain(|_, held| held.strong_count() > 0);
+        if let Some(lock) = locks.get(url).and_then(Weak::upgrade) {
+            return lock;
+        }
+        let lock = Arc::new(tokio::sync::Mutex::new(()));
+        locks.insert(url.to_owned(), Arc::downgrade(&lock));
+        lock
+    }
+
+    /// A saved answer of any age the cache still has, for when GameBanana can't answer.
+    async fn saved<T>(
+        &self,
+        url: &Url,
+        decode: impl Fn(&[u8]) -> Result<T, CatalogError>,
+    ) -> Option<T> {
+        let body = self.cache.get(url.as_str(), STALE_MAX).await?;
+        let value = decode(&body).ok()?;
+        *self
+            .served_saved
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(Instant::now());
+        Some(value)
     }
 
     fn endpoint(&self, path: &str, query: &[(&str, String)]) -> Result<Url, CatalogError> {
@@ -78,7 +138,26 @@ impl GameBanana {
         {
             return Ok(value);
         }
-        let resp = self.net.get(&url).await?;
+        // One request per URL at a time: a second caller for the same page (two parts of the
+        // UI, a double-run effect) waits, then finds the first one's answer in the cache.
+        let lock = self.url_lock(url.as_str());
+        let _one_at_a_time = lock.lock().await;
+        if let Some(body) = self.cache.get(url.as_str(), ttl).await
+            && let Ok(value) = decode(&body)
+        {
+            return Ok(value);
+        }
+        let resp = match self.net.get(&url).await {
+            Ok(resp) => resp,
+            // Unreachable, failing or asked to slow down: an older answer beats none.
+            Err(e) if e.is_temporary() => {
+                return match self.saved(&url, decode).await {
+                    Some(value) => Ok(value),
+                    None => Err(e.into()),
+                };
+            }
+            Err(e) => return Err(e.into()),
+        };
         match resp.status {
             200..=299 => {
                 let value = decode(&resp.body)?;
@@ -134,8 +213,16 @@ impl CatalogSource for GameBanana {
     }
 
     async fn mod_files(&self, mod_id: u64) -> Result<ModFiles, CatalogError> {
+        self.mod_files_within(mod_id, TTL_FILES).await
+    }
+
+    async fn mod_files_within(
+        &self,
+        mod_id: u64,
+        max_age: Duration,
+    ) -> Result<ModFiles, CatalogError> {
         let url = self.endpoint(&format!("Mod/{mod_id}/DownloadPage"), &[])?;
-        let raw: RawDownloadPage = self.fetch(url, TTL_FILES, "mod files").await?;
+        let raw: RawDownloadPage = self.fetch(url, max_age, "mod files").await?;
         Ok(map_files(raw.files, raw.archived_files))
     }
 

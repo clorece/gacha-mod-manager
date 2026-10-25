@@ -42,6 +42,15 @@ pub trait CatalogSource: Send + Sync {
     fn mod_files(&self, mod_id: u64)
     -> impl Future<Output = Result<ModFiles, CatalogError>> + Send;
 
+    /// Like [`mod_files`](Self::mod_files), but a saved answer up to `max_age` old will do
+    /// (the startup update check, which would otherwise ask about every installed mod on
+    /// every start).
+    fn mod_files_within(
+        &self,
+        mod_id: u64,
+        max_age: std::time::Duration,
+    ) -> impl Future<Output = Result<ModFiles, CatalogError>> + Send;
+
     fn mod_updates(
         &self,
         mod_id: u64,

@@ -6,6 +6,16 @@ use gmm_db::DbError;
 use gmm_fsguard::{FsError, PathError};
 use gmm_net::NetError;
 
+impl CoreError {
+    /// For GameBanana asking GMM to slow down: how long until it may be asked again.
+    pub fn retry_in(&self) -> Option<std::time::Duration> {
+        match self {
+            Self::Net(e) | Self::Catalog(CatalogError::Net(e)) => e.retry_in(),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum CoreError {
     #[error(transparent)]
@@ -27,6 +37,16 @@ pub enum CoreError {
     #[error("file error: {0}")]
     Io(String),
 
+    #[error("{0}")]
+    BadProfile(String),
+    #[error("can't adopt this mod: {0}")]
+    CantAdopt(String),
+    #[error("can't install from this file: {0}")]
+    CantInstallLocal(String),
+    #[error("GameBanana mod {gb_mod_id} isn't installed for {game}")]
+    NotInstalled { gb_mod_id: u64, game: String },
+    #[error("{changed} folder(s) moved to the new file, then: {message}")]
+    PartlyChanged { changed: usize, message: String },
     #[error("mod {mod_id} has no file {file_id}")]
     NoSuchFile { mod_id: u64, file_id: u64 },
     #[error("mod {0} has no file that GameBanana has scanned as clean")]

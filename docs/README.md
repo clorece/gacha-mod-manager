@@ -10,7 +10,8 @@ Development happens on Windows (primary target). Linux follows later from the sa
 ## Where we are (2026-10-25)
 
 **Done:** the backend (Phases 0–2), the app foundations (Phase 3) and the design (Phase 4),
-2026-10-23 to 25. Phase 5 is under way (below).
+2026-10-23 to 25. Phase 5 (screens) is under way, and Phase 6 (power features) started
+alongside it on 2026-10-25 (below).
 Every feature works from the `gmm` command line: browse GameBanana, install (download, safe
 extraction, policy scan, variants), switch mods on and off, uninstall to the Recycle Bin,
 conflicts, storage, launch through XXMI. The Phase 2 exit check passed in game. The app window
@@ -27,18 +28,18 @@ design canvas is in the code: tokens for both themes, bundled Nunito, hand-built
 | Crate | What it does |
 |---|---|
 | `gmm-fsguard` | Every file access: registered read-only/read-write roots, safe relative paths, junction/symlink escape checks, denylist for secrets |
-| `gmm-net` | Every network request: GameBanana-only allowlist (every redirect hop), rate limiting, retries, verified resumable downloads |
+| `gmm-net` | Every network request: GameBanana-only allowlist (every redirect hop), rate limiting, one shared "slow down" cooldown for all clients, verified resumable downloads |
 | `gmm-archive` | Safe zip/7z/rar extraction (two-pass checks, bomb limits) and a policy scan of what came out; starts the RAR helper |
 | `gmm-extract` | The RAR helper: a separate, sandboxed program with RARLAB's UnRAR that streams entries to GMM and never writes a file |
-| `gmm-catalog` | GameBanana client: list, search, mod page, files, updates, categories |
+| `gmm-catalog` | GameBanana client: list, search, mod page, files, updates, categories, trending, counters; saved answers stand in when GameBanana can't answer |
 | `gmm-adapters` | The ZZZ and WuWa manifests and their validation |
 | `gmm-detect` | Finds games: Steam, HoYoPlay, Epic, manual folders |
 | `gmm-xxmi` | Reads XXMI's setup (allowlisted config fields only) and works out each game's setup state |
 | `gmm-migoto` | Reads 3DMigoto mod `.ini` files: override hashes, what they replace, namespaces, key bindings |
-| `gmm-db` | SQLite database (`%APPDATA%\GMM\gmm.db`): settings, manual game folders, installed mods, download cache, GameBanana response cache |
-| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`, in one go or in two steps with an install plan; one download per file at a time), the install queue and stop signal, versions (grouping, switching), the update check, the featured gallery (trending, backfilled), the library (list with disk state, unmanaged mods, enable/disable, open folder, uninstall to the Recycle Bin), conflict detection, storage accounting, launching through XXMI (with exe confirmation, recording "last played"), app folders, the image cache behind `gmmimg` |
+| `gmm-db` | SQLite database (`%APPDATA%\GMM\gmm.db`): settings, manual game folders, installed mods (with categories), last played, profiles, download cache, GameBanana response cache |
+| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`, in one go or in two steps with an install plan; one download per file at a time), the install queue and stop signal, versions (grouping, switching), the update check, the featured gallery (trending, backfilled), the library (list with disk state, unmanaged mods, enable/disable, open folder, uninstall to the Recycle Bin), update and roll back, profiles, key bindings, adopting hand-installed mods, installing from a local archive, conflict detection, storage accounting, launching through XXMI (with exe confirmation, recording "last played"), app folders, the image cache behind `gmmimg` |
 | `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, a command per CLI action plus the install confirmation, queue, versions, startup check, featured mods, card stats and the confirmed openers (ids only), the queue worker, the `gmmimg` protocol, the description address rewrite, navigation guard; the React UI is in `apps/desktop/src` |
-| `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm list`, `gmm enable/disable/uninstall`, `gmm conflicts`, `gmm storage`, `gmm launch`, `gmm detect`, `gmm status`, `gmm config` |
+| `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm install-file`, `gmm list`, `gmm enable/disable/uninstall`, `gmm update`, `gmm rollback`, `gmm keys`, `gmm adopt`, `gmm profile …`, `gmm conflicts`, `gmm storage`, `gmm launch`, `gmm detect`, `gmm status`, `gmm config` |
 
 On the dev machine, `gmm status` and the app report ZZZ `Ready` (HoYoPlay install) and WuWa
 `Ready` (Steam install; its Steam copy runs with XXMI's Game Launch on Direct).
@@ -47,10 +48,10 @@ On the dev machine, `gmm status` and the app report ZZZ `Ready` (HoYoPlay instal
 2026-10-25) is written up in [08-design-system.md](08-design-system.md); file formats and the
 RAR plan in [09-archive-formats.md](09-archive-formats.md).
 
-**Waiting on you:** the game banner source (see 08); whether description images on
-GameBanana's own file hosts (`filecacheNN.gamebanana.com`, `files.gamebanana.com`) may be
-shown (only `images.gamebanana.com` is today); screenshots of each XXMI setup step, for the
-setup guide; the product name, if it changes.
+**Waiting on you:** the game banner source (see 08); whether profiles may snapshot and
+restore `d3dx_user.ini` (an R3 amendment: GMM would write that one file in each importer
+folder); screenshots of each XXMI setup step, for the setup guide; the product name, if it
+changes.
 
 **Phase 5** (started 2026-10-24): **RAR works.** GMM extracts RAR4 and RAR5 through
 `gmm-extract`, a separate sandboxed helper with RARLAB's UnRAR 7.23 that streams entries
@@ -76,9 +77,25 @@ fetches of the same file at once collided on its partial file (now one download 
 The first Linux CI run (2026-10-25) built the RAR helper with g++ and passed its 19 RAR
 cases.
 
-**Next:** the Dashboard and setup guide polish, then the Mods Store, which gives the
-install confirmation its Download buttons (today it opens from the dev style guide). See
-the roadmap.
+**GameBanana API** (2026-10-25, [10](10-gamebanana-api.md)): no permission or key is needed
+for what GMM does (checked: the Terms of Service, Site Rules and a site moderator's answer
+to the same question); only 1-click buttons on mod pages would need GameBanana to add GMM.
+GMM now treats a "slow down" (429, 503 with `Retry-After`, a Cloudflare challenge) as a
+pause for all of its GameBanana traffic, shows saved data and a notice meanwhile, and the
+install queue waits and carries on. Background reads share the API budget, identical
+requests are merged, and the startup update check accepts answers up to 6 h old.
+Description images from GameBanana's own file hosts are shown now.
+
+**Phase 6** (started 2026-10-25): update and roll back (folder names and on/off states
+kept, previous files from the cache), profiles with share codes, key bindings, adopting
+hand-installed mods, and installing from a local archive (drop on the window or a file
+dialog). Each works from the `gmm` command line and in the app (Mod settings panel,
+Profiles panel, Downloads); update, roll back, key bindings, profiles and adopt suggestions
+were tried in the real window against the real XXMI setup (and cleaned up afterwards).
+
+**Next:** the remaining Phase 5 screens (Dashboard and setup guide polish, the Mods Store,
+which gives the install confirmation its Download buttons, the mod page, Settings), and
+Phase 6's rest (Report a Bug, deep links if GameBanana adds GMM). See the roadmap.
 
 ## Docs
 
@@ -92,6 +109,7 @@ the roadmap.
 | [07-frontend-design.md](07-frontend-design.md) | Screens: what each one shows (store, mod page, library, conflicts, storage, setup) |
 | [08-design-system.md](08-design-system.md) | Navigation, screen layouts, tokens (dark and light), type, motion, data constraints on the design |
 | [09-archive-formats.md](09-archive-formats.md) | Which archive formats GMM installs from, error messages, and the RAR plan |
+| [10-gamebanana-api.md](10-gamebanana-api.md) | GameBanana's terms (no permission needed), rate limits per IP, how GMM backs off and keeps its load low, API limits users meet |
 | [brand/](brand/) | The GMM mark and lockups, and how to use them |
 | [../crates/gmm-adapters/games/](../crates/gmm-adapters/games/) | The game manifests for ZZZ and WuWa |
 | `research/` (local only, git-ignored) | Prior-art notes and Phase 0 observations |

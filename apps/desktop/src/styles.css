@@ -1112,6 +1112,10 @@ dialog.drawer[open] {
   overflow-y: auto;
   padding: 28px 36px 48px;
 }
+/* The GameBanana notice (NetworkNotice) sits above the page heading. */
+.main > .notice:first-child {
+  margin-bottom: 18px;
+}
 .page-head {
   display: flex;
   align-items: flex-end;
@@ -1656,6 +1660,67 @@ dialog.drawer[open] {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* ---- Phase 6 panels: Mod settings extras, profiles, adopt ---- */
+
+.xr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.xr-row b {
+  font-weight: 800;
+}
+.xr-input {
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text);
+  font-weight: 700;
+}
+.xr-input::placeholder {
+  color: var(--muted);
+}
+.xr-code {
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 14px;
+  resize: vertical;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12.5px;
+}
+.xr-thumb {
+  width: 56px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.action {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--text);
+  text-align: left;
+}
+.action:hover {
+  border-color: var(--accent);
+}
+.action b {
+  font-size: 13.5px;
+  font-weight: 800;
 }
 
 /* ---- Downloads (08, "Downloads") ---- */

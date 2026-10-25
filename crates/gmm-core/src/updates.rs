@@ -13,6 +13,10 @@ use serde::Serialize;
 
 use crate::error::CoreError;
 
+/// The startup check accepts a mod's file list saved this recently instead of asking again,
+/// so starting GMM a few times a day doesn't ask about every installed mod each time.
+const UPDATE_CHECK_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
+
 /// A GameBanana mod with a newer file than the installed one.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -71,7 +75,10 @@ pub async fn check_updates<C: CatalogSource>(
     };
     for (gb_mod_id, rows) in by_mod {
         let name = rows[0].name.clone();
-        let files = match catalog.mod_files(gb_mod_id).await {
+        let files = match catalog
+            .mod_files_within(gb_mod_id, UPDATE_CHECK_MAX_AGE)
+            .await
+        {
             Ok(files) => files,
             Err(e) => {
                 check.notes.push(format!("{name} (mod {gb_mod_id}): {e}"));

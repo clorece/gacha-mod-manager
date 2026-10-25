@@ -20,7 +20,7 @@ use crate::error::CoreError;
 use crate::workspace::Workspace;
 
 /// `.ini` files above this size aren't read for markers.
-const MAX_INI_BYTES: u64 = 4 * 1024 * 1024;
+pub(crate) const MAX_INI_BYTES: u64 = 4 * 1024 * 1024;
 
 /// One installable mod inside an archive.
 #[derive(Debug, Clone, PartialEq, Eq)]

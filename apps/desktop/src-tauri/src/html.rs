@@ -5,10 +5,10 @@
 //! This is not the sanitizer: the webview runs the result through DOMPurify (strict
 //! allowlist), and the CSP stops anything that slips through from loading. What happens here
 //! is that every address leaves the HTML before the webview sees it: image `src`s become
-//! `gmmimg` URLs for keys (GameBanana's image host only; others are dropped), link `href`s
-//! become `#gmm-link:<key>` for the `open_link` command, and `srcset` is dropped. The scanner
-//! walks tags and their attributes (quoted, single-quoted or bare values) and leaves
-//! everything else, text and comments included, as it was.
+//! `gmmimg` URLs for keys (GameBanana's image and file hosts only; others are dropped),
+//! link `href`s become `#gmm-link:<key>` for the `open_link` command, and `srcset` is
+//! dropped. The scanner walks tags and their attributes (quoted, single-quoted or bare
+//! values) and leaves everything else, text and comments included, as it was.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, PoisonError};

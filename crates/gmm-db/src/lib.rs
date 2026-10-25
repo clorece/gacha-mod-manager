@@ -16,6 +16,7 @@ mod downloads;
 mod error;
 mod http_cache;
 mod mods;
+mod profiles;
 mod settings;
 
 use std::str::FromStr;
@@ -30,7 +31,8 @@ use sqlx::sqlite::{
 
 pub use downloads::{CachedDownload, NewCachedDownload};
 pub use error::DbError;
-pub use mods::{InstalledMod, ModCategories, NewInstalledMod};
+pub use mods::{FileChange, InstalledMod, ModCategories, NewInstalledMod};
+pub use profiles::ProfileRow;
 pub use settings::ManualGameFolder;
 
 /// The database's file name inside GMM's data folder.
@@ -48,6 +50,11 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
         2,
         "categories_last_played",
         include_str!("../migrations/0002_categories_last_played.sql"),
+    ),
+    (
+        3,
+        "profiles",
+        include_str!("../migrations/0003_profiles.sql"),
     ),
 ];
 

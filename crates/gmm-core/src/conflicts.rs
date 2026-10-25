@@ -27,7 +27,7 @@ use crate::names::{GMM_DIR, on_disk_name};
 use crate::workspace::Workspace;
 
 /// Stop reading a mod after this many files; its index is then marked incomplete.
-const MAX_FILES_PER_MOD: usize = 20_000;
+pub(crate) const MAX_FILES_PER_MOD: usize = 20_000;
 
 /// A mod in a conflict report.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]

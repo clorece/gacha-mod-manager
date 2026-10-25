@@ -3,11 +3,12 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use reqwest::header::RETRY_AFTER;
+use reqwest::header::{HeaderMap, RETRY_AFTER};
 use tokio::time::sleep;
 use url::Url;
 
 use crate::allowlist::{Allowlist, redact};
+use crate::cooldown::{Cooldown, WAIT_OUT};
 use crate::error::NetError;
 use crate::limiter::{Limiter, RateLimit};
 
@@ -55,12 +56,26 @@ impl HttpResponse {
     }
 }
 
-/// Cheap to clone; clones share the connection pool and the rate limiter.
+/// Cheap to clone; clones share the connection pool, the rate limiter and the slow-down
+/// state. [`Client::sibling`] makes a client for another kind of traffic that shares the
+/// pool and the slow-down state but has its own rate.
 #[derive(Debug, Clone)]
 pub struct Client {
     pub(crate) http: reqwest::Client,
     pub(crate) config: Arc<NetConfig>,
     pub(crate) limiter: Arc<Limiter>,
+    /// The parent's limiter, for a sibling that spends the parent's budget too.
+    pub(crate) budget: Option<Arc<Limiter>>,
+    pub(crate) cooldown: Arc<Cooldown>,
+}
+
+/// What GameBanana said about GMM's request rate, for the app's notice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Slowdown {
+    /// HTTP 429, or a 503 with `Retry-After`.
+    RateLimited,
+    /// Cloudflare's browser check (`cf-mitigated: challenge`), which GMM can't pass.
+    Challenged,
 }
 
 impl Client {
@@ -89,21 +104,80 @@ impl Client {
         Ok(Self {
             http,
             limiter: Arc::new(Limiter::new(config.rate_limit)),
+            budget: None,
             config: Arc::new(config),
+            cooldown: Arc::new(Cooldown::default()),
         })
+    }
+
+    /// A client for another kind of traffic (background reads, images) with its own rate
+    /// limit, sharing this one's connections and slow-down state. With `share_budget` its
+    /// requests also spend this client's tokens, so the two together stay within this
+    /// client's rate (used for background API reads, which must never add to the API load).
+    pub fn sibling(&self, rate_limit: RateLimit, share_budget: bool) -> Client {
+        Client {
+            http: self.http.clone(),
+            config: self.config.clone(),
+            limiter: Arc::new(Limiter::new(rate_limit)),
+            budget: share_budget.then(|| self.limiter.clone()),
+            cooldown: self.cooldown.clone(),
+        }
     }
 
     pub fn config(&self) -> &NetConfig {
         &self.config
     }
 
-    /// GET for API calls: allowlisted, rate-limited, retried on 429/5xx/connection errors,
-    /// size-capped. Other statuses (including 4xx) are returned for the caller to interpret.
+    /// How long GMM still holds off GameBanana after it asked GMM to slow down.
+    pub fn cooldown_remaining(&self) -> Option<Duration> {
+        self.cooldown.remaining()
+    }
+
+    /// Waits for this client's tokens (and its parent's, for a sibling sharing the budget).
+    pub(crate) async fn acquire(&self) {
+        self.limiter.acquire().await;
+        if let Some(budget) = &self.budget {
+            budget.acquire().await;
+        }
+    }
+
+    /// Fails at once while GameBanana has asked GMM to hold off, except for a pause about to
+    /// end, which is waited out.
+    pub(crate) async fn respect_cooldown(&self) -> Result<(), NetError> {
+        match self.cooldown.remaining() {
+            None => Ok(()),
+            Some(left) if left <= WAIT_OUT => {
+                sleep(left).await;
+                Ok(())
+            }
+            Some(left) => Err(NetError::SlowDown {
+                why: Slowdown::RateLimited,
+                retry_in: left,
+            }),
+        }
+    }
+
+    /// Turns a "slow down" answer into a strike and its error; `None` for any other answer.
+    pub(crate) fn slowdown(&self, status: u16, headers: &HeaderMap) -> Option<NetError> {
+        let why = slowdown_kind(status, headers)?;
+        let retry_in = self.cooldown.strike(retry_after(headers));
+        Some(NetError::SlowDown { why, retry_in })
+    }
+
+    pub(crate) fn succeeded(&self) {
+        self.cooldown.clear();
+    }
+
+    /// GET for API calls: allowlisted, rate-limited, size-capped; retried on 5xx and
+    /// connection errors. A "slow down" (429, a 503 with `Retry-After`, a Cloudflare
+    /// challenge) is not retried: it pauses every sibling client ([`NetError::SlowDown`]).
+    /// Other statuses (including 4xx) are returned for the caller to interpret.
     pub async fn get(&self, url: &Url) -> Result<HttpResponse, NetError> {
         self.config.allowlist.check(url)?;
         let mut attempt = 0;
         loop {
-            self.limiter.acquire().await;
+            self.respect_cooldown().await?;
+            self.acquire().await;
             let sent = self
                 .http
                 .get(url.clone())
@@ -113,9 +187,12 @@ impl Client {
             match sent {
                 Ok(resp) => {
                     let status = resp.status().as_u16();
-                    let retryable = status == 429 || status >= 500;
+                    if let Some(slow_down) = self.slowdown(status, resp.headers()) {
+                        return Err(slow_down);
+                    }
+                    let retryable = status >= 500;
                     if retryable && attempt < self.config.max_retries {
-                        let wait = retry_after(&resp).unwrap_or_else(|| backoff(attempt));
+                        let wait = backoff(attempt);
                         attempt += 1;
                         sleep(wait.min(self.config.max_backoff)).await;
                         continue;
@@ -127,6 +204,9 @@ impl Client {
                         });
                     }
                     let body = read_capped(resp, url, self.config.max_body_bytes).await?;
+                    if (200..300).contains(&status) {
+                        self.succeeded();
+                    }
                     return Ok(HttpResponse { status, body });
                 }
                 Err(e)
@@ -145,9 +225,23 @@ fn backoff(attempt: u32) -> Duration {
     Duration::from_secs(1u64 << attempt.min(6))
 }
 
-fn retry_after(resp: &reqwest::Response) -> Option<Duration> {
-    let value = resp.headers().get(RETRY_AFTER)?.to_str().ok()?;
+/// `Retry-After` in seconds (the HTTP-date form isn't used by GameBanana's servers).
+fn retry_after(headers: &HeaderMap) -> Option<Duration> {
+    let value = headers.get(RETRY_AFTER)?.to_str().ok()?;
     value.trim().parse::<u64>().ok().map(Duration::from_secs)
+}
+
+fn slowdown_kind(status: u16, headers: &HeaderMap) -> Option<Slowdown> {
+    let challenged = headers
+        .get("cf-mitigated")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.eq_ignore_ascii_case("challenge"));
+    match status {
+        403 | 503 if challenged => Some(Slowdown::Challenged),
+        429 => Some(Slowdown::RateLimited),
+        503 if retry_after(headers).is_some() => Some(Slowdown::RateLimited),
+        _ => None,
+    }
 }
 
 async fn read_capped(

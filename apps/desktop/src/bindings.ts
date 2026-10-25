@@ -146,6 +146,22 @@ notes: Array<string>, };
 
 export type CardStats = { mod_id: number, stats: ModStats, };
 
+export type NetworkStatus = { 
+/**
+ * Seconds until GMM asks GameBanana again, while it holds off after a "slow down".
+ */
+cooldown_secs: number | null, 
+/**
+ * Saved answers stood in for fresh ones in the last minute and a half.
+ */
+showing_saved: boolean, };
+
+export type RollbackFile = { file_id: number, name: string, 
+/**
+ * Upload date (Unix seconds), when GameBanana still lists the file.
+ */
+date_added: number | null, version: string | null, };
+
 export type GameStatus = { game_id: string, game_name: string, state: SetupState, 
 /**
  * One sentence for the user.
@@ -465,7 +481,7 @@ a: number, b: number,
  */
 hashes: number, };
 
-export type Job = { id: number, game: string, mod_id: number, mod_name: string, author: string | null, file_name: string | null, file_size: number | null, 
+export type Job = { id: number, action: JobAction, game: string, mod_id: number, mod_name: string, author: string | null, file_name: string | null, file_size: number | null, 
 /**
  * The mod's preview, as the caller wants it shown (the app passes a `gmmimg` URL).
  */
@@ -479,7 +495,7 @@ versions: number, state: JobState,
  */
 queued_at: number, finished_at: number | null, };
 
-export type JobState = { "type": "queued" } | { "type": "downloading", downloaded: number, total: number | null, } | { "type": "extracting" } | { "type": "installing", folder: string, } | { "type": "paused" } | { "type": "done", installed: Array<InstalledFolder>, } | { "type": "failed", message: string, } | { "type": "cancelled" };
+export type JobState = { "type": "queued" } | { "type": "downloading", downloaded: number, total: number | null, } | { "type": "extracting" } | { "type": "installing", folder: string, } | { "type": "waiting", until: number, } | { "type": "paused" } | { "type": "done", installed: Array<InstalledFolder>, } | { "type": "failed", message: string, } | { "type": "cancelled" };
 
 export type ModUpdateInfo = { game: string, gb_mod_id: number, name: string, 
 /**
@@ -504,3 +520,95 @@ summary: ModSummary,
  * The trending window it was picked from; `None` for a backfilled mod.
  */
 period: TopPeriod | null, };
+
+export type JobAction = "install" | "change_file";
+
+export type ModKeyBinding = { 
+/**
+ * The `.ini` it's in, relative to the mod's folder (`/` separators).
+ */
+ini: string, 
+/**
+ * The section name without `Key` (`[KeySwap]` -> `Swap`), else as written.
+ */
+name: string, 
+/**
+ * The keys that trigger it, as written (`VK_LEFT`, `no_modifiers ctrl 1`).
+ */
+keys: Array<string>, 
+/**
+ * Keys that step backwards through a cycle.
+ */
+back: Array<string>, 
+/**
+ * `cycle`, `toggle`, `hold` or `activate`, when the section says.
+ */
+kind: string | null, };
+
+export type KeyBindings = { bindings: Array<ModKeyBinding>, 
+/**
+ * Files that couldn't be read or were too large, as text.
+ */
+notes: Array<string>, };
+
+export type ProfileInfo = { id: number, game: string, name: string, 
+/**
+ * How many mods it switches on.
+ */
+mods: number, updated_at: number, };
+
+export type ProfileApplied = { switched_on: Array<string>, switched_off: Array<string>, 
+/**
+ * Mods in the profile that aren't in the Mods folder any more.
+ */
+missing: Array<string>, };
+
+export type SharedMod = { gb_mod_id: number, gb_file_id: number | null, variant: string | null, name: string, };
+
+export type ProfileImported = { profile: ProfileInfo, 
+/**
+ * Shared mods this GMM doesn't have; install them, then import again.
+ */
+missing: Array<SharedMod>, };
+
+export type MatchReason = "sidecar" | "id_in_name" | "search";
+
+export type AdoptCandidate = { summary: ModSummary, reason: MatchReason, 
+/**
+ * The file the folder's `gmm.json` names, for a [`MatchReason::Sidecar`] match.
+ */
+file_id: number | null, };
+
+export type Adopted = { id: number, folder_name: string, 
+/**
+ * It was moved into `Mods/GMM/` (its in-game toggle state starts over).
+ */
+moved: boolean, };
+
+export type FileChangeReport = { game: string, gb_mod_id: number, mod_name: string, 
+/**
+ * The file the mod is on now.
+ */
+file: ModFile, changed: Array<ChangedFolder>, 
+/**
+ * Folders left as they were: their version isn't in the new file, or they already
+ * were on it.
+ */
+kept: Array<string>, 
+/**
+ * Previous folders that couldn't be moved to the Recycle Bin (left in the staging
+ * folder, which GMM clears after an hour).
+ */
+not_trashed: Array<string>, };
+
+export type ChangedFolder = { id: number, folder_name: string, enabled: boolean, files: number, bytes: number, 
+/**
+ * Blocked files in the new file that were left out.
+ */
+skipped: Array<string>, };
+
+export type LocalPlan = { game: string, name: string, file_name: string, archive_bytes: number, 
+/**
+ * The mod kind, or `None` when nothing in the archive is a mod for this game.
+ */
+kind: string | null, versions: Array<VersionPlan>, version_conflicts: Array<VersionConflict>, install_to: string, };

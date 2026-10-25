@@ -353,6 +353,78 @@ async fn failed_responses_are_not_cached() {
     assert!(gb.mod_profile(900001).await.is_ok());
 }
 
+#[tokio::test]
+async fn the_same_page_asked_twice_at_once_is_fetched_once() {
+    let server = MockServer::start().await;
+    serve(
+        &server,
+        "/apiv11/Mod/900001/ProfilePage",
+        "mod_profile.json",
+    )
+    .await;
+    let gb = catalog(&server, Arc::new(MemoryCache::default()));
+    let (a, b) = tokio::join!(gb.mod_profile(900001), gb.mod_profile(900001));
+    assert_eq!(a.unwrap().summary.id, b.unwrap().summary.id);
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
+}
+
+/// A cache holding mod 900001's page, two hours old: too old for a mod page (one hour),
+/// fine as a stand-in when GameBanana can't answer.
+struct TwoHoursOld(String);
+
+impl gmm_catalog::HttpCache for TwoHoursOld {
+    fn get<'a>(
+        &'a self,
+        key: &'a str,
+        max_age: Duration,
+    ) -> gmm_catalog::CacheFuture<'a, Option<Vec<u8>>> {
+        let hit = (key.contains("/Mod/900001/") && max_age > Duration::from_secs(2 * 3600))
+            .then(|| self.0.clone().into_bytes());
+        Box::pin(async move { hit })
+    }
+
+    fn put<'a>(&'a self, _: &'a str, _: Vec<u8>) -> gmm_catalog::CacheFuture<'a, ()> {
+        Box::pin(async {})
+    }
+}
+
+#[tokio::test]
+async fn saved_answers_stand_in_when_gamebanana_says_slow_down() {
+    let server = MockServer::start().await;
+    Mock::given(path("/apiv11/Mod/900001/ProfilePage"))
+        .respond_with(ResponseTemplate::new(429))
+        .mount(&server)
+        .await;
+    let gb = catalog(&server, Arc::new(TwoHoursOld(fixture("mod_profile.json"))));
+    assert!(!gb.served_saved_data_within(Duration::from_secs(60)));
+    let profile = gb.mod_profile(900001).await.unwrap();
+    assert_eq!(profile.summary.id, 900001);
+    assert!(gb.served_saved_data_within(Duration::from_secs(60)));
+    assert!(gb.cooldown_remaining().is_some());
+
+    // Nothing saved: the slow-down reaches the caller, without another request.
+    let err = gb.mod_profile(900002).await.unwrap_err();
+    assert!(
+        matches!(&err, CatalogError::Net(e) if e.retry_in().is_some()),
+        "{err}"
+    );
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn a_404_is_never_answered_from_saved_data() {
+    let server = MockServer::start().await;
+    Mock::given(path("/apiv11/Mod/900001/ProfilePage"))
+        .respond_with(ResponseTemplate::new(404).set_body_string("{}"))
+        .mount(&server)
+        .await;
+    let gb = catalog(&server, Arc::new(TwoHoursOld(fixture("mod_profile.json"))));
+    assert!(matches!(
+        gb.mod_profile(900001).await,
+        Err(CatalogError::NotFound)
+    ));
+}
+
 // ---- live API (ignored by default) -----------------------------------------------------------
 
 fn live() -> GameBanana {

@@ -26,6 +26,14 @@ use crate::error::CoreError;
 /// (observed in API responses: `/img/ss/`, `/img/av/`, `/img/ico/`).
 pub const IMAGE_HOST: &str = "images.gamebanana.com";
 
+/// Images in mod descriptions also come from GameBanana's file hosts (observed 2026-10-25:
+/// `files.gamebanana.com` and numbered `filecacheNN.gamebanana.com` mirrors). They serve mod
+/// archives too, so what comes back is still only kept when it sniffs as an image, and the
+/// client's body cap (8 MiB) bounds any mistake.
+const FILE_HOST: &str = "files.gamebanana.com";
+const FILE_MIRROR_PREFIX: &str = "filecache";
+const GAMEBANANA_DOMAIN: &str = ".gamebanana.com";
+
 /// When the cache grows past this, the oldest images are removed.
 pub const MAX_IMAGE_CACHE_BYTES: u64 = 512 * 1024 * 1024;
 
@@ -80,8 +88,8 @@ impl ImageCache {
     }
 
     /// The key for a GameBanana image URL, remembered so [`get`](Self::get) may fetch it.
-    /// `None` for anything that isn't an HTTPS URL on [`IMAGE_HOST`] (the caller then shows
-    /// no image).
+    /// `None` for anything that isn't an HTTPS URL on [`IMAGE_HOST`] or GameBanana's file
+    /// hosts (the caller then shows no image).
     pub fn register(&self, url: &str) -> Option<String> {
         let parsed = Url::parse(url).ok()?;
         if !image_url_allowed(&parsed) || self.net.config().allowlist.check(&parsed).is_err() {
@@ -166,10 +174,12 @@ impl ImageCache {
 }
 
 fn image_url_allowed(url: &Url) -> bool {
-    if url
-        .host_str()
-        .is_some_and(|h| h.eq_ignore_ascii_case(IMAGE_HOST))
-    {
+    let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+    let mirror = host
+        .strip_suffix(GAMEBANANA_DOMAIN)
+        .and_then(|label| label.strip_prefix(FILE_MIRROR_PREFIX))
+        .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
+    if url.scheme() == "https" && (host == IMAGE_HOST || host == FILE_HOST || mirror) {
         return true;
     }
     // Unit tests serve images from a local mock server.
@@ -249,9 +259,22 @@ mod tests {
             .register("https://images.gamebanana.com/img/ss/mods/x.jpg")
             .unwrap();
         assert!(is_key(&key));
+        for description_host in [
+            "https://files.gamebanana.com/bitpit/x.png",
+            "https://filecache41.gamebanana.com/img/x.jpg",
+        ] {
+            assert!(
+                cache.register(description_host).is_some(),
+                "{description_host}"
+            );
+        }
         for bad in [
             "https://evil.example/img.png",
             "https://gamebanana.com/mods/1",
+            "https://filecache.gamebanana.com/x.png",
+            "https://filecache4x.gamebanana.com/x.png",
+            "https://filecache41.gamebanana.com.evil.example/x.png",
+            "https://i.imgur.com/x.png",
             "http://images.gamebanana.com/img/ss/x.jpg",
             "https://user:pw@images.gamebanana.com/x.jpg",
             "https://images.gamebanana.com:8443/x.jpg",

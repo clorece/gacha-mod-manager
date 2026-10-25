@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // The app shell (docs/08, "Navigation"): the startup check first, then the sidebar and the
-// current page, the install queue and the install confirmation. Dashboard, Downloads and
-// Mods Library are built; the other pages arrive in Phase 5 (docs/05-roadmap.md).
+// current page, the install queue, the install confirmation and the local install (a file
+// dropped on the window). Dashboard, Downloads and Mods Library are built; the other pages
+// arrive in Phase 5 (docs/05-roadmap.md).
 
-import { lazy, type ReactNode, Suspense, useState } from "react";
-import type { StartupReport } from "./api";
+import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
+import { api, type ModUpdateInfo } from "./api";
 import { InstallDialog } from "./components/InstallDialog";
+import { LocalInstallDialog } from "./components/LocalInstallDialog";
+import { NetworkNotice } from "./components/NetworkNotice";
 import { modCounts, useAppData } from "./data";
 import { ALL, type Scope } from "./games";
 import { Dashboard } from "./pages/Dashboard";
@@ -26,17 +29,27 @@ export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
   const [scope, setScope] = useState<Scope>(ALL);
   const [started, setStarted] = useState(false);
-  // The startup check's findings (mod updates), for the library and store badges to come.
-  const [, setStartup] = useState<StartupReport | null>(null);
+  // Newer files the startup check found; the Mod settings panel offers Update for them.
+  const [updates, setUpdates] = useState<ModUpdateInfo[]>([]);
   const [installing, setInstalling] = useState<number | null>(null);
-  const jobs = useQueue((job) => void data.refreshLibrary(job.game));
+  /** The name of an archive dropped on the window or picked, for the local install. */
+  const [localFile, setLocalFile] = useState<string | null>(null);
+  const jobs = useQueue((job) => {
+    void data.refreshLibrary(job.game);
+    // An update that finished is no longer one to offer.
+    if (job.action === "change_file") setUpdates((all) => all.filter((u) => u.gb_mod_id !== job.mod_id));
+  });
+
+  useEffect(() => {
+    api.dropWatch((name) => setLocalFile(name)).catch(() => {});
+  }, []);
 
   if (!started) {
     return (
       <Startup
         games={data.games}
         onDone={(report) => {
-          setStartup(report);
+          setUpdates(report?.updates ?? []);
           setStarted(true);
         }}
       />
@@ -62,10 +75,22 @@ export default function App() {
       content = <Dashboard data={data} />;
       break;
     case "downloads":
-      content = <Downloads jobs={jobs} games={data.games} onShowLibrary={showLibrary} />;
+      content = (
+        <Downloads
+          jobs={jobs}
+          games={data.games}
+          onShowLibrary={showLibrary}
+          onInstallFile={async () => {
+            const name = await api.pickArchive();
+            if (name) setLocalFile(name);
+          }}
+        />
+      );
       break;
     case "library":
-      content = <Library data={data} scope={scope} onScope={setScope} />;
+      content = (
+        <Library data={data} scope={scope} onScope={setScope} updates={updates} onQueued={() => setPage("downloads")} />
+      );
       break;
     case "bug":
       content = <ReportBug />;
@@ -93,7 +118,23 @@ export default function App() {
         onToggleTheme={() => choose(theme === "dark" ? "light" : "dark")}
         activeDownloads={jobs.filter(isActive).length}
       />
-      <main className="main">{content}</main>
+      <main className="main">
+        <NetworkNotice />
+        {content}
+      </main>
+      {localFile !== null && data.games.length > 0 && (
+        <LocalInstallDialog
+          fileName={localFile}
+          games={data.games}
+          defaultGame={scope === ALL ? (data.games[0]?.id ?? "") : scope}
+          onClose={() => setLocalFile(null)}
+          onInstalled={async (game) => {
+            setLocalFile(null);
+            await data.refreshLibrary(game);
+            showLibrary(game);
+          }}
+        />
+      )}
       {installing !== null && (
         <InstallDialog
           modId={installing}

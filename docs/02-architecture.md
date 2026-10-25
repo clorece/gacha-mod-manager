@@ -101,8 +101,8 @@ user data.
   version, SHA-256 of the archive, install time, GMM version) and a row in `installed_mods`.
   3DMigoto only loads `.ini` files, so the sidecar is ignored by XXMI.
 - **Unmanaged mod**: any other folder (or loose `.ini`) in `Mods/`, i.e. installed by hand.
-  GMM shows it, includes it in conflicts and storage, and later offers "adopt" (link to a GB
-  entry). It only touches one the user names: `gmm enable`/`gmm disable <name or path>` use
+  GMM shows it, includes it in conflicts and storage, and can adopt it (Phase 6: the user
+  picks the GameBanana mod it is, from GMM's suggestions; it then becomes a managed mod). It only touches one the user names: `gmm enable`/`gmm disable <name or path>` use
   the same `DISABLED ` rename (enabling removes any `DISABLED` prefix style, e.g.
   `DISABLED_Old` → `Old`; switching on checks conflicts first), and `gmm uninstall <name>`
   lists the exact folder with its size and asks before moving it to the Recycle Bin. A bare
@@ -145,6 +145,20 @@ has `include_recursive = Mods`, so nested folders load:
   `DISABLED`) GMM didn't install, stops the install.
 - **Uninstall** = move the mod folder to the Recycle Bin (`Guard::move_to_trash`, `trash`
   crate) and remove the DB row. The archive stays in the download cache.
+- **Update / roll back** (`gmm_core::change_file`, Phase 6) = every folder of the mod is
+  rebuilt from the other file in staging and swapped in under the **same folder name and
+  on/off state** (the current folder moves into staging, the new one is renamed into place,
+  the row is pointed at the new file; a failure swaps that folder back). Versions are matched
+  by name. The previous folders go to the Recycle Bin; their archive stays cached, so a roll
+  back downloads nothing.
+- **Profiles** (Phase 6) = named sets of switched-on mods per game (table `profiles`);
+  applying one is a series of ordinary on/off renames. GMM's mods are kept by folder name,
+  hand-installed ones by their path without a `DISABLED` prefix.
+- **Adopt** (Phase 6) = a hand-installed folder keeps its name, moves into `Mods/GMM/` only
+  if it was elsewhere, gets a `gmm.json` and a row; a failed write moves it back.
+- **Local archives** (Phase 6) = copied into the cache (the archive's folder registered
+  read-only for that one read), then the same extraction, scan, classification and install
+  as a download, without GameBanana ids. The cached copy is removed afterwards.
 - **The disk is the truth for on/off.** `gmm list` compares each DB row with `Mods/GMM/`:
   a folder renamed by hand updates the row; a folder that's gone is shown as missing (and
   uninstalling it only removes the record); both names present is refused as ambiguous.
@@ -228,9 +242,14 @@ requests work (HTTP 206), so downloads can be paused and resumed. Images live on
 GameBanana's JSON is loosely typed (numbers as strings, `[]` for empty objects), so the client
 decodes every field leniently.
 
-Rules: HTTP cache (SQLite `http_cache` table in `gmm-db`) with lists cached for
-minutes and detail pages for an hour; a global rate limit of about 2 requests/second with
-backoff on 429/5xx; and an identifying `User-Agent`. GameBanana sends no rate-limit headers. Store each mod's
+Rules ([10](10-gamebanana-api.md) has the reasoning): HTTP cache (SQLite `http_cache`
+table in `gmm-db`) with lists cached for minutes and detail pages for an hour, and saved
+answers (up to 7 days) standing in when GameBanana is unreachable, failing or asked GMM to
+slow down; identical requests in flight merged into one; an API budget of about 2
+requests/second per install shared with background reads; a "slow down" (429, 503 with
+`Retry-After`, a Cloudflare challenge) pauses every GameBanana client of the app
+(`gmm-net/src/cooldown.rs`: `Retry-After`, else 30 s doubling, 5 s to 15 min) instead of
+being retried; 5xx retried with backoff; and an identifying `User-Agent`. GameBanana sends no rate-limit headers. Store each mod's
 license, never re-host files, respect `_sInitialVisibility` / content ratings (NSFW hidden by
 default), and sanitize `_sText` HTML before display. The full mod page field mapping is in
 [07](07-frontend-design.md).
@@ -241,7 +260,8 @@ webview never contacts the internet and never names a URL: when a catalogue comm
 data, every image URL (preview images and their scaled variants, avatars, category icons) is
 registered with the cache and replaced by `http://gmmimg.localhost/<key>` (Windows/WebView2)
 or `gmmimg://localhost/<key>` (elsewhere), where the key is the URL's SHA-256. Only HTTPS
-URLs on `images.gamebanana.com` get a key; others are dropped. On first request the image is
+URLs on `images.gamebanana.com` and, for description images, GameBanana's file hosts
+(`files.gamebanana.com`, `filecacheNN.gamebanana.com`) get a key; others are dropped. On first request the image is
 fetched through `gmm-net` (its own client with its own rate limit, 8/s with bursts of 16, so a
 page of thumbnails doesn't hold up API calls; 8 MiB per image), kept as
 `cache/images/<key>`, and served only if its first bytes are JPEG, PNG, WebP or GIF (with
@@ -251,13 +271,14 @@ are still served. The cache is capped at 512 MiB, and the oldest images go first
 **Description HTML** (`_sText`, `_sLicense`, update text) is rewritten in Rust before it
 reaches the webview (`apps/desktop/src-tauri/src/html.rs`, called from `catalog_mod` and
 `catalog_updates`): a scanner walks the start tags and replaces every `src` with a `gmmimg`
-URL (or drops it when the image isn't on `images.gamebanana.com`), every `href` with
+URL (or drops it when the image isn't on one of GameBanana's image or file hosts), every `href` with
 `#gmm-link:<key>` for an `http(s)` address (or drops it), and drops `srcset`. Link keys
 (first 16 bytes of the address's SHA-256, hex) live in `AppState.links` for the run. The
 webview then sanitizes with DOMPurify (`components/RichText.tsx`) and opens a link only
 through `open_link`. Observed 2026-10-25 across ten mods: description images are as often
 on `filecacheNN.gamebanana.com`, `files.gamebanana.com` or third-party hosts (imgur,
-i.meee.com.tw) as on `images.gamebanana.com`; only the last are shown.
+i.meee.com.tw) as on `images.gamebanana.com`; GameBanana's own hosts are shown, third
+parties never (R2).
 
 **Featured gallery** (`gmm_core::featured`): the top submissions in GameBanana's order,
 minus sensitive ones unless the user opted in, each read from its mod page (which adds views,
@@ -277,8 +298,13 @@ screens, `prepare_install`, `switch_version`, `catalog_featured`, `catalog_stats
 `clear_http_cache` there, the queue in `src/queue.rs` (`queue_install`, `queue_jobs`,
 `queue_watch`, `queue_pause`, `queue_resume`, `queue_cancel`, `queue_dismiss`,
 `queue_clear_finished`), `startup_check` in `src/startup.rs`, and the openers in
-`src/open.rs` (`open_mod_page`, `open_xxmi_releases`, `open_link`, `open_mod_folder`).
-Each calls the same `gmm-core` functions as the CLI.
+`src/open.rs` (`open_mod_page`, `open_xxmi_releases`, `open_link`, `open_mod_folder`),
+and `network_status`. Phase 6 adds `queue_change_file` (queue), `rollback_files`,
+`mod_keybindings`, `adopt_candidates`, `adopt` (commands.rs), the profile commands in
+`src/profiles.rs` (`profiles`, `profile_save`, `profile_apply`, `profile_rename`,
+`profile_delete`, `profile_export`, `profile_import`) and the local install in
+`src/local.rs` (`drop_watch`, `pick_archive`, `prepare_local`, `install_local`,
+`discard_local`). Each calls the same `gmm-core` functions as the CLI.
 
 - **Arguments are ids**: game ids, GameBanana ids, GMM mod ids, and `ModKey`
   (`{type: "managed", id}` or `{type: "unmanaged", path}`, where `path` must exactly match an
@@ -313,8 +339,17 @@ Each calls the same `gmm-core` functions as the CLI.
   `gmm_core::mod_folder` (a directory inside the Mods folder, through
   `Guard::os_path_of_dir`) and `gmm_xxmi::open_folder` opens it.
 - **Background reads**: `catalog_stats` uses `AppState.gb_background`, a second
-  `GameBanana` on its own client (2 requests/s, bursts of 4) sharing the response cache, so
-  filling in card counters never delays what the user clicked.
+  `GameBanana` on a sibling client (`Client::sibling`: its own 1 request/s, bursts of 2,
+  and it spends the API client's budget too) sharing the response cache. The image client is
+  a sibling with its own 8/s budget. All three share one connection pool and one cooldown.
+- **Slow-down notice**: `network_status` (local only) says whether GMM is holding off
+  GameBanana and whether saved answers were shown lately; `NetworkNotice` polls it every
+  5 s. The queue worker turns a slow-down into a `waiting` job that carries on by itself
+  (up to four waits), keeping the partial download.
+- **Local installs**: a file dropped on the window arrives as Tauri's window drop event in
+  Rust (`main.rs`), which keeps the path and sends only the file name to the webview
+  (`drop_watch`); "Install from a file" opens a native dialog from Rust (`pick_archive`).
+  One archive waits at a time, with the workspace its paths belong to.
 - **Launch** is two steps: `launch_plan` shows the exe and whether it was confirmed;
   `launch(game, confirm)` records the confirmation and starts XXMI.
 - **Uninstall** is two steps: `uninstall_preview` returns each folder's full path (and size,
@@ -343,9 +378,12 @@ Each calls the same `gmm-core` functions as the CLI.
     `Placeholders` (the remaining Phase 5 pages and Report a Bug), `StyleGuide` (dev builds
     only, dropped from release builds by `import.meta.env.DEV`; also opens the real install
     confirmation by mod id until the Store exists).
-  - `components/`: `InstallDialog` (the install confirmation from `InstallPlan`), `RichText`
-    (GameBanana HTML through DOMPurify), `Launch` (exe confirmation dialog), `SetupCard`,
-    `ModSettings` (side panel: switch, details, Uninstall with the itemized confirmation).
+  - `components/`: `InstallDialog` (the install confirmation from `InstallPlan`),
+    `LocalInstallDialog` (the same for a local archive), `RichText` (GameBanana HTML through
+    DOMPurify), `NetworkNotice`, `Launch` (exe confirmation dialog), `SetupCard`,
+    `ModSettings` (side panel: switch, Updates / Roll back, Key bindings, Actions, details,
+    Uninstall with the itemized confirmation; the Phase 6 sections are in `ModExtras`),
+    `AdoptDialog`, `ProfilesPanel`.
 - Logic both front ends need lives below them, not in either: `Page::hide_sensitive`
   (`gmm-catalog`, the NSFW filter), `game_for_mod`, `Machine::launch_plan` and
   `conflicts_after_install` (`gmm-core`).
@@ -408,7 +446,7 @@ matching Game Launch setting (`LaunchModeMismatch`).
 `crates/gmm-db/migrations/` and is applied when the database opens; an older GMM refuses a
 database that a newer one has migrated. sqlx 0.9 with SQLite bundled, WAL journal, foreign
 keys on, every query a static SQL string with bound parameters (sqlx rejects anything else).
-Times are Unix seconds. Built so far (migrations 0001 and 0002):
+Times are Unix seconds. Built so far (migrations 0001 to 0003):
 
 ```
 settings(key PK, value)                  -- xxmi.root (a folder the user picked),
@@ -426,6 +464,8 @@ http_cache(url PK, body, fetched_at)     -- each endpoint passes its own max age
                                          -- rows older than 7 days, or beyond 5,000, are
                                          -- pruned on open
 game_activity(game_id PK, last_played)   -- 0002: when GMM's Launch last started each game
+profiles(id PK, game_id, name, entries_json, created_at, updated_at, UNIQUE(game_id, name))
+                                         -- 0003: switched-on mods per profile (gmm-core JSON)
 ```
 
 - `installed_mods.folder_name` never includes the `DISABLED ` prefix; `enabled` says which

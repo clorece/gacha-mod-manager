@@ -1,24 +1,35 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Mod settings: the side panel from a library card (docs/08, "Mod settings"). For now: the
-// switch, the details and Uninstall with its itemized confirmation. Versions, Open folder,
-// View on GameBanana and Reinstall arrive with Phase 5's commands.
+// Mod settings: the side panel from a library card (docs/08, "Mod settings"): the switch,
+// updates and roll back, key bindings, actions (open folder, GameBanana, adopt), the details
+// and Uninstall with its itemized confirmation. Switching between versions comes with the
+// Library's version groups.
 
 import { useState } from "react";
-import { api, asCmdError, type UninstallItem } from "../api";
+import { api, asCmdError, type ModUpdateInfo, type UninstallItem } from "../api";
 import { bytes, plural } from "../format";
 import type { LibraryItem } from "../pages/Library";
 import { Button, Dialog, SidePanel, Switch, useToast } from "../ui";
+import { ActionsSection, KeySection, UpdateSection } from "./ModExtras";
 
 export function ModSettings({
   item,
   onClose,
   onToggle,
   onRemoved,
+  update,
+  onQueued,
+  onChanged,
 }: {
   item: LibraryItem;
   onClose: () => void;
   onToggle: (on: boolean) => void;
   onRemoved: () => Promise<void>;
+  /** A newer file found by the startup check, for GMM's GameBanana mods. */
+  update: ModUpdateInfo | undefined;
+  /** An update or roll back went to the queue. */
+  onQueued: () => void;
+  /** The mod changed kind (adopted): reload the library. */
+  onChanged: () => Promise<void>;
 }) {
   const toast = useToast();
   const [preview, setPreview] = useState<UninstallItem[] | null>(null);
@@ -70,6 +81,9 @@ export function ModSettings({
             />
           </div>
         </section>
+        <UpdateSection item={item} update={update} onQueued={onQueued} />
+        <KeySection item={item} />
+        <ActionsSection item={item} onAdopted={onChanged} />
         <section className="drawer-sec">
           <h3 className="sec-h">Details</h3>
           <div className="kv">

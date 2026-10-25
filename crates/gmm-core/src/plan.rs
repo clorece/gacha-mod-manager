@@ -11,7 +11,7 @@ use gmm_catalog::ModFile;
 use gmm_db::Db;
 use serde::Serialize;
 
-use crate::analyze::VersionConflict;
+use crate::analyze::{Analysis, VersionConflict};
 use crate::error::CoreError;
 use crate::install::Prepared;
 use crate::names::{GMM_DIR, mod_folder_name};
@@ -63,10 +63,56 @@ pub async fn install_plan(
     prepared: &Prepared,
 ) -> Result<InstallPlan, CoreError> {
     let analysis = &prepared.analysis;
+    let versions = version_plans(
+        db,
+        game,
+        analysis,
+        &prepared.mod_name,
+        Some(prepared.mod_id),
+    )
+    .await?;
+    let file = prepared.fetched.file.clone();
+    let mut other_files: Vec<ModFile> = prepared
+        .files
+        .files
+        .iter()
+        .filter(|f| f.id != file.id)
+        .cloned()
+        .collect();
+    other_files.sort_by_key(|f| std::cmp::Reverse(f.date_added));
+    Ok(InstallPlan {
+        game: game.id().to_owned(),
+        mod_id: prepared.mod_id,
+        mod_name: prepared.mod_name.clone(),
+        file,
+        other_files,
+        archive_bytes: prepared.fetched.bytes,
+        from_cache: prepared.fetched.from_cache,
+        kind: analysis.kind.clone(),
+        versions,
+        version_conflicts: analysis.version_conflicts.clone(),
+        install_to: install_to(game),
+    })
+}
+
+/// Where mods install, relative to XXMI: `ZZMI\Mods\GMM`.
+pub(crate) fn install_to(game: &GameManifest) -> String {
+    format!("{}\\Mods\\{GMM_DIR}", game.xxmi.importer.as_str())
+}
+
+/// Every version of an analysed archive: its folder, size, blocked files and warnings, and
+/// whether it's installed already.
+pub(crate) async fn version_plans(
+    db: &Db,
+    game: &GameManifest,
+    analysis: &Analysis,
+    mod_name: &str,
+    gb_mod_id: Option<u64>,
+) -> Result<Vec<VersionPlan>, CoreError> {
     let mut versions = Vec::with_capacity(analysis.variants.len());
     for v in &analysis.variants {
         let variant = (!v.name.is_empty()).then_some(v.name.as_str());
-        let folder = mod_folder_name(&prepared.mod_name, Some(prepared.mod_id), variant);
+        let folder = mod_folder_name(mod_name, gb_mod_id, variant);
         let installed = db
             .installed_mod_by_folder(game.id(), &folder)
             .await?
@@ -99,26 +145,5 @@ pub async fn install_plan(
             warnings,
         });
     }
-    let file = prepared.fetched.file.clone();
-    let mut other_files: Vec<ModFile> = prepared
-        .files
-        .files
-        .iter()
-        .filter(|f| f.id != file.id)
-        .cloned()
-        .collect();
-    other_files.sort_by_key(|f| std::cmp::Reverse(f.date_added));
-    Ok(InstallPlan {
-        game: game.id().to_owned(),
-        mod_id: prepared.mod_id,
-        mod_name: prepared.mod_name.clone(),
-        file,
-        other_files,
-        archive_bytes: prepared.fetched.bytes,
-        from_cache: prepared.fetched.from_cache,
-        kind: analysis.kind.clone(),
-        versions,
-        version_conflicts: analysis.version_conflicts.clone(),
-        install_to: format!("{}\\Mods\\{GMM_DIR}", game.xxmi.importer.as_str()),
-    })
+    Ok(versions)
 }

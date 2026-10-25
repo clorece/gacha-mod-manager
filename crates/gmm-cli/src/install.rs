@@ -155,3 +155,90 @@ pub async fn run(
     }
     Ok(())
 }
+
+pub struct LocalArgs {
+    pub file: PathBuf,
+    pub game: &'static GameManifest,
+    pub variants: Vec<String>,
+    pub all_variants: bool,
+    pub skip_blocked: bool,
+    pub xxmi: Option<PathBuf>,
+    pub folders: Vec<(String, PathBuf)>,
+}
+
+/// `gmm install-file`: install from an archive on this computer (same checks as a download).
+pub async fn run_local(db: &Db, args: LocalArgs, json: bool) -> Result<(), AnyError> {
+    let game = args.game;
+    let file = std::path::absolute(&args.file)?;
+    let hints = SetupHints {
+        xxmi: args.xxmi,
+        folders: args.folders,
+    };
+    let target = ModsTarget::open(db, game, hints).await?;
+    if !json {
+        eprintln!("copying into the cache, extracting and scanning");
+    }
+    let prepared = gmm_core::prepare_local(&target.ws, game, &file)?;
+    let options = InstallOptions {
+        variants: if args.all_variants {
+            VariantChoice::All
+        } else if args.variants.is_empty() {
+            VariantChoice::Only
+        } else {
+            VariantChoice::Named(args.variants)
+        },
+        skip_blocked: args.skip_blocked,
+        start_disabled: false,
+    };
+    let result = gmm_core::install_local(
+        db,
+        &target.ws,
+        target.mods,
+        game,
+        &prepared,
+        &options,
+        |_| {},
+    )
+    .await;
+    prepared.discard(&target.ws);
+    let installed = match result {
+        Ok(installed) => installed,
+        Err(CoreError::ChooseVariant(list)) => {
+            return Err(format!(
+                "this archive holds several mods. Pick with --variant N (repeatable) or \
+                 --all-variants:\n  {}",
+                list.join("\n  ")
+            )
+            .into());
+        }
+        Err(CoreError::Blocked(files)) => {
+            return Err(format!(
+                "the archive contains executables or scripts, which GMM never installs:\n  {}\n\
+                 Re-run with --skip-blocked to install it without them.",
+                files.join("\n  ")
+            )
+            .into());
+        }
+        Err(e) => return Err(e.into()),
+    };
+    let clashes = conflicts_after_install(db, &target.ws, target.mods, game, &installed).await?;
+    crate::output(json, &installed, || {
+        let mut text = String::new();
+        for folder in &installed {
+            text.push_str(&format!(
+                "installed {:?} as #{} ({} files, {})\n",
+                folder.folder_name,
+                folder.id,
+                folder.files,
+                bytes(folder.bytes)
+            ));
+            for skipped in &folder.skipped {
+                text.push_str(&format!("  left out (blocked): {skipped}\n"));
+            }
+        }
+        for c in &clashes {
+            text.push_str(&format!("conflict: {}\n", describe(c)));
+        }
+        text
+    })
+}

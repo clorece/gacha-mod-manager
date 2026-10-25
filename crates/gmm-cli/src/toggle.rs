@@ -348,3 +348,137 @@ async fn unknown_id(db: &Db, id: i64) -> Result<String, AnyError> {
         ids.join(", ")
     ))
 }
+
+/// `gmm keys`: a mod's key bindings (its `[Key*]` sections), read-only.
+pub async fn keys(
+    db: &Db,
+    arg: &str,
+    only_game: Option<&'static GameManifest>,
+    hints: SetupHints,
+    json: bool,
+) -> Result<(), AnyError> {
+    let registry = Registry::builtin()?;
+    let mut targets = Targets {
+        db,
+        hints,
+        open: HashMap::new(),
+    };
+    let target = match as_id(arg) {
+        Some(id) => {
+            let Some(row) = db.installed_mod(id).await? else {
+                return Err(unknown_id(db, id).await?.into());
+            };
+            let game = registry
+                .get(&row.game_id)
+                .ok_or_else(|| format!("mod {id} belongs to an unknown game {:?}", row.game_id))?;
+            Target::Managed {
+                game,
+                id,
+                enabled: row.enabled,
+            }
+        }
+        None => find_by_name(&mut targets, registry, only_game, arg).await?,
+    };
+    let game = target.game();
+    let open = targets.get(game).await?;
+    let which = match &target {
+        Target::Managed { id, .. } => gmm_core::ModFolder::Managed(*id),
+        Target::Unmanaged { path, .. } => gmm_core::ModFolder::Unmanaged(path),
+    };
+    let found = gmm_core::mod_keybindings(db, &open.ws, open.mods, game, which).await?;
+    crate::output(json, &found, || {
+        let mut text = String::new();
+        if found.bindings.is_empty() {
+            text.push_str("This mod has no key bindings.\n");
+        }
+        for k in &found.bindings {
+            let kind = k
+                .kind
+                .as_deref()
+                .map(|t| format!(" ({t})"))
+                .unwrap_or_default();
+            let back = if k.back.is_empty() {
+                String::new()
+            } else {
+                format!(", back: {}", k.back.join(" or "))
+            };
+            text.push_str(&format!(
+                "{:<20} {}{back}{kind}   [{}]\n",
+                k.name,
+                k.keys.join(" or "),
+                k.ini
+            ));
+        }
+        for note in &found.notes {
+            text.push_str(&format!("note: {note}\n"));
+        }
+        text
+    })
+}
+
+/// `gmm adopt`: list the GameBanana mods a hand-installed folder could be, or with `gb`,
+/// take it over as that mod.
+#[allow(clippy::too_many_arguments)]
+pub async fn adopt(
+    gb_client: &gmm_catalog::GameBanana,
+    db: &Db,
+    arg: &str,
+    only_game: Option<&'static GameManifest>,
+    gb: Option<u64>,
+    file: Option<u64>,
+    hints: SetupHints,
+    json: bool,
+) -> Result<(), AnyError> {
+    let registry = Registry::builtin()?;
+    let mut targets = Targets {
+        db,
+        hints,
+        open: HashMap::new(),
+    };
+    let Target::Unmanaged { game, path, .. } =
+        find_by_name(&mut targets, registry, only_game, arg).await?
+    else {
+        return Err("that mod is already GMM's".into());
+    };
+    let open = targets.get(game).await?;
+    let Some(gb_mod_id) = gb else {
+        let found =
+            gmm_core::adopt_candidates(gb_client, db, &open.ws, open.mods, game, &path).await?;
+        return crate::output(json, &found, || {
+            if found.is_empty() {
+                return "GameBanana found nothing like it; pass --gb ID if you know the mod.\n"
+                    .to_owned();
+            }
+            let mut text = String::new();
+            for c in &found {
+                let why = match c.reason {
+                    gmm_core::MatchReason::Sidecar => "its gmm.json",
+                    gmm_core::MatchReason::IdInName => "id in the folder name",
+                    gmm_core::MatchReason::Search => "search",
+                };
+                text.push_str(&format!(
+                    "{:<9} {} by {} ({why})\n",
+                    c.summary.id, c.summary.name, c.summary.submitter.name
+                ));
+            }
+            text.push_str(&format!("Adopt one with `gmm adopt {arg:?} --gb <id>`.\n"));
+            text
+        });
+    };
+    let adopted = gmm_core::adopt(
+        gb_client, db, &open.ws, open.mods, game, &path, gb_mod_id, file,
+    )
+    .await?;
+    crate::output(json, &adopted, || {
+        let mut text = format!(
+            "adopted {:?} as GMM mod #{} (GameBanana {gb_mod_id})\n",
+            adopted.folder_name, adopted.id
+        );
+        if adopted.moved {
+            text.push_str(
+                "It was moved into Mods/GMM/, so its in-game toggles start over (3DMigoto keys them by path).\n",
+            );
+        }
+        text
+    })
+}

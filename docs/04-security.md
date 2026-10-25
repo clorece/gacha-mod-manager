@@ -64,6 +64,12 @@ does is the failure we design out.
     opens that file and its `-wal`/`-shm` siblings in the same folder. SQLite extension
     loading is not compiled in.
   - **GMM never writes to a game folder.** XXMI owns game settings.
+  - **A local archive's folder is read once** (Phase 6, installing from a file the user dropped
+    or picked): that folder is registered read-only on a separate guard for the one copy into
+    GMM's cache (a regular `.zip`/`.7z`/`.rar` file, size-capped), and nothing else in it is
+    read. The path comes from the OS drop event or a native dialog, both handled in Rust (R5).
+  - **`d3dx_user.ini` is not written.** Profiles would need to snapshot and restore it (it sits
+    in `<IMP>/`, outside `Mods/`); that waits on an explicit amendment of this rule.
 - **R4 — Never read secrets or personal data.** Denylisted by name, even inside allowed roots:
   - Steam `config/loginusers.vdf`, `config/config.vdf`, `local.vdf`, `ssfn*`, `userdata/`
   - Game logs (`Player.log`, `output_log.txt`) and launcher login caches
@@ -77,7 +83,11 @@ does is the failure we design out.
   arguments look like paths but are only compared, never opened: an unmanaged mod's `path`
   (must equal an entry of a fresh library listing exactly) and the folder given to
   `remove_game_folder` (must equal a stored row). Image URLs never reach the webview either:
-  it gets `gmmimg` keys.
+  it gets `gmmimg` keys. Files dropped on the window (Phase 6) reach Rust through Tauri's
+  window drop event; the webview only learns the file's name. Profile share codes are the one
+  free text the webview sends besides names and search text: `gmm-core` treats them as
+  untrusted (64 KiB, 1,000 mods, 200-character names, known game, versioned format) and they
+  only ever match against mods already installed.
 - **R6 — No debug or automation bridges in release.** Devtools and test hooks sit behind a `dev`
   feature that release CI asserts is off.
 - **R7 — Process launching is minimal.** GMM starts exactly two kinds of process, each from
@@ -112,6 +122,12 @@ does is the failure we design out.
   if `Command::new` appears outside `gmm-xxmi/src/launch.rs` and `gmm-archive/src/helper.rs`
   (tests excepted). Other platforms start XXMI with `std::process::Command` in the launch
   module (past the clippy ban there and in the helper module only).
+- **R2a — Staying welcome on GameBanana** ([10](10-gamebanana-api.md)). No key, no account,
+  an honest User-Agent. One API budget per install (about 2 requests/s, background reads
+  included), merged duplicate requests, the response cache, and saved answers when
+  GameBanana can't answer. A 429, a 503 with `Retry-After` or a Cloudflare challenge pauses
+  every GameBanana client of the app at once (`gmm-net/src/cooldown.rs`) and is never
+  retried in a loop; GMM never tries to pass a challenge.
 - **R8 — Recoverable deletes.** Uninstall and storage deletes go through the Recycle Bin
   (`gmm_fsguard::Guard::move_to_trash`, the only caller of the `trash` crate; it applies the
   same read-write-root checks as any write). Unmanaged (hand-installed) mods are never deleted
@@ -234,7 +250,9 @@ does is the failure we design out.
 | 2 | **Egress harness** (✅ done, `crates/gmm-cli/tests/privacy.rs`): the real `gmm` binary runs every network command behind an in-test proxy that logs and refuses each request. Every `CONNECT` target must pass `Allowlist::production()` on port 443, at least one must be seen, and local commands (detect, status, config, list, conflicts, storage, launch) must make none. On Linux CI each `gmm` process also runs under `strace`, and any IPv4/IPv6 connection that isn't loopback (traffic bypassing the proxy) fails the run. ⏳ a Windows equivalent of the bypass check (firewall rule) | R2 |
 | 2 | **File-access harness** (✅ done, same test): a fake profile with canary files (Steam `loginusers.vdf`, `config.vdf`, `userdata/`, a game `Player.log`, a browser `logins.json`, `~/.ssh/id_rsa`) and secrets in XXMI's config; GMM's folders redirected with `GMM_HOME`. Asserts nothing in the profile outside `Mods/` changed and no canary content reached GMM's files. Under `strace` (Linux CI) it also fails if any canary is opened or stat-ed, or any write lands outside `GMM_HOME` and `Mods/`. ⏳ Process Monitor on Windows | R3/R4 |
 | 5 | IPC fuzz: hostile args to every Tauri command. ⏳ Not automated yet; checked by hand in the running app (2026-10-24): an unknown game id (`../../etc`), an unmanaged key `../XXMI Launcher Config.json`, an image key GMM never issued, and plugin commands are all refused; 2026-10-25: `open_mod_folder` with an unmanaged key `../../Windows` and an unknown mod id is refused | R5 |
-| 3 | Image cache tests (✅ done, `gmm-core/src/images.rs`): only `images.gamebanana.com` HTTPS URLs get keys; bad keys, SVG/HTML bodies and HTTP errors are refused and nothing is written; cache survives restarts; oldest images pruned at the cap | R2, R5 |
+| 2 | Slow-down tests (✅ `gmm-net`, `gmm-catalog`): a 429 pauses every sibling client with no further request, a Cloudflare challenge counts, a plain 403 doesn't, a download keeps its partial file, saved answers stand in (never for a 404), identical requests are fetched once | R2a |
+| 6 | Share-code tests (✅ `gmm-core/tests/core.rs`): garbage, a newer format, another game, an unknown game, an empty name and an oversized code are refused | R5 |
+| 3 | Image cache tests (✅ done, `gmm-core/src/images.rs`): only HTTPS URLs on `images.gamebanana.com` and GameBanana's file hosts get keys (look-alike hosts refused); bad keys, SVG/HTML bodies and HTTP errors are refused and nothing is written; cache survives restarts; oldest images pruned at the cap | R2, R5 |
 | 3 | `bindings_are_current` (✅ done, `gmm-desktop`): the TypeScript types match the Rust types | Bridge types can't drift |
 | 2 | Adapter conformance suite on fixtures (✅ done: per-state fixtures in 0b; `gmm-core/tests/conformance.rs` runs detect → install → toggle → conflicts → storage → uninstall per game, asserts no file outside `Mods/` changed and no XXMI config canary reached GMM's database, cache or mod folders) | Correct detection, no writes outside `Mods/`, R4 for the database |
 | 5 | XSS corpus through the description renderer. Rust side ✅ (`src-tauri/src/html.rs` unit tests: entity-encoded schemes, quoting styles, comments, broken tags, escaping); checked live 2026-10-25 on ten real descriptions (no outside address left in any attribute). ⏳ the DOMPurify side (`RichText.sanitize`) in Vitest | T3 |

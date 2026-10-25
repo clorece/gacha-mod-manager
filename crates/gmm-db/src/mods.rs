@@ -57,6 +57,18 @@ pub struct NewInstalledMod {
     pub categories: ModCategories,
 }
 
+/// What changes when an installed mod moves to another GameBanana file (an update or a
+/// roll back). The folder name, on/off state and install date stay.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FileChange {
+    pub gb_file_id: Option<u64>,
+    pub version: Option<String>,
+    pub file_date: Option<i64>,
+    pub archive_sha256: Option<String>,
+    pub size_bytes: u64,
+    pub scan_report_json: Option<String>,
+}
+
 /// `SELECT <every column> FROM installed_mods <rest>`, as a static string (sqlx only takes
 /// static SQL, which rules out injection by construction).
 macro_rules! select {
@@ -171,6 +183,30 @@ impl Db {
             .bind(id)
             .execute(&self.pool)
             .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Points a mod at another file of its GameBanana mod. Returns false if there is no such
+    /// mod.
+    pub async fn change_installed_mod_file(
+        &self,
+        id: i64,
+        change: &FileChange,
+    ) -> Result<bool, DbError> {
+        let result = sqlx::query(
+            "UPDATE installed_mods SET gb_file_id = ?, version = ?, file_date = ?,
+                 archive_sha256 = ?, size_bytes = ?, scan_report_json = ?
+             WHERE id = ?",
+        )
+        .bind(opt_to_db(change.gb_file_id, "gb_file_id")?)
+        .bind(&change.version)
+        .bind(change.file_date)
+        .bind(&change.archive_sha256)
+        .bind(to_db(change.size_bytes, "size_bytes")?)
+        .bind(&change.scan_report_json)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
         Ok(result.rows_affected() > 0)
     }
 

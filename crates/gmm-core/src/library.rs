@@ -400,25 +400,41 @@ pub async fn mod_folder(
     which: ModFolder<'_>,
 ) -> Result<PathBuf, CoreError> {
     let guard = ws.guard();
-    let dir = match which {
+    let (at, is_dir) = mod_location(db, ws, mods, game, which).await?;
+    let dir = if is_dir {
+        at
+    } else {
+        at.parent().unwrap_or(guard.path(mods, "")?)
+    };
+    Ok(guard.os_path_of_dir(&dir)?)
+}
+
+/// Where a mod is on disk now: its folder, or for a hand-installed loose `.ini`, that file
+/// (`true` for a folder).
+pub(crate) async fn mod_location(
+    db: &Db,
+    ws: &Workspace,
+    mods: RootId,
+    game: &GameManifest,
+    which: ModFolder<'_>,
+) -> Result<(ScopedPath, bool), CoreError> {
+    let guard = ws.guard();
+    Ok(match which {
         ModFolder::Managed(id) => {
             let row = managed_row(db, game, id).await?;
             let gmm_dir = guard.path(mods, GMM_DIR)?;
             let enabled = guard.exists(&gmm_dir.join(&row.folder_name)?)?;
-            gmm_dir.join(&on_disk_name(&row.folder_name, enabled))?
+            (
+                gmm_dir.join(&on_disk_name(&row.folder_name, enabled))?,
+                true,
+            )
         }
         ModFolder::Unmanaged(path) => {
             let lib = library(db, ws, mods, game).await?;
             let entry = listed_unmanaged(&lib, game, path)?;
-            let at = guard.path(mods, &entry.path)?;
-            if entry.is_dir {
-                at
-            } else {
-                at.parent().unwrap_or(guard.path(mods, "")?)
-            }
+            (guard.path(mods, &entry.path)?, entry.is_dir)
         }
-    };
-    Ok(guard.os_path_of_dir(&dir)?)
+    })
 }
 
 fn rename_unmanaged(

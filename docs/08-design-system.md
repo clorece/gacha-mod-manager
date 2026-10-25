@@ -177,6 +177,16 @@ A panel that slides in from the right (480 px) from a library card's settings bu
   Hand-installed mods get Open folder and Find on GameBanana (matching, Phase 6).
 - **More settings**: room for per-mod options as they arrive; Key bindings shows as "Later"
   (Phase 6).
+- Built so far (2026-10-25, Phase 6 ahead of the full panel): **Updates** (Update to the
+  newer file the startup check found; Roll back to an earlier file from the cache), **Key
+  bindings** (each `[Key*]` section: name, keys prettified as "Ctrl + Left", back keys,
+  cycle / toggle / hold), and **Actions** as two tiles (Open folder; View on GameBanana, or
+  Find on GameBanana for a hand-installed folder, which opens a picker of suggested mods with
+  flagged previews hidden). Not designed on the canvas yet, and built from its tokens: the
+  Library's **Profiles** panel (save current, apply, copy code, delete, import a code), the
+  **local install** confirmation (game, versions, blocked files) opened by a file dropped
+  on the window or "Install from a file" on Downloads, and the **GameBanana notice** at the
+  top of the page while GMM holds off after a "slow down".
 - **Uninstall** (red outline) with a line saying what it does: all versions to the Recycle
   Bin, archive kept in the cache; for hand-installed mods, the itemized confirmation first.
 

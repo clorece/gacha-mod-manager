@@ -6,7 +6,7 @@ use std::ops::ControlFlow;
 use std::time::Duration;
 
 use gmm_fsguard::{Access, Guard, RootId};
-use gmm_net::{Allowlist, Client, DownloadRequest, NetConfig, NetError, RateLimit, Url};
+use gmm_net::{Allowlist, Client, DownloadRequest, NetConfig, NetError, RateLimit, Slowdown, Url};
 use md5::Md5;
 use sha2::{Digest, Sha256};
 use wiremock::matchers::{header, method, path};
@@ -110,10 +110,10 @@ async fn redirect_to_allowed_host_is_followed() {
 }
 
 #[tokio::test]
-async fn retries_429_and_5xx_then_succeeds() {
+async fn retries_5xx_then_succeeds() {
     let server = MockServer::start().await;
     Mock::given(path("/busy"))
-        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "0"))
+        .respond_with(ResponseTemplate::new(502))
         .up_to_n_times(1)
         .with_priority(1)
         .mount(&server)
@@ -132,6 +132,79 @@ async fn retries_429_and_5xx_then_succeeds() {
     let resp = test_client().get(&url(&server, "/busy")).await.unwrap();
     assert_eq!(resp.body, b"done");
     assert_eq!(server.received_requests().await.unwrap().len(), 3);
+}
+
+#[tokio::test]
+async fn a_429_pauses_every_sibling_without_more_requests() {
+    let server = MockServer::start().await;
+    Mock::given(path("/busy"))
+        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "120"))
+        .mount(&server)
+        .await;
+    let api = test_client();
+    let images = api.sibling(
+        RateLimit {
+            per_second: 1000.0,
+            burst: 1000,
+        },
+        false,
+    );
+    let err = api.get(&url(&server, "/busy")).await.unwrap_err();
+    assert!(
+        matches!(
+            err,
+            NetError::SlowDown {
+                why: Slowdown::RateLimited,
+                ..
+            }
+        ),
+        "{err}"
+    );
+    assert_eq!(err.retry_in(), Some(Duration::from_secs(120)));
+    assert!(err.to_string().contains("slow down"), "{err}");
+    assert!(api.cooldown_remaining().is_some());
+
+    // Held off everywhere, and nothing more reaches the server.
+    let again = images.get(&url(&server, "/anything")).await.unwrap_err();
+    assert!(matches!(again, NetError::SlowDown { .. }));
+    assert!(again.is_temporary());
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
+
+    // An unrelated client (another app) isn't affected.
+    assert!(test_client().cooldown_remaining().is_none());
+}
+
+#[tokio::test]
+async fn a_cloudflare_challenge_is_a_slow_down_too() {
+    let server = MockServer::start().await;
+    Mock::given(path("/check"))
+        .respond_with(
+            ResponseTemplate::new(403)
+                .insert_header("cf-mitigated", "challenge")
+                .set_body_string("<html>Just a moment...</html>"),
+        )
+        .mount(&server)
+        .await;
+    Mock::given(path("/forbidden"))
+        .respond_with(ResponseTemplate::new(403))
+        .mount(&server)
+        .await;
+    let plain = test_client();
+    // A plain 403 is the caller's to read, not a slow-down.
+    assert_eq!(
+        plain.get(&url(&server, "/forbidden")).await.unwrap().status,
+        403
+    );
+    assert!(plain.cooldown_remaining().is_none());
+    let err = plain.get(&url(&server, "/check")).await.unwrap_err();
+    assert!(matches!(
+        err,
+        NetError::SlowDown {
+            why: Slowdown::Challenged,
+            ..
+        }
+    ));
+    assert_eq!(err.retry_in(), Some(Duration::from_secs(30)));
 }
 
 #[tokio::test]
@@ -402,4 +475,39 @@ async fn existing_destination_refused() {
         .unwrap_err();
     assert!(matches!(err, NetError::DestinationExists));
     assert!(server.received_requests().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_429_on_a_download_keeps_the_partial_file() {
+    let server = MockServer::start().await;
+    let data = payload();
+    let env = dl_env();
+    env.guard
+        .create_dir_all(&env.guard.path(env.root, "downloads").unwrap())
+        .unwrap();
+    let part = env.guard.path(env.root, "downloads/.mod.zip.part").unwrap();
+    env.guard.write_atomic(&part, &data[..1000]).unwrap();
+    Mock::given(path("/files/mod.zip"))
+        .respond_with(ResponseTemplate::new(429))
+        .mount(&server)
+        .await;
+    let client = test_client();
+    let req = request(&server, &env, Some(data.len() as u64), None);
+    let err = client
+        .download(&env.guard, &req, |_| ControlFlow::Continue(()))
+        .await
+        .unwrap_err();
+    assert!(matches!(err, NetError::SlowDown { .. }), "{err}");
+    assert_eq!(
+        env.guard.read(&part).unwrap(),
+        &data[..1000],
+        "kept for resuming"
+    );
+    // While paused, a second attempt doesn't even ask.
+    let again = client
+        .download(&env.guard, &req, |_| ControlFlow::Continue(()))
+        .await
+        .unwrap_err();
+    assert!(matches!(again, NetError::SlowDown { .. }));
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
 }

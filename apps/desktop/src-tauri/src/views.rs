@@ -89,6 +89,25 @@ pub struct ModRow {
     pub category_id: Option<u64>,
 }
 
+/// An earlier file of an installed mod, kept in the download cache.
+#[derive(Debug, Serialize, TS)]
+pub struct RollbackFile {
+    pub file_id: u64,
+    pub name: String,
+    /// Upload date (Unix seconds), when GameBanana still lists the file.
+    pub date_added: Option<i64>,
+    pub version: Option<String>,
+}
+
+/// See `commands::network_status`.
+#[derive(Debug, Serialize, TS)]
+pub struct NetworkStatus {
+    /// Seconds until GMM asks GameBanana again, while it holds off after a "slow down".
+    pub cooldown_secs: Option<u64>,
+    /// Saved answers stood in for fresh ones in the last minute and a half.
+    pub showing_saved: bool,
+}
+
 /// A card's counters, sent as each mod's numbers arrive (`catalog_stats`).
 #[derive(Debug, Clone, Serialize, TS)]
 pub struct CardStats {

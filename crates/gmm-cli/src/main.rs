@@ -9,8 +9,10 @@ mod format;
 mod install;
 mod launch;
 mod library;
+mod profile;
 mod setup;
 mod toggle;
+mod update;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -109,6 +111,47 @@ enum Command {
         #[arg(long = "folder", value_parser = setup::parse_folder)]
         folders: Vec<(String, PathBuf)>,
     },
+    /// Move an installed GameBanana mod to its newest clean file, keeping each folder's name
+    /// and on/off state (the previous file stays cached for `gmm rollback`). Without a mod
+    /// id, list the installed mods that have a newer file.
+    Update {
+        /// GameBanana mod id (see `gmm list`).
+        gb_mod_id: Option<u64>,
+        /// A specific file id (see `gmm catalog show`) instead of the newest.
+        #[arg(long, requires = "gb_mod_id")]
+        file: Option<u64>,
+        #[command(flatten)]
+        setup: SetupArgs,
+    },
+    /// Move an installed GameBanana mod back to an earlier file from the download cache
+    /// (the newest other one, or --file). Nothing is downloaded.
+    Rollback {
+        /// GameBanana mod id (see `gmm list`).
+        gb_mod_id: u64,
+        /// A specific cached file id.
+        #[arg(long)]
+        file: Option<u64>,
+        #[command(flatten)]
+        setup: SetupArgs,
+    },
+    /// Install a mod from a .zip, .7z or .rar archive on this computer, with the same checks
+    /// as a download. The archive is copied into GMM's cache; your file is left alone.
+    InstallFile {
+        file: PathBuf,
+        /// The game it's for (see `gmm games`).
+        #[arg(long, value_parser = parse_game)]
+        game: &'static GameManifest,
+        /// Which variant to install when the archive holds several (repeatable).
+        #[arg(long = "variant")]
+        variants: Vec<String>,
+        #[arg(long, conflicts_with = "variants")]
+        all_variants: bool,
+        /// Install without executables or scripts found inside.
+        #[arg(long)]
+        skip_blocked: bool,
+        #[command(flatten)]
+        setup: SetupArgs,
+    },
     /// List each game's mods: the ones GMM installed (checked against the disk) and the
     /// ones it didn't.
     List {
@@ -144,6 +187,36 @@ enum Command {
         #[command(flatten)]
         setup: SetupArgs,
     },
+    /// Show a mod's key bindings (its [Key...] sections): which keys switch its parts in
+    /// game. GMM's mods by id, hand-installed ones by name or path (see `gmm list`).
+    Keys {
+        r#mod: String,
+        /// Only look in this game for hand-installed mods (see `gmm games`).
+        #[arg(long, value_parser = parse_game)]
+        game: Option<&'static GameManifest>,
+        #[command(flatten)]
+        setup: SetupArgs,
+    },
+    /// Take over a hand-installed mod as a GameBanana mod (update checks, updates, its page).
+    /// Without --gb, list the GameBanana mods it could be.
+    Adopt {
+        /// The hand-installed mod's name or path (see `gmm list`).
+        r#mod: String,
+        /// The GameBanana mod id it is.
+        #[arg(long)]
+        gb: Option<u64>,
+        /// Which of its files it is (default: the newest clean one).
+        #[arg(long, requires = "gb")]
+        file: Option<u64>,
+        /// Only look in this game (see `gmm games`).
+        #[arg(long, value_parser = parse_game)]
+        game: Option<&'static GameManifest>,
+        #[command(flatten)]
+        setup: SetupArgs,
+    },
+    /// Profiles: named sets of switched-on mods per game, shareable as a code.
+    #[command(subcommand)]
+    Profile(profile::ProfileCommand),
     /// Show enabled mods that replace the same things (managed and hand-installed).
     Conflicts {
         /// Only this game (see `gmm games`).
@@ -366,6 +439,53 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
         Command::List { game, setup } => {
             library::list(db, game, setup.xxmi, setup.folders, cli.json).await
         }
+        Command::InstallFile {
+            file,
+            game,
+            variants,
+            all_variants,
+            skip_blocked,
+            setup,
+        } => {
+            let args = install::LocalArgs {
+                file,
+                game,
+                variants,
+                all_variants,
+                skip_blocked,
+                xxmi: setup.xxmi,
+                folders: setup.folders,
+            };
+            install::run_local(db, args, cli.json).await
+        }
+        Command::Update {
+            gb_mod_id,
+            file,
+            setup,
+        } => {
+            let args = update::ChangeArgs {
+                gb_mod_id,
+                file,
+                rollback: false,
+                xxmi: setup.xxmi,
+                folders: setup.folders,
+            };
+            update::run(&gb, &net, db, args, cli.json).await
+        }
+        Command::Rollback {
+            gb_mod_id,
+            file,
+            setup,
+        } => {
+            let args = update::ChangeArgs {
+                gb_mod_id: Some(gb_mod_id),
+                file,
+                rollback: true,
+                xxmi: setup.xxmi,
+                folders: setup.folders,
+            };
+            update::run(&gb, &net, db, args, cli.json).await
+        }
         Command::Enable {
             mods,
             game,
@@ -400,6 +520,17 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
             };
             launch::run(db, game, yes, hints, cli.json).await
         }
+        Command::Keys { r#mod, game, setup } => {
+            toggle::keys(db, &r#mod, game, setup.hints(), cli.json).await
+        }
+        Command::Profile(cmd) => profile::run(db, cmd, cli.json).await,
+        Command::Adopt {
+            r#mod,
+            gb: gb_mod,
+            file,
+            game,
+            setup,
+        } => toggle::adopt(&gb, db, &r#mod, game, gb_mod, file, setup.hints(), cli.json).await,
         Command::Conflicts { game, setup } => {
             library::show_conflicts(db, game, setup.xxmi, setup.folders, cli.json).await
         }

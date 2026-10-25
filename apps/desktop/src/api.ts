@@ -5,6 +5,8 @@
 
 import { Channel, invoke } from "@tauri-apps/api/core";
 import type {
+  AdoptCandidate,
+  Adopted,
   CardStats,
   CatalogPage,
   CatalogQuery,
@@ -16,17 +18,25 @@ import type {
   GameInfo,
   GameStatus,
   InstallArgs,
+  InstalledFolder,
   InstallPlan,
   InstallProgress,
   InstallResult,
   Job,
+  KeyBindings,
   Launched,
   LaunchInfo,
   LibraryView,
+  LocalPlan,
   ModKey,
   ModProfile,
   ModUpdate,
+  NetworkStatus,
   Page,
+  ProfileApplied,
+  ProfileImported,
+  ProfileInfo,
+  RollbackFile,
   Settings,
   StartupReport,
   StartupStep,
@@ -35,6 +45,7 @@ import type {
   ToggleOutcome,
   Uninstalled,
   UninstallItem,
+  VariantPick,
 } from "./bindings";
 
 export type * from "./bindings";
@@ -76,6 +87,10 @@ export const api = {
 
   /** The confirmed install goes to the queue (the Downloads page). */
   queueInstall: (args: InstallArgs) => invoke<number>("queue_install", { args }),
+  /** Moves an installed mod to its newest file (an update) or to `fileId` (a roll back). */
+  queueChangeFile: (gbModId: number, fileId: number | null) => invoke<number>("queue_change_file", { gbModId, fileId }),
+  /** Earlier files of an installed mod still in the download cache. */
+  rollbackFiles: (game: string, gbModId: number) => invoke<RollbackFile[]>("rollback_files", { game, gbModId }),
   queueJobs: () => invoke<Job[]>("queue_jobs"),
   /** Calls `onChange` with the whole list now and whenever it changes. */
   queueWatch: (onChange: (jobs: Job[]) => void) => {
@@ -109,10 +124,39 @@ export const api = {
   uninstallPreview: (game: string, keys: ModKey[]) => invoke<UninstallItem[]>("uninstall_preview", { game, keys }),
   uninstall: (game: string, keys: ModKey[]) => invoke<Uninstalled[]>("uninstall", { game, keys }),
   conflicts: (game: string) => invoke<ConflictReport>("conflicts", { game }),
+  modKeybindings: (game: string, key: ModKey) => invoke<KeyBindings>("mod_keybindings", { game, key }),
+  adoptCandidates: (game: string, path: string) => invoke<AdoptCandidate[]>("adopt_candidates", { game, path }),
+  adopt: (game: string, path: string, gbModId: number, fileId: number | null) =>
+    invoke<Adopted>("adopt", { game, path, gbModId, fileId }),
+
+  profiles: (game: string) => invoke<ProfileInfo[]>("profiles", { game }),
+  profileSave: (game: string, name: string) => invoke<ProfileInfo>("profile_save", { game, name }),
+  profileApply: (game: string, id: number) => invoke<ProfileApplied>("profile_apply", { game, id }),
+  profileRename: (game: string, id: number, name: string) => invoke<null>("profile_rename", { game, id, name }),
+  profileDelete: (game: string, id: number) => invoke<null>("profile_delete", { game, id }),
+  profileExport: (game: string, id: number) => invoke<string>("profile_export", { game, id }),
+  profileImport: (game: string, code: string, name: string | null) =>
+    invoke<ProfileImported>("profile_import", { game, code, name }),
+
+  /** Calls `onDrop` with the name of each file dropped on the window (Rust keeps the path). */
+  dropWatch: (onDrop: (name: string) => void) => {
+    const channel = new Channel<string>();
+    channel.onmessage = onDrop;
+    return invoke<null>("drop_watch", { onDrop: channel });
+  },
+  /** A native file dialog for an archive; resolves with its name, or null when cancelled. */
+  pickArchive: () => invoke<string | null>("pick_archive"),
+  /** Copies the dropped or picked archive into the cache and looks inside, for `game`. */
+  prepareLocal: (game: string) => invoke<LocalPlan>("prepare_local", { game }),
+  installLocal: (variants: VariantPick, skipBlocked: boolean, startDisabled: boolean) =>
+    invoke<InstalledFolder[]>("install_local", { variants, skipBlocked, startDisabled }),
+  discardLocal: () => invoke<null>("discard_local"),
 
   storage: () => invoke<StorageView>("storage"),
   clearDownloadCache: () => invoke<ClearedCache>("clear_download_cache"),
   clearHttpCache: () => invoke<number>("clear_http_cache"),
+  /** Whether GameBanana asked GMM to slow down, and whether saved data is showing. Local only. */
+  networkStatus: () => invoke<NetworkStatus>("network_status"),
 
   /** Each asks in a native dialog first; resolves false when the user cancels. */
   openModPage: (modId: number) => invoke<boolean>("open_mod_page", { modId }),

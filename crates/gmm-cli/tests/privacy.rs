@@ -311,6 +311,8 @@ fn egress_and_file_access() {
             "install",
             vec!["install", "1", "--game", "zzz", "--xxmi", &xxmi],
         ),
+        ("update", vec!["update", "1", "--xxmi", &xxmi]),
+        ("rollback", vec!["rollback", "1", "--xxmi", &xxmi]),
     ];
     let children: Vec<(&str, Child)> = network
         .iter()
@@ -361,6 +363,14 @@ fn egress_and_file_access() {
         ("list", vec!["list"]),
         ("conflicts", vec!["conflicts"]),
         ("storage", vec!["storage"]),
+        // Nothing installed, so there is nothing to check.
+        ("update-check", vec!["update"]),
+        (
+            "profile-save",
+            vec!["profile", "save", "zzz", "Test", "--xxmi", &xxmi],
+        ),
+        ("profile-list", vec!["profile", "list", "zzz"]),
+        ("profile-export", vec!["profile", "export", "zzz", "Test"]),
         ("launch", vec!["launch", "zzz"]),
         ("config-remove", vec!["config", "remove-folder", &folder]),
         ("config-clear", vec!["config", "clear-xxmi"]),

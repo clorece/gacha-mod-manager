@@ -17,6 +17,7 @@ gmm-net.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+tokio.workspace = true
 ts-rs = { workspace = true, optional = true }
 url.workspace = true
 

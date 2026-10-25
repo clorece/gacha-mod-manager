@@ -126,17 +126,47 @@ Exit: everything the CLI does is reachable in the app for ZZZ and WuWa (RAR incl
 the designed loading, empty and error states; install (all confirmation paths), versions,
 uninstall, storage and settings exercised in the app against the real setup.
 
-## Phase 6 — Power features
+## Phase 6 — Power features (in progress)
 
-- [ ] One-click mod update with rollback from the download cache (the update check itself
-      lands in Phase 5's startup check)
-- [ ] Profiles (named sets of enabled mods; snapshot / restore `d3dx_user.ini`), shareable as a
-      JSON code
-- [ ] Keybind viewer (from `[Key*]` sections, already parsed by `gmm-migoto`)
-- [ ] Adopt unmanaged mods (match against GameBanana)
-- [ ] Drag-and-drop local archive install (same scan pipeline)
+Started 2026-10-25 at your request, alongside the Phase 5 screens still to build (the Store,
+mod page, Settings...). Each feature is built backend first (`gmm-core`, a `gmm` command,
+an app command) and shown where a screen already exists; the rest of its UI arrives with its
+Phase 5 screen.
+
+- [x] **Update and roll back** (2026-10-25): `gmm_core::change_file` moves every installed
+      folder of a GameBanana mod to another of its files, keeping each folder's name (so
+      3DMigoto's saved toggles survive) and on/off state; versions are matched by name; a
+      failed swap is undone; the previous folders go to the Recycle Bin and their archive
+      stays cached, so a roll back downloads nothing (`rollback_choices`). `gmm update`
+      (no id: list updates), `gmm rollback`; app: `queue_change_file` (through the queue,
+      "Updated" rows), `rollback_files`, Update / Roll back in the Mod settings panel
+- [x] **Profiles** (2026-10-25): named sets of switched-on mods per game (migration 0003);
+      apply switches exactly those on and the rest off, GMM's and hand-installed mods alike;
+      share codes are versioned JSON with GameBanana ids (hand-installed mods left out),
+      validated as untrusted input (size, counts, game, name). `gmm profile ...`; app:
+      `profiles`, `profile_save` / `apply` / `rename` / `delete` / `export` / `import`,
+      the Profiles panel in the Library
+- [ ] Profiles: snapshot / restore `d3dx_user.ini` (3DMigoto's saved in-game toggles). Waits
+      on your decision: the file is outside `Mods/`, so writing it needs an R3 amendment
+- [x] **Key bindings** (2026-10-25): `gmm_core::mod_keybindings` reads every `.ini` of a mod
+      (`DISABLED*` skipped, links not followed, conflict-check limits). `gmm keys`; app:
+      `mod_keybindings`, Key bindings in the Mod settings panel (key names prettified)
+- [x] **Adopt hand-installed mods** (2026-10-25): suggestions from the folder's own
+      `gmm.json`, a GameBanana id in its name, then a search; the user picks; the folder
+      keeps its name (moved into `Mods/GMM/` only if it was elsewhere) and gets a
+      `gmm.json` and a row. `gmm adopt`; app: `adopt_candidates`, `adopt`, Find on
+      GameBanana in the Mod settings panel (flagged previews hidden)
+- [x] **Install from a local archive** (2026-10-25): `gmm_core::prepare_local` copies the
+      archive into the cache (its folder registered read-only for that one read), then the
+      same extraction, scan and classification as a download; `install_local`. `gmm
+      install-file`; app: a file dropped on the window reaches Rust (R5), or "Install from a
+      file" on Downloads opens a native dialog; the local install confirmation (game,
+      versions, blocked files)
 - [ ] Report a Bug (describe, attach a log the user reviews; needs a destination host, R2)
-- [ ] 1-click install deep links (`gmm://`) if GameBanana allows (T6)
+- [ ] 1-click install deep links (`gmm://`): needs GameBanana to add GMM as a mod-manager
+      integration for ZZZ/WuWa (none listed today, [10](10-gamebanana-api.md)); then T6
+- [ ] UI still to come with Phase 5 screens: version groups and switching in the Library,
+      Update badges on cards, profiles in the Dashboard
 
 ## Phase 7 — Release
 
@@ -147,7 +177,9 @@ uninstall, storage and settings exercised in the app against the real setup.
       (Process Monitor, a firewall rule for the bypass check); reproducible-build check;
       release feature assertion; `SECURITY.md`
 - [ ] Licensing checklist in [06](06-licensing-and-provenance.md) (third-party notices in About)
-- [ ] GameBanana contacted about API use and 1-click
+- [ ] Courtesy contact with GameBanana before the public beta (not a permission: none is
+      needed, [10](10-gamebanana-api.md)): say what GMM requests and its User-Agent, ask about
+      a 1-click integration for ZZZ/WuWa and the "Powered by GameBanana" wording
 - [ ] Public beta (Windows), then Linux (AppImage / Flatpak) from the same codebase
 
 ## Phase 8+ — More games
@@ -182,11 +214,21 @@ Epic install to confirm the Epic reader (fixture-tested only).
   your decision.
 - The browser openers (`open_mod_page`, `open_link`, `open_xxmi_releases`) need a click
   in their native dialog, so they haven't been driven end to end yet; their address checks
-  have unit tests.
+  have unit tests. The same goes for a real file drop and the "Install from a file" dialog:
+  the local install pipeline is tested in `gmm-core`, not yet through the window.
+- GameBanana publishes no rate limit; GMM's budget (2 API requests/s per install) is a
+  guess, backed by the shared cooldown ([10](10-gamebanana-api.md)). The cooldown and the
+  "slow down" notice have only been exercised against a mock server.
+- Applying a profile renames the mods it switches (`DISABLED `), so 3DMigoto forgets their
+  saved in-game toggles until `d3dx_user.ini` snapshots exist (above).
+- Updating an adopted mod replaces the files that were there by hand with GameBanana's.
 
 ## Open questions
 
 1. **Name.** The license is decided (MIT OR Apache-2.0, see [06](06-licensing-and-provenance.md)).
    The product name still needs to be chosen and cleared before publishing.
-2. **GameBanana relationship.** Contact them before release about API use and 1-click.
+2. **GameBanana relationship.** No permission needed ([10](10-gamebanana-api.md)); a courtesy
+   contact before the public beta, mainly for 1-click.
 3. **Copyright holder** for the license files (currently "The Gacha Mod Manager Contributors").
+4. **`d3dx_user.ini` in profiles**: an R3 amendment letting GMM write that one file in each
+   importer folder. Your call.

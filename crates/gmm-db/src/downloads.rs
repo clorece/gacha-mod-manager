@@ -99,6 +99,21 @@ impl Db {
     }
 
     /// Every cached archive, least recently used first (the eviction order).
+    /// The archives kept for one GameBanana mod, newest first (what a roll back can use
+    /// without downloading).
+    pub async fn cached_downloads_for_mod(
+        &self,
+        gb_mod_id: u64,
+    ) -> Result<Vec<CachedDownload>, DbError> {
+        let rows = sqlx::query(select!(
+            "WHERE gb_mod_id = ? ORDER BY added_at DESC, sha256"
+        ))
+        .bind(to_db(gb_mod_id, "gb_mod_id")?)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.iter().map(map_row).collect()
+    }
+
     pub async fn cached_downloads(&self) -> Result<Vec<CachedDownload>, DbError> {
         let rows = sqlx::query(select!("ORDER BY last_used_at, sha256"))
             .fetch_all(&self.pool)

@@ -28,8 +28,8 @@ use crate::error::{CmdError, CmdResult};
 use crate::views::{
     CardStats, CatalogPage, CatalogQuery, FolderRow, GameInfo, GameStorageView, InstallArgs,
     InstallProgress, InstallResult, LaunchInfo, Launched, LibraryView, ModKey, ModRow,
-    ProgressThrottle, Settings, StorageView, Toggled, UninstallItem, Uninstalled,
-    rewrite_categories, rewrite_profile, rewrite_summary, rewrite_updates,
+    NetworkStatus, ProgressThrottle, RollbackFile, Settings, StorageView, Toggled, UninstallItem,
+    Uninstalled, rewrite_categories, rewrite_profile, rewrite_summary, rewrite_updates,
 };
 
 pub(crate) fn registry() -> CmdResult<&'static Registry> {
@@ -233,6 +233,48 @@ pub async fn prepare_install(
     let plan = gmm_core::install_plan(&state.db, game, &prepared).await;
     prepared.discard(&target.ws);
     Ok(plan?)
+}
+
+/// The earlier files of an installed mod that are still in the download cache, newest first:
+/// what "Roll back" offers (no download needed).
+#[tauri::command]
+pub async fn rollback_files(
+    state: State<'_, AppState>,
+    game: String,
+    gb_mod_id: u64,
+) -> CmdResult<Vec<RollbackFile>> {
+    let game = game_by_id(&game)?;
+    let ids = gmm_core::rollback_choices(&state.db, game, gb_mod_id).await?;
+    // Names and dates from the mod page when GameBanana still lists the file; the cached
+    // file's own name otherwise (`<file id>-<name>`).
+    let listed = state.gb.mod_profile(gb_mod_id).await.ok();
+    let cached = state.db.cached_downloads_for_mod(gb_mod_id).await?;
+    Ok(ids
+        .into_iter()
+        .map(|file_id| {
+            let on_page = listed.as_ref().and_then(|p| {
+                p.files
+                    .files
+                    .iter()
+                    .chain(&p.files.archived_files)
+                    .find(|f| f.id == file_id)
+            });
+            let cached_name = cached
+                .iter()
+                .find(|c| c.gb_file_id == Some(file_id))
+                .and_then(|c| c.path_rel.rsplit('/').next())
+                .map(|n| n.split_once('-').map_or(n, |(_, name)| name).to_owned());
+            RollbackFile {
+                file_id,
+                name: on_page
+                    .map(|f| f.name.clone())
+                    .or(cached_name)
+                    .unwrap_or_else(|| format!("file {file_id}")),
+                date_added: on_page.map(|f| f.date_added),
+                version: on_page.and_then(|f| f.version.clone()),
+            }
+        })
+        .collect())
 }
 
 /// Switches one version of a mod on and the versions that clash with it off. Returns every
@@ -471,6 +513,66 @@ pub async fn uninstall(
     Ok(done)
 }
 
+/// A mod's key bindings (its `[Key*]` sections), for the Mod settings panel. Read-only.
+#[tauri::command]
+pub async fn mod_keybindings(
+    state: State<'_, AppState>,
+    game: String,
+    key: ModKey,
+) -> CmdResult<gmm_core::KeyBindings> {
+    let game = game_by_id(&game)?;
+    let target = mods_target(&state, game).await?;
+    let which = match &key {
+        ModKey::Managed { id } => gmm_core::ModFolder::Managed(*id),
+        ModKey::Unmanaged { path } => gmm_core::ModFolder::Unmanaged(path),
+    };
+    Ok(gmm_core::mod_keybindings(&state.db, &target.ws, target.mods, game, which).await?)
+}
+
+/// The GameBanana mods a hand-installed folder could be, best first (its `gmm.json`, an id
+/// in its name, then a search). `path` must be one the library listed.
+#[tauri::command]
+pub async fn adopt_candidates(
+    state: State<'_, AppState>,
+    game: String,
+    path: String,
+) -> CmdResult<Vec<gmm_core::AdoptCandidate>> {
+    let game = game_by_id(&game)?;
+    let target = mods_target(&state, game).await?;
+    let mut found =
+        gmm_core::adopt_candidates(&state.gb, &state.db, &target.ws, target.mods, game, &path)
+            .await?;
+    for c in &mut found {
+        rewrite_summary(&state.images, &mut c.summary);
+    }
+    Ok(found)
+}
+
+/// Takes over a hand-installed folder as GameBanana mod `gb_mod_id` (file `file_id`, or
+/// the newest clean one), after the user picked it.
+#[tauri::command]
+pub async fn adopt(
+    state: State<'_, AppState>,
+    game: String,
+    path: String,
+    gb_mod_id: u64,
+    file_id: Option<u64>,
+) -> CmdResult<gmm_core::Adopted> {
+    let game = game_by_id(&game)?;
+    let target = mods_target(&state, game).await?;
+    Ok(gmm_core::adopt(
+        &state.gb,
+        &state.db,
+        &target.ws,
+        target.mods,
+        game,
+        &path,
+        gb_mod_id,
+        file_id,
+    )
+    .await?)
+}
+
 /// Enabled mods of a game that replace the same things.
 #[tauri::command]
 pub async fn conflicts(state: State<'_, AppState>, game: String) -> CmdResult<ConflictReport> {
@@ -506,6 +608,19 @@ pub async fn storage(state: State<'_, AppState>) -> CmdResult<StorageView> {
 pub async fn clear_download_cache(state: State<'_, AppState>) -> CmdResult<ClearedCache> {
     let ws = gmm_core::Workspace::open(&state.dirs.cache)?;
     Ok(clear_downloads(&state.db, &ws, &RecycleBin).await?)
+}
+
+/// How GameBanana is treating GMM right now, for the app's notice: whether it asked GMM to
+/// slow down (and for how long still), and whether saved answers were shown lately because
+/// fresh ones couldn't be had. Local only; asks nothing of GameBanana.
+#[tauri::command]
+pub fn network_status(state: State<'_, AppState>) -> NetworkStatus {
+    const RECENT: std::time::Duration = std::time::Duration::from_secs(90);
+    NetworkStatus {
+        cooldown_secs: state.gb.cooldown_remaining().map(|d| d.as_secs().max(1)),
+        showing_saved: state.gb.served_saved_data_within(RECENT)
+            || state.gb_background.served_saved_data_within(RECENT),
+    }
 }
 
 /// Empties the cache of GameBanana responses (the next pages load fresh). Returns how many

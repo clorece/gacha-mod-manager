@@ -13,12 +13,13 @@
 
 mod allowlist;
 mod client;
+mod cooldown;
 mod download;
 mod error;
 mod limiter;
 
 pub use allowlist::Allowlist;
-pub use client::{Client, HttpResponse, NetConfig};
+pub use client::{Client, HttpResponse, NetConfig, Slowdown};
 pub use download::{DownloadOutcome, DownloadRequest, Progress};
 pub use error::NetError;
 pub use limiter::RateLimit;

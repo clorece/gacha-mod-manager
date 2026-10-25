@@ -30,6 +30,11 @@ pub enum JobState {
     Installing {
         folder: String,
     },
+    /// GameBanana asked GMM to slow down; the install carries on by itself at `until`
+    /// (Unix seconds). Pausing or cancelling still works.
+    Waiting {
+        until: i64,
+    },
     Paused,
     Done {
         installed: Vec<InstalledFolder>,
@@ -51,9 +56,25 @@ impl JobState {
     fn is_running(&self) -> bool {
         matches!(
             self,
-            Self::Downloading { .. } | Self::Extracting | Self::Installing { .. }
+            Self::Downloading { .. }
+                | Self::Extracting
+                | Self::Installing { .. }
+                | Self::Waiting { .. }
         )
     }
+}
+
+/// What a job does.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum JobAction {
+    /// Installs a mod (the install confirmation).
+    #[default]
+    Install,
+    /// Moves an installed mod to another of its files: an update or a roll back
+    /// ([`crate::change_file`]).
+    ChangeFile,
 }
 
 /// What to install; set when the install is confirmed.
@@ -63,6 +84,7 @@ pub struct JobRequest {
     pub mod_id: u64,
     pub file_id: Option<u64>,
     pub options: InstallOptions,
+    pub action: JobAction,
 }
 
 /// One row on the Downloads page.
@@ -70,6 +92,7 @@ pub struct JobRequest {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Job {
     pub id: JobId,
+    pub action: JobAction,
     pub game: String,
     pub mod_id: u64,
     pub mod_name: String,
@@ -153,6 +176,7 @@ impl InstallQueue {
         inner.entries.push(Entry {
             job: Job {
                 id,
+                action: request.action,
                 game: request.game.clone(),
                 mod_id: request.mod_id,
                 mod_name: label.mod_name,
@@ -315,6 +339,7 @@ mod tests {
             mod_id,
             file_id: None,
             options: InstallOptions::default(),
+            action: JobAction::Install,
         }
     }
 

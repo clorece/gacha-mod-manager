@@ -9,7 +9,9 @@
 mod commands;
 mod error;
 mod html;
+mod local;
 mod open;
+mod profiles;
 mod queue;
 mod startup;
 mod views;
@@ -37,6 +39,8 @@ pub struct AppState {
     pub images: Arc<ImageCache>,
     /// Link keys handed out in rewritten descriptions (`open_link`).
     pub links: html::Links,
+    /// The archive dropped or picked for a local install (`local.rs`).
+    pub local: local::Local,
     pub dirs: AppDirs,
     /// The Downloads page's installs, run one at a time by `queue::spawn_worker`.
     pub queue: InstallQueue,
@@ -49,24 +53,28 @@ impl AppState {
     async fn open() -> Result<Self, Box<dyn std::error::Error>> {
         let dirs = AppDirs::system()?;
         let db = open_db(&dirs).await?;
+        // Every client shares one connection pool and one "slow down" state: they all reach
+        // GameBanana from the same IP address (docs/10-gamebanana-api.md).
         let net = Client::new(NetConfig::production())?;
         let gb = GameBanana::new(net.clone(), Arc::new(db.clone()));
-        let background_net = Client::new(NetConfig {
-            rate_limit: RateLimit {
-                per_second: 2.0,
-                burst: 4,
+        // Background reads (card counters) spend the API budget too, at most 1/s of it.
+        let background_net = net.sibling(
+            RateLimit {
+                per_second: 1.0,
+                burst: 2,
             },
-            ..NetConfig::production()
-        })?;
+            true,
+        );
         let gb_background = GameBanana::new(background_net, Arc::new(db.clone()));
-        // Images get their own rate limit so a page of thumbnails doesn't hold up API calls.
-        let image_net = Client::new(NetConfig {
-            rate_limit: RateLimit {
+        // Images come from GameBanana's image host, not the API, so a page of thumbnails
+        // gets its own rate and doesn't hold up API calls.
+        let image_net = net.sibling(
+            RateLimit {
                 per_second: 8.0,
                 burst: 16,
             },
-            ..NetConfig::production()
-        })?;
+            false,
+        );
         let images = Arc::new(ImageCache::open(&dirs.cache, image_net)?);
         Ok(Self {
             db,
@@ -75,6 +83,7 @@ impl AppState {
             gb_background,
             images,
             links: html::Links::default(),
+            local: local::Local::default(),
             dirs,
             queue: InstallQueue::new(),
             wake: tokio::sync::Notify::new(),
@@ -144,6 +153,12 @@ fn main() {
             queue::spawn_worker(app.handle().clone());
             Ok(())
         })
+        // Files dropped on the window reach Rust, not the webview (R5): a local install.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
+                local::dropped(window.app_handle(), paths);
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::games,
             commands::statuses,
@@ -157,6 +172,7 @@ fn main() {
             commands::prepare_install,
             commands::install,
             queue::queue_install,
+            queue::queue_change_file,
             queue::queue_jobs,
             queue::queue_watch,
             queue::queue_pause,
@@ -167,13 +183,23 @@ fn main() {
             startup::startup_check,
             commands::library,
             commands::switch_version,
+            commands::rollback_files,
             commands::set_enabled,
             commands::uninstall_preview,
             commands::uninstall,
+            commands::mod_keybindings,
+            commands::adopt_candidates,
+            commands::adopt,
+            local::drop_watch,
+            local::pick_archive,
+            local::prepare_local,
+            local::install_local,
+            local::discard_local,
             commands::conflicts,
             commands::storage,
             commands::clear_download_cache,
             commands::clear_http_cache,
+            commands::network_status,
             commands::launch_plan,
             commands::launch,
             commands::settings,
@@ -185,6 +211,13 @@ fn main() {
             open::open_xxmi_releases,
             open::open_link,
             open::open_mod_folder,
+            profiles::profiles,
+            profiles::profile_save,
+            profiles::profile_apply,
+            profiles::profile_rename,
+            profiles::profile_delete,
+            profiles::profile_export,
+            profiles::profile_import,
         ])
         .run(tauri::generate_context!());
     if let Err(e) = result {

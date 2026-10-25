@@ -5,8 +5,9 @@
 // Category, character and select mode come with Phase 5's stored categories.
 
 import { useState } from "react";
-import { api, asCmdError, type Conflict, type GameInfo, type ModKey, type ModRef } from "../api";
+import { api, asCmdError, type Conflict, type GameInfo, type ModKey, type ModRef, type ModUpdateInfo } from "../api";
 import { ModSettings } from "../components/ModSettings";
+import { ProfilesPanel } from "../components/ProfilesPanel";
 import { type AppData, modCounts } from "../data";
 import { bytes, day, plural } from "../format";
 import { ALL, bannerClass, type Scope } from "../games";
@@ -29,6 +30,10 @@ export type LibraryItem = {
   version: string | null;
   folder: string;
   art: string;
+  /** GameBanana mod id, for GMM's mods from GameBanana. */
+  gbModId: number | null;
+  /** A folder (hand-installed loose `.ini` files aren't). */
+  isDir: boolean;
 };
 
 function refName(ref: ModRef): string {
@@ -53,6 +58,8 @@ function itemsFor(data: AppData, games: GameInfo[]): LibraryItem[] {
         version: m.version,
         folder: `GMM/${m.folder}`,
         art: artClass(m.id),
+        gbModId: m.gb_mod_id,
+        isDir: true,
       })),
       ...view.unmanaged.map<LibraryItem>((u) => ({
         game,
@@ -67,6 +74,8 @@ function itemsFor(data: AppData, games: GameInfo[]): LibraryItem[] {
         version: null,
         folder: u.path,
         art: "art art-hand",
+        gbModId: null,
+        isDir: u.is_dir,
       })),
     ];
   });
@@ -80,12 +89,26 @@ function isSelf(ref: ModRef, key: ModKey): boolean {
 
 const keyId = (game: string, key: ModKey) => `${game}|${key.type === "managed" ? key.id : key.path}`;
 
-export function Library({ data, scope, onScope }: { data: AppData; scope: Scope; onScope: (s: Scope) => void }) {
+export function Library({
+  data,
+  scope,
+  onScope,
+  updates,
+  onQueued,
+}: {
+  data: AppData;
+  scope: Scope;
+  onScope: (s: Scope) => void;
+  /** Newer files found by the startup check. */
+  updates: ModUpdateInfo[];
+  onQueued: () => void;
+}) {
   const toast = useToast();
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<{ item: LibraryItem; conflicts: Conflict[] } | null>(null);
   const [blocked, setBlocked] = useState<string[]>([]);
   const [settingsFor, setSettingsFor] = useState<string | null>(null);
+  const [profilesOpen, setProfilesOpen] = useState(false);
 
   const inScope = scope === ALL ? data.games : data.games.filter((g) => g.id === scope);
   const items = itemsFor(data, inScope);
@@ -219,6 +242,14 @@ export function Library({ data, scope, onScope }: { data: AppData; scope: Scope;
             {plural(shown.length, "mod")} · {shown.filter((i) => i.enabled).length} on
           </span>
           <span className="spacer" />
+          <Button
+            icon="layers"
+            onClick={() => setProfilesOpen(true)}
+            disabled={scope === ALL}
+            title={scope === ALL ? "Pick a game first: profiles are per game" : undefined}
+          >
+            Profiles
+          </Button>
           <Button onClick={() => setAll(true)} disabled={shown.length === 0}>
             Enable all
           </Button>
@@ -248,12 +279,28 @@ export function Library({ data, scope, onScope }: { data: AppData; scope: Scope;
         </div>
       )}
 
+      {profilesOpen && inScope.length === 1 && inScope[0] && (
+        <ProfilesPanel
+          game={inScope[0]}
+          onClose={() => setProfilesOpen(false)}
+          onApplied={() => data.refreshLibrary(scope)}
+        />
+      )}
       {settingsItem && (
         <ModSettings
           item={settingsItem}
           onClose={() => setSettingsFor(null)}
           onToggle={(on) => toggle(settingsItem, on)}
           onRemoved={async () => {
+            setSettingsFor(null);
+            await data.refreshLibrary(settingsItem.game.id);
+          }}
+          update={updates.find((u) => u.game === settingsItem.game.id && u.gb_mod_id === settingsItem.gbModId)}
+          onQueued={() => {
+            setSettingsFor(null);
+            onQueued();
+          }}
+          onChanged={async () => {
             setSettingsFor(null);
             await data.refreshLibrary(settingsItem.game.id);
           }}

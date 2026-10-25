@@ -20,7 +20,7 @@ use crate::names::{GMM_DIR, SIDECAR_FILE, STAGING_DIR, mod_folder_name, on_disk_
 use crate::stop::StopSignal;
 use crate::workspace::{STALE_TEMP, Workspace, remove_stale, unique_id};
 
-const SIDECAR_FORMAT: u32 = 1;
+pub(crate) const SIDECAR_FORMAT: u32 = 1;
 
 /// Which variants of an archive to install.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -406,19 +406,12 @@ pub async fn install_analyzed(
                 return Err(CoreError::FolderTaken { folder });
             }
         }
-        let in_variant = |f: &&Finding| f.path.starts_with(&variant.root);
-        let blocked: Vec<RelPath> = analysis
-            .scan
-            .blocked()
-            .filter(in_variant)
-            .map(|f| f.path.clone())
-            .collect();
+        let (blocked, findings) = variant_findings(analysis, variant);
         if !blocked.is_empty() && !options.skip_blocked {
             return Err(CoreError::Blocked(
                 blocked.iter().map(ToString::to_string).collect(),
             ));
         }
-        let findings: Vec<&Finding> = analysis.scan.findings.iter().filter(in_variant).collect();
         plans.push((variant, folder, blocked, findings));
     }
 
@@ -437,71 +430,10 @@ pub async fn install_analyzed(
                 folder: folder.clone(),
             });
             let dir = stage.join(&index.to_string())?;
-            let (files, bytes) = copy_variant(guard, analysis, variant, &blocked, &dir)?;
-            let variant_name = (!variant.name.is_empty()).then(|| variant.name.clone());
-            let sidecar = Sidecar {
-                format: SIDECAR_FORMAT,
-                game: game.id().to_owned(),
-                name: meta.name.clone(),
-                variant: variant_name.clone(),
-                gb_mod_id: meta.gb_mod_id,
-                gb_file_id: meta.gb_file_id,
-                file_name: meta.file_name.clone(),
-                file_date: meta.file_date,
-                version: meta.version.clone(),
-                archive_sha256: meta.archive_sha256.clone(),
-                installed_at: now(),
-                installed_by: format!("GMM {}", env!("CARGO_PKG_VERSION")),
-            };
-            guard.write_atomic(
-                &dir.join(SIDECAR_FILE)?,
-                &serde_json::to_vec_pretty(&sidecar)?,
+            let assembled = assemble_variant(
+                guard, game, meta, analysis, variant, &folder, &blocked, &findings, &dir,
             )?;
-            let report: Vec<ScanEntry> = findings
-                .iter()
-                .map(|f| ScanEntry {
-                    path: relative_to(&f.path, &variant.root),
-                    severity: match f.severity {
-                        Severity::Blocked => "blocked",
-                        Severity::Warning => "warning",
-                    },
-                    kind: format!("{:?}", f.kind),
-                })
-                .collect();
-            let warnings = findings
-                .iter()
-                .filter(|f| f.severity == Severity::Warning)
-                .map(|f| format!("{}: {:?}", relative_to(&f.path, &variant.root), f.kind))
-                .collect();
-            staged.push((
-                dir,
-                NewInstalledMod {
-                    game_id: game.id().to_owned(),
-                    folder_name: folder.clone(),
-                    name: meta.name.clone(),
-                    gb_mod_id: meta.gb_mod_id,
-                    gb_file_id: meta.gb_file_id,
-                    variant: variant_name.clone(),
-                    version: meta.version.clone(),
-                    file_date: meta.file_date,
-                    archive_sha256: Some(meta.archive_sha256.clone()),
-                    size_bytes: bytes,
-                    scan_report_json: Some(serde_json::to_string(&report)?),
-                    categories: meta.categories.clone(),
-                },
-                InstalledFolder {
-                    id: 0,
-                    folder_name: folder,
-                    variant: variant_name,
-                    files,
-                    bytes,
-                    skipped: blocked
-                        .iter()
-                        .map(|p| relative_to(p, &variant.root))
-                        .collect(),
-                    warnings,
-                },
-            ));
+            staged.push((dir, assembled.row, assembled.folder));
         }
 
         // Record, then rename. If the rename fails the row is removed again.
@@ -526,6 +458,108 @@ pub async fn install_analyzed(
     .await;
     let _ = guard.remove_dir_all(&stage);
     result
+}
+
+/// A chosen variant's blocked files (left out) and every scan finding inside it.
+pub(crate) fn variant_findings<'a>(
+    analysis: &'a Analysis,
+    variant: &Variant,
+) -> (Vec<RelPath>, Vec<&'a Finding>) {
+    let in_variant = |f: &&Finding| f.path.starts_with(&variant.root);
+    let blocked = analysis
+        .scan
+        .blocked()
+        .filter(in_variant)
+        .map(|f| f.path.clone())
+        .collect();
+    let findings = analysis.scan.findings.iter().filter(in_variant).collect();
+    (blocked, findings)
+}
+
+/// One variant copied into `dir` with its `gmm.json`: the row to record and the report.
+pub(crate) struct Assembled {
+    pub row: NewInstalledMod,
+    pub folder: InstalledFolder,
+}
+
+/// Copies a variant (minus `blocked`) into `dir` and writes its sidecar. Nothing in the
+/// Mods folder changes yet; `dir` is under the staging folder.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn assemble_variant(
+    guard: &Guard,
+    game: &GameManifest,
+    meta: &ModMeta,
+    analysis: &Analysis,
+    variant: &Variant,
+    folder: &str,
+    blocked: &[RelPath],
+    findings: &[&Finding],
+    dir: &ScopedPath,
+) -> Result<Assembled, CoreError> {
+    let (files, bytes) = copy_variant(guard, analysis, variant, blocked, dir)?;
+    let variant_name = (!variant.name.is_empty()).then(|| variant.name.clone());
+    let sidecar = Sidecar {
+        format: SIDECAR_FORMAT,
+        game: game.id().to_owned(),
+        name: meta.name.clone(),
+        variant: variant_name.clone(),
+        gb_mod_id: meta.gb_mod_id,
+        gb_file_id: meta.gb_file_id,
+        file_name: meta.file_name.clone(),
+        file_date: meta.file_date,
+        version: meta.version.clone(),
+        archive_sha256: meta.archive_sha256.clone(),
+        installed_at: now(),
+        installed_by: format!("GMM {}", env!("CARGO_PKG_VERSION")),
+    };
+    guard.write_atomic(
+        &dir.join(SIDECAR_FILE)?,
+        &serde_json::to_vec_pretty(&sidecar)?,
+    )?;
+    let report: Vec<ScanEntry> = findings
+        .iter()
+        .map(|f| ScanEntry {
+            path: relative_to(&f.path, &variant.root),
+            severity: match f.severity {
+                Severity::Blocked => "blocked",
+                Severity::Warning => "warning",
+            },
+            kind: format!("{:?}", f.kind),
+        })
+        .collect();
+    let warnings = findings
+        .iter()
+        .filter(|f| f.severity == Severity::Warning)
+        .map(|f| format!("{}: {:?}", relative_to(&f.path, &variant.root), f.kind))
+        .collect();
+    Ok(Assembled {
+        row: NewInstalledMod {
+            game_id: game.id().to_owned(),
+            folder_name: folder.to_owned(),
+            name: meta.name.clone(),
+            gb_mod_id: meta.gb_mod_id,
+            gb_file_id: meta.gb_file_id,
+            variant: variant_name.clone(),
+            version: meta.version.clone(),
+            file_date: meta.file_date,
+            archive_sha256: Some(meta.archive_sha256.clone()),
+            size_bytes: bytes,
+            scan_report_json: Some(serde_json::to_string(&report)?),
+            categories: meta.categories.clone(),
+        },
+        folder: InstalledFolder {
+            id: 0,
+            folder_name: folder.to_owned(),
+            variant: variant_name,
+            files,
+            bytes,
+            skipped: blocked
+                .iter()
+                .map(|p| relative_to(p, &variant.root))
+                .collect(),
+            warnings,
+        },
+    })
 }
 
 fn select_variants<'a>(
@@ -618,7 +652,7 @@ fn relative_to(path: &RelPath, root: &RelPath) -> String {
         .to_string()
 }
 
-fn now() -> i64 {
+pub(crate) fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))

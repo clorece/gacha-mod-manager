@@ -33,7 +33,7 @@ async fn file_database_is_created_migrated_and_reopened() {
     let file = guard.path(data, DB_FILE_NAME).unwrap();
 
     let db = Db::open(&guard, &file).await.unwrap();
-    assert_eq!(db.schema_version().await.unwrap(), 2);
+    assert_eq!(db.schema_version().await.unwrap(), 3);
     db.set_xxmi_root(Some(Path::new(r"D:\XXMI Launcher")))
         .await
         .unwrap();
@@ -42,7 +42,7 @@ async fn file_database_is_created_migrated_and_reopened() {
 
     // Reopening runs no migration twice and keeps the data.
     let db = Db::open(&guard, &file).await.unwrap();
-    assert_eq!(db.schema_version().await.unwrap(), 2);
+    assert_eq!(db.schema_version().await.unwrap(), 3);
     assert_eq!(
         db.xxmi_root().await.unwrap().as_deref(),
         Some(Path::new(r"D:\XXMI Launcher"))
@@ -270,4 +270,27 @@ async fn http_cache_through_the_catalog_trait() {
     assert_eq!(db.http_cache_stats().await.unwrap(), (1, 12));
     assert_eq!(db.clear_http_cache().await.unwrap(), 1);
     assert_eq!(cache.get(url, HOUR).await, None);
+}
+
+#[tokio::test]
+async fn profiles_save_replace_rename_delete() {
+    let db = Db::open_in_memory().await.unwrap();
+    let a = db.save_profile("zzz", "Casual", "[1]").await.unwrap();
+    let again = db.save_profile("zzz", "Casual", "[2]").await.unwrap();
+    assert_eq!(a, again, "same name replaces");
+    assert_eq!(db.profile(a).await.unwrap().unwrap().entries_json, "[2]");
+    let b = db.save_profile("zzz", "Battle", "[]").await.unwrap();
+    db.save_profile("wuwa", "Casual", "[]").await.unwrap();
+    let names: Vec<String> = db
+        .profiles("zzz")
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|p| p.name)
+        .collect();
+    assert_eq!(names, ["Battle", "Casual"]);
+    assert!(!db.rename_profile(b, "Casual").await.unwrap(), "name taken");
+    assert!(db.rename_profile(b, "Combat").await.unwrap());
+    assert!(db.delete_profile(a).await.unwrap());
+    assert!(db.profile(a).await.unwrap().is_none());
 }

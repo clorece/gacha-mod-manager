@@ -94,7 +94,8 @@ impl Client {
             }
         }
 
-        self.limiter.acquire().await;
+        self.respect_cooldown().await?;
+        self.acquire().await;
         let mut request = self.http.get(req.url.clone());
         if have > 0 {
             request = request.header(RANGE, format!("bytes={have}-"));
@@ -104,6 +105,10 @@ impl Client {
             .await
             .map_err(|e| request_error(&req.url, e))?;
         let status = resp.status().as_u16();
+        if let Some(slow_down) = self.slowdown(status, resp.headers()) {
+            // The partial file stays; the next attempt resumes it.
+            return Err(slow_down);
+        }
         let (mut file, resumed) = match status {
             206 if have > 0 && content_range_start(&resp) == Some(have) => {
                 (guard.open_append(&part)?, true)
@@ -191,6 +196,7 @@ impl Client {
         }
         let sha256 = hex::encode(hashes.sha256.finalize());
         guard.rename(&part, &req.dest)?;
+        self.succeeded();
         Ok(DownloadOutcome {
             bytes: have,
             sha256,

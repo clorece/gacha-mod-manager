@@ -19,25 +19,31 @@
 //! setup state whether installing makes sense yet. A [`StopSignal`] pauses or cancels an
 //! install; [`InstallQueue`] keeps the Downloads page's list.
 
+mod adopt;
 mod analyze;
 mod conflicts;
 mod error;
 mod fetch;
 mod images;
 mod install;
+mod keys;
 mod launch;
 mod library;
+mod local;
 mod names;
 mod plan;
+mod profiles;
 mod queue;
 mod setup;
 mod stop;
 mod storage;
 mod store;
+mod update;
 mod updates;
 mod versions;
 mod workspace;
 
+pub use adopt::{AdoptCandidate, Adopted, MatchReason, adopt, adopt_candidates};
 pub use analyze::{Analysis, Variant, VersionConflict, analyze};
 pub use conflicts::{
     Conflict, ConflictReport, ModRef, conflicts, conflicts_after_install, conflicts_for,
@@ -51,6 +57,7 @@ pub use install::{
     Prepared, Sidecar, VariantChoice, install, install_analyzed, install_gate, install_prepared,
     prepare,
 };
+pub use keys::{KeyBindings, ModKeyBinding, mod_keybindings};
 pub use launch::{LaunchPlan, confirm_exe, plan_launch, start};
 pub use library::{
     DiskState, Library, ManagedMod, ModFolder, RecycleBin, ToggleOutcome, Trash, UninstallOutcome,
@@ -58,11 +65,19 @@ pub use library::{
     one_unmanaged, set_enabled, set_unmanaged_enabled, set_unmanaged_enabled_at, uninstall,
     uninstall_unmanaged,
 };
+pub use local::{
+    LOCAL_ARCHIVE_TYPES, LocalPlan, LocalPrepared, install_local, local_plan, prepare_local,
+};
 pub use names::{
     DISABLED_PREFIX, GMM_DIR, SIDECAR_FILE, STAGING_DIR, mod_folder_name, on_disk_name,
 };
 pub use plan::{InstallPlan, VersionPlan, install_plan};
-pub use queue::{InstallQueue, Job, JobId, JobLabel, JobRequest, JobState, NextJob};
+pub use profiles::{
+    MAX_PROFILE_NAME, MAX_SHARE_CODE, ProfileApplied, ProfileImported, ProfileInfo, SharedMod,
+    apply_profile, delete_profile, export_profile, import_profile, profiles, rename_profile,
+    save_profile,
+};
+pub use queue::{InstallQueue, Job, JobAction, JobId, JobLabel, JobRequest, JobState, NextJob};
 pub use setup::{Machine, ModsTarget, SetupHints, game_for_mod, saved_setup};
 pub use stop::{StopReason, StopSignal};
 pub use storage::{
@@ -70,6 +85,7 @@ pub use storage::{
     game_storage, unmanaged_size,
 };
 pub use store::{FEATURED_COUNT, FeaturedMod, featured};
+pub use update::{ChangedFolder, FileChangeReport, change_file, rollback_choices};
 pub use updates::{ModUpdateInfo, UpdateCheck, check_updates, refresh_catalog};
 pub use versions::{switch_version, version_group};
 pub use workspace::{AppDirs, Workspace, open_db};

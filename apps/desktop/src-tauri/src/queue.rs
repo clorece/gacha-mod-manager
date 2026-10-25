@@ -6,11 +6,12 @@
 //! whenever it changes; download progress is sent at most every 200 ms (`ProgressThrottle`).
 
 use std::sync::{Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
-use gmm_catalog::CatalogSource;
+use gmm_catalog::{CatalogSource, ModFile, ModProfile};
 use gmm_core::{
-    CoreError, FetchEvent, InstallEvent, InstallOptions, InstallRequest, Job, JobId, JobLabel,
-    JobRequest, JobState, NextJob, StopReason,
+    CoreError, FetchEvent, InstallEvent, InstallOptions, InstallRequest, Job, JobAction, JobId,
+    JobLabel, JobRequest, JobState, NextJob, RecycleBin, StopReason, StopSignal,
 };
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State};
@@ -62,8 +63,26 @@ pub fn spawn_worker(app: AppHandle) {
     });
 }
 
+/// How many times one install waits out a GameBanana slow-down before it fails.
+const SLOW_DOWN_RETRIES: u32 = 4;
+
 async fn run(state: &AppState, job: NextJob) {
-    let outcome = install(state, &job).await;
+    let mut waited = 0;
+    let outcome = loop {
+        match install(state, &job).await {
+            Err(e) if e.retry_in().is_some() && waited < SLOW_DOWN_RETRIES => {
+                waited += 1;
+                let wait = e.retry_in().unwrap_or(Duration::from_secs(30));
+                let until = unix_now() + i64::try_from(wait.as_secs()).unwrap_or(i64::MAX);
+                state.queue.set_state(job.id, JobState::Waiting { until });
+                broadcast(state);
+                if let Some(reason) = wait_unless_stopped(&job.stop, wait).await {
+                    break Err(CoreError::Stopped(reason));
+                }
+            }
+            other => break other,
+        }
+    };
     let final_state = match outcome {
         Ok(installed) => JobState::Done { installed },
         Err(CoreError::Stopped(StopReason::Paused)) => JobState::Paused,
@@ -75,6 +94,52 @@ async fn run(state: &AppState, job: NextJob) {
     state.queue.set_state(job.id, final_state);
 }
 
+/// Sleeps for `wait`, or until the job is paused or cancelled (then returns why).
+async fn wait_unless_stopped(stop: &StopSignal, wait: Duration) -> Option<StopReason> {
+    let until = Instant::now() + wait;
+    loop {
+        if let Some(reason) = stop.requested() {
+            return Some(reason);
+        }
+        let left = until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return None;
+        }
+        tokio::time::sleep(left.min(Duration::from_millis(500))).await;
+    }
+}
+
+fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
+}
+
+/// Turns install events into the job's state on the Downloads page.
+fn track(state: &AppState, id: JobId) -> impl FnMut(InstallEvent) + '_ {
+    let mut throttle = ProgressThrottle::default();
+    move |event| {
+        let send = throttle.pass(&event);
+        let next = match event {
+            InstallEvent::Fetch(FetchEvent::UsingCache) => JobState::Extracting,
+            InstallEvent::Fetch(FetchEvent::Downloading { size }) => JobState::Downloading {
+                downloaded: 0,
+                total: Some(size),
+            },
+            InstallEvent::Fetch(FetchEvent::Progress(p)) => JobState::Downloading {
+                downloaded: p.downloaded,
+                total: p.total,
+            },
+            InstallEvent::Extracting => JobState::Extracting,
+            InstallEvent::Installing { folder } => JobState::Installing { folder },
+        };
+        state.queue.set_state(id, next);
+        if send {
+            broadcast(state);
+        }
+    }
+}
+
 async fn install(
     state: &AppState,
     job: &NextJob,
@@ -83,12 +148,40 @@ async fn install(
     let target = mods_target(state, game)
         .await
         .map_err(|e| CoreError::Io(e.message().to_owned()))?;
+    if job.request.action == JobAction::ChangeFile {
+        let report = gmm_core::change_file(
+            &state.gb,
+            &state.net,
+            &state.db,
+            &target.ws,
+            target.mods,
+            game,
+            job.request.mod_id,
+            job.request.file_id,
+            &RecycleBin,
+            &job.stop,
+            track(state, job.id),
+        )
+        .await?;
+        return Ok(report
+            .changed
+            .into_iter()
+            .map(|f| gmm_core::InstalledFolder {
+                id: f.id,
+                folder_name: f.folder_name,
+                variant: None,
+                files: f.files,
+                bytes: f.bytes,
+                skipped: f.skipped,
+                warnings: Vec::new(),
+            })
+            .collect());
+    }
     let request = InstallRequest {
         mod_id: job.request.mod_id,
         file_id: job.request.file_id,
         options: job.request.options.clone(),
     };
-    let mut throttle = ProgressThrottle::default();
     let report = gmm_core::install(
         &state.gb,
         &state.net,
@@ -98,26 +191,7 @@ async fn install(
         game,
         &request,
         &job.stop,
-        |event| {
-            let send = throttle.pass(&event);
-            let next = match event {
-                InstallEvent::Fetch(FetchEvent::UsingCache) => JobState::Extracting,
-                InstallEvent::Fetch(FetchEvent::Downloading { size }) => JobState::Downloading {
-                    downloaded: 0,
-                    total: Some(size),
-                },
-                InstallEvent::Fetch(FetchEvent::Progress(p)) => JobState::Downloading {
-                    downloaded: p.downloaded,
-                    total: p.total,
-                },
-                InstallEvent::Extracting => JobState::Extracting,
-                InstallEvent::Installing { folder } => JobState::Installing { folder },
-            };
-            state.queue.set_state(job.id, next);
-            if send {
-                broadcast(state);
-            }
-        },
+        track(state, job.id),
     )
     .await?;
     // Versions that replace the same things can't all be on: the first one picked stays on
@@ -151,15 +225,7 @@ pub async fn queue_install(state: State<'_, AppState>, args: InstallArgs) -> Cmd
             .find(|f| f.id == id),
         None => profile.files.default_choice(),
     };
-    let mut summary = profile.summary.clone();
-    rewrite_summary(&state.images, &mut summary);
-    let label = JobLabel {
-        mod_name: profile.summary.name.clone(),
-        author: Some(profile.summary.submitter.name.clone()).filter(|n| !n.is_empty()),
-        file_name: file.map(|f| f.name.clone()),
-        file_size: file.map(|f| f.size),
-        image: summary.banner().map(|b| b.url_for_width(220).to_owned()),
-    };
+    let label = job_label(&state, &profile, file);
     let id = state.queue.push(
         JobRequest {
             game: game.id().to_owned(),
@@ -170,6 +236,56 @@ pub async fn queue_install(state: State<'_, AppState>, args: InstallArgs) -> Cmd
                 skip_blocked: args.skip_blocked,
                 start_disabled: args.start_disabled,
             },
+            action: JobAction::Install,
+        },
+        label,
+    );
+    state.wake.notify_one();
+    broadcast(&state);
+    Ok(id)
+}
+
+fn job_label(state: &AppState, profile: &ModProfile, file: Option<&ModFile>) -> JobLabel {
+    let mut summary = profile.summary.clone();
+    rewrite_summary(&state.images, &mut summary);
+    JobLabel {
+        mod_name: profile.summary.name.clone(),
+        author: Some(profile.summary.submitter.name.clone()).filter(|n| !n.is_empty()),
+        file_name: file.map(|f| f.name.clone()),
+        file_size: file.map(|f| f.size),
+        image: summary.banner().map(|b| b.url_for_width(220).to_owned()),
+    }
+}
+
+/// Queues moving an installed mod to another of its files: the newest clean one (an
+/// update) or `file_id` (an update to a specific file, or a roll back to a cached one).
+/// Each folder keeps its name and on/off state (`gmm_core::change_file`).
+#[tauri::command]
+pub async fn queue_change_file(
+    state: State<'_, AppState>,
+    gb_mod_id: u64,
+    file_id: Option<u64>,
+) -> CmdResult<JobId> {
+    let profile = state.gb.mod_profile(gb_mod_id).await?;
+    let game = gmm_core::game_for_mod(&profile)?;
+    mods_target(&state, game).await?;
+    let file = match file_id {
+        Some(id) => profile
+            .files
+            .files
+            .iter()
+            .chain(&profile.files.archived_files)
+            .find(|f| f.id == id),
+        None => profile.files.default_choice(),
+    };
+    let label = job_label(&state, &profile, file);
+    let id = state.queue.push(
+        JobRequest {
+            game: game.id().to_owned(),
+            mod_id: gb_mod_id,
+            file_id,
+            options: InstallOptions::default(),
+            action: JobAction::ChangeFile,
         },
         label,
     );

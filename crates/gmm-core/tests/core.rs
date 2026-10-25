@@ -1484,3 +1484,210 @@ async fn update_check_finds_newer_files() {
     assert_eq!(check.updates.len(), 1);
     assert_eq!(check.notes.len(), 1);
 }
+
+#[tokio::test]
+async fn key_bindings_are_read_from_every_ini_but_disabled_ones() {
+    let f = Fixture::new().await;
+    let main = b"[TextureOverrideBody]\nhash = 0123abcd\n\n[KeySwap]\nkey = VK_LEFT\nback = VK_RIGHT\ntype = cycle\n";
+    let extra = b"[KeyGlasses]\nkey = no_modifiers ctrl 1\ntype = toggle\n";
+    let off = b"[KeyIgnored]\nkey = F9\n";
+    let a = f.analyze(&[
+        ("Ellen/ellen.ini", main),
+        ("Ellen/Parts/glasses.ini", extra),
+        ("Ellen/DISABLED old/old.ini", off),
+    ]);
+    let id = f.install(&a, InstallOptions::default()).await.unwrap()[0].id;
+    let keys = gmm_core::mod_keybindings(
+        &f.db,
+        &f.ws,
+        f.mods,
+        zzz(),
+        gmm_core::ModFolder::Managed(id),
+    )
+    .await
+    .unwrap();
+    let names: Vec<(&str, &str)> = keys
+        .bindings
+        .iter()
+        .map(|k| (k.ini.as_str(), k.name.as_str()))
+        .collect();
+    assert_eq!(
+        names,
+        [("Parts/glasses.ini", "Glasses"), ("ellen.ini", "Swap")]
+    );
+    let swap = &keys.bindings[1];
+    assert_eq!(swap.keys, ["VK_LEFT"]);
+    assert_eq!(swap.back, ["VK_RIGHT"]);
+    assert_eq!(swap.kind.as_deref(), Some("cycle"));
+    assert!(keys.notes.is_empty());
+}
+
+#[tokio::test]
+async fn profiles_save_apply_and_share() {
+    let f = Fixture::new().await;
+    let a = f.analyze(&[
+        ("Red/red.ini", INI),
+        ("Blue/blue.ini", b"[TextureOverrideHair]\nhash = 99999999\n"),
+    ]);
+    let ids: Vec<i64> = f
+        .install(
+            &a,
+            InstallOptions {
+                variants: VariantChoice::All,
+                ..InstallOptions::default()
+            },
+        )
+        .await
+        .unwrap()
+        .iter()
+        .map(|i| i.id)
+        .collect();
+    fs::create_dir_all(f.mods_dir.join("Phoenix")).unwrap();
+    fs::write(f.mods_dir.join("Phoenix/phoenix.ini"), INI).unwrap();
+    let (red, blue) = (ids[0], ids[1]);
+    let (db, ws, mods) = (&f.db, &f.ws, f.mods);
+
+    // Red and Phoenix on, Blue off.
+    gmm_core::set_enabled(db, ws, mods, zzz(), blue, false)
+        .await
+        .unwrap();
+    let saved = gmm_core::save_profile(db, ws, mods, zzz(), " Casual ")
+        .await
+        .unwrap();
+    assert_eq!((saved.name.as_str(), saved.mods), ("Casual", 2));
+
+    // Everything flipped, including Phoenix (renamed to DISABLED Phoenix).
+    gmm_core::set_enabled(db, ws, mods, zzz(), red, false)
+        .await
+        .unwrap();
+    gmm_core::set_enabled(db, ws, mods, zzz(), blue, true)
+        .await
+        .unwrap();
+    gmm_core::set_unmanaged_enabled_at(db, ws, mods, zzz(), "Phoenix", false)
+        .await
+        .unwrap();
+    assert!(f.mods_dir.join("DISABLED Phoenix").exists());
+
+    let applied = gmm_core::apply_profile(db, ws, mods, zzz(), saved.id)
+        .await
+        .unwrap();
+    assert_eq!(applied.switched_on.len(), 2, "{applied:?}");
+    assert_eq!(applied.switched_off.len(), 1);
+    assert!(applied.missing.is_empty());
+    assert!(f.mods_dir.join("Phoenix").exists());
+    assert!(db.installed_mod(red).await.unwrap().unwrap().enabled);
+    assert!(!db.installed_mod(blue).await.unwrap().unwrap().enabled);
+
+    // Sharing: GameBanana ids only, hand-installed mods left out.
+    let code = gmm_core::export_profile(db, zzz(), saved.id).await.unwrap();
+    assert!(
+        code.contains("652373") && !code.contains("Phoenix"),
+        "{code}"
+    );
+    let imported = gmm_core::import_profile(db, ws, mods, zzz(), &code, Some("Shared"))
+        .await
+        .unwrap();
+    assert_eq!((imported.profile.mods, imported.missing.len()), (1, 0));
+
+    let other = r#"{"gmm_profile":1,"game":"zzz","name":"Theirs","mods":[{"gb_mod_id":5,"gb_file_id":null,"variant":null,"name":"Not here"}]}"#;
+    let theirs = gmm_core::import_profile(db, ws, mods, zzz(), other, None)
+        .await
+        .unwrap();
+    assert_eq!(theirs.missing[0].name, "Not here");
+    assert_eq!(theirs.profile.mods, 0);
+
+    for hostile in [
+        "not json",
+        r#"{"gmm_profile":2,"game":"zzz","name":"x","mods":[]}"#,
+        r#"{"gmm_profile":1,"game":"wuwa","name":"x","mods":[]}"#,
+        r#"{"gmm_profile":1,"game":"../etc","name":"x","mods":[]}"#,
+        r#"{"gmm_profile":1,"game":"zzz","name":"","mods":[]}"#,
+    ] {
+        assert!(
+            gmm_core::import_profile(db, ws, mods, zzz(), hostile, None)
+                .await
+                .is_err(),
+            "{hostile}"
+        );
+    }
+    let huge = format!(
+        r#"{{"gmm_profile":1,"game":"zzz","name":"x","mods":[],"pad":"{}"}}"#,
+        "a".repeat(gmm_core::MAX_SHARE_CODE)
+    );
+    assert!(
+        gmm_core::import_profile(db, ws, mods, zzz(), &huge, None)
+            .await
+            .is_err()
+    );
+    let names: Vec<String> = gmm_core::profiles(db, zzz())
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|p| p.name)
+        .collect();
+    assert_eq!(names, ["Casual", "Shared", "Theirs"]);
+}
+
+#[tokio::test]
+async fn local_archives_go_through_the_same_pipeline() {
+    let f = Fixture::new().await;
+    let elsewhere = tempfile::tempdir().unwrap();
+    let file = elsewhere.path().join("ellen_maid_v2.zip");
+    fs::write(
+        &file,
+        zip_of(&[
+            ("Ellen/ellen.ini", INI),
+            ("Ellen/body.dds", b"dds"),
+            ("Ellen/setup.exe", b"MZ"),
+        ]),
+    )
+    .unwrap();
+
+    let prepared = gmm_core::prepare_local(&f.ws, zzz(), &file).unwrap();
+    assert_eq!(prepared.name, "ellen maid v2");
+    let plan = gmm_core::local_plan(&f.db, zzz(), &prepared).await.unwrap();
+    assert_eq!(plan.kind.as_deref(), Some("migoto"));
+    assert_eq!(plan.versions.len(), 1);
+    assert_eq!(plan.versions[0].folder, "ellen maid v2");
+    assert_eq!(plan.versions[0].blocked, ["setup.exe"]);
+
+    let installed = gmm_core::install_local(
+        &f.db,
+        &f.ws,
+        f.mods,
+        zzz(),
+        &prepared,
+        &InstallOptions {
+            skip_blocked: true,
+            ..InstallOptions::default()
+        },
+        |_| {},
+    )
+    .await
+    .unwrap();
+    assert_eq!(installed[0].skipped, ["setup.exe"]);
+    assert!(f.gmm().join("ellen maid v2/ellen.ini").exists());
+    assert!(!f.gmm().join("ellen maid v2/setup.exe").exists());
+    let row = f.db.installed_mod(installed[0].id).await.unwrap().unwrap();
+    assert_eq!((row.gb_mod_id, row.gb_file_id), (None, None));
+
+    prepared.discard(&f.ws);
+    assert!(file.exists(), "the user's file is untouched");
+    let leftovers: Vec<_> = fs::read_dir(f.cache_dir.join("downloads"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert!(leftovers.is_empty(), "{leftovers:?}");
+
+    // Only archives, only files.
+    fs::write(elsewhere.path().join("notes.txt"), b"hi").unwrap();
+    for bad in [
+        elsewhere.path().join("notes.txt"),
+        elsewhere.path().to_path_buf(),
+    ] {
+        assert!(matches!(
+            gmm_core::prepare_local(&f.ws, zzz(), &bad),
+            Err(CoreError::CantInstallLocal(_))
+        ));
+    }
+}

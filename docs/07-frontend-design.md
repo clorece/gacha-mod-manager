@@ -142,7 +142,11 @@ Layout: [08](08-design-system.md#mods-library). Contents and actions:
   one), details (version, file, size, folder), actions (open folder, view on GameBanana,
   check for updates, reinstall), per-mod options as they arrive (key bindings, Phase 6),
   uninstall (Recycle Bin; hand-installed mods only after the itemized confirmation, R8).
-  Adopt a hand-installed mod (match it on GameBanana) comes in Phase 6.
+  Adopt a hand-installed mod (match it on GameBanana; Phase 6, built). Update / roll back
+  and key bindings are built too (2026-10-25).
+- **Profiles** (Phase 6, built): per game, from the Library toolbar. Save which mods are on,
+  apply a profile (exactly those on, the rest off), share it as a code (GameBanana ids; the
+  other side sees which mods it lacks).
 - The search and filter row stays at the top while the grid scrolls (also in the store).
 - A reminder while the game isn't `Ready`: "These mods are installed but XXMI isn't set up
   for this game yet."
