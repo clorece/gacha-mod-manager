@@ -8,14 +8,18 @@ use gmm_fsguard::{FsError, PathError};
 pub enum ArchiveError {
     #[error(transparent)]
     Fs(#[from] FsError),
-    #[error("not a supported archive (zip or 7z)")]
+    #[error("not a supported archive (zip, 7z or rar)")]
     UnknownFormat,
-    #[error("{0} archives are not supported yet")]
-    UnsupportedFormat(&'static str),
     #[error("archive is damaged or unreadable: {0}")]
     Corrupt(String),
     #[error("archive is password-protected")]
     Encrypted,
+    #[error("archive uses a compression method GMM can't read: {0}")]
+    UnsupportedMethod(String),
+    #[error("GMM's RAR reader is missing (expected at {}); reinstall GMM, or build it with `cargo build -p gmm-extract`", .0.display())]
+    HelperMissing(std::path::PathBuf),
+    #[error("GMM's RAR reader failed: {0}")]
+    Helper(String),
     #[error("unsafe entry name {name:?}: {reason}")]
     UnsafePath { name: String, reason: PathError },
     #[error("entry with an empty name")]

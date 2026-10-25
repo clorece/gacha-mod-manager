@@ -15,6 +15,7 @@ the code they guard ([04](04-security.md)). When a phase finishes, every doc get
 | In-game checks | 2026-10-24 | Confirmed in game: `DISABLED ` hides a mod, nested `Mods/GMM/<mod>/` loads, Quick Start works, WuWa's Steam copy runs with Game Launch = Direct |
 | 1 — Foundations | 2026-10-23 | Workspace, CI (Windows + Linux), `cargo-deny`; `gmm-fsguard`, `gmm-net`, `gmm-archive` (zip/7z, malicious corpus), `gmm-catalog`, `gmm-adapters`; `gmm catalog`, `gmm fetch` |
 | 2 — Backend features | 2026-10-24 | `gmm-db`, `gmm-core` (install pipeline, library, toggle, uninstall to the Recycle Bin, conflicts, storage, launch through XXMI), `gmm-migoto`; the adapter conformance suite and the egress / file-access privacy harnesses. Exit check passed in game with Casual Velina (GameBanana 688491) |
+| 4 — Design | 2026-10-25 | The design canvas (23 artboards, dark and light; signed off) written up in [08](08-design-system.md), file formats in [09](09-archive-formats.md); in the app: the tokens and base styles for both themes in `styles.css`, Nunito bundled (OFL-1.1 exception, `THIRD-PARTY-NOTICES.md`), hand-built primitives in `src/ui` (button, icon button, switch, checkbox, radio, segmented control, dropdown, chip / badge, notice, dialog, side panel, toast, progress bar, spinner, icons), a dev-only style guide page, and the shell restyled to the sidebar (Select Game, Dashboard with bubbles and Launch, Mods Library with switches, conflicts and a first Mod settings panel, the launch dialog) |
 | 3 — App foundations | 2026-10-24 | `apps/desktop`: Tauri 2 shell over `gmm-core` with 22 commands (ids only), generated TypeScript types, the `gmmimg` image protocol, locked-down capability / CSP / navigation guard, a first shell (game rail, state pill, setup card, mod list, Launch with XXMI); frontend CI (typecheck, lint, `pnpm audit`, npm license check). Verified in a release build on the dev machine |
 
 Cleanup pass (2026-10-24, after Phase 3): unused functions and a dependency removed; the NSFW
@@ -23,79 +24,46 @@ into shared `gmm-catalog` / `gmm-core` functions used by both the CLI and the ap
 to a release outside pnpm's minimum-age window (the auto-added exemption removed); finished
 phases condensed in this file.
 
-Design rounds (2026-10-24/25): see Phase 4 below.
+Phase 4 decisions: the primitives are built by hand (no component library); the theme choice
+is kept per window in `localStorage` until the Settings screen stores it. Still open, waiting
+on you: the game banner source (08); the banners are the game's colors until then.
 
-## Phase 4 — Design (mostly done; finishing in the app)
-
-Deciding how the app looks and flows before building the screens, so each gets built once.
-The written spec is [08-design-system.md](08-design-system.md); the interactive mockup is a
-design canvas in your claude.ai account (23 artboards: every screen and dialog, dark and
-light, real GameBanana data with placeholder preview art).
-
-**Your direction (2026-10-24/25):** left sidebar with General (Dashboard, Downloads, Settings),
-Mods (Select Game banner dropdown, Mods Library, Mods Store) and Development (Report a Bug as
-WIP, Documentation); dashboard game bubbles that enlarge to reveal Launch; downloads grouped by
-game with a self-clearing finished state; store with a trending gallery and sticky search and
-filters; library with a game selector header, switches, install dates, select mode and enable /
-disable all; a startup check screen; an install confirmation where every choice (file,
-versions) is made before downloading; per-mod settings with versions; theme after HoYoLAB; the
-GMM brand ([brand/](brand/)).
-
-**Done**
-- [x] Brand assets in the repo (`docs/brand/`); app and exe icons from the mark; the mark in
-      the current shell
-- [x] Navigation and every screen designed, dark and light, on the canvas; layout and theme
-      signed off (2026-10-25)
-- [x] Visual system: tokens for both themes, type, radius, spacing, motion, scrollbars,
-      accessibility rules ([08](08-design-system.md#tokens))
-- [x] Three contrast and overlap passes, then a fourth with the new surfaces: 62 states in
-      both themes, checked by screenshots and an automated audit (contrast of every text
-      against its real background, overlap of every pair of text lines). Rules recorded in 08
-- [x] Second round (2026-10-25): sticky search / filter bar, startup check screen,
-      install confirmation (one version, choose a file, choose versions with a scrolling
-      list, add versions, RAR notice), mod settings with versions, "needs your choice"
-      removed from Downloads
-- [x] Data checks that shape the design: NSFW share, trending endpoint, no download counts in
-      listings, RAR share (4 of 15 sampled), versions as files vs. folders, character icons,
-      game art ([08](08-design-system.md#what-the-data-allows-found-while-designing))
-- [x] File formats documented with a RAR decision record ([09](09-archive-formats.md))
-- [x] [07](07-frontend-design.md) updated to the new navigation and flows
-
-**Left** (finishing the phase in the app)
-- [ ] Decide the game banner source and the component approach (open decisions in 08)
-- [ ] Bundle Nunito (OFL-1.1: a font-only exception in the npm license check, a notice)
-- [ ] Port the tokens and base styles from the canvas into `apps/desktop/src/styles.css`
-      (both themes, scrollbars, `:where()` button base)
-- [ ] Primitives: button, icon button, switch, checkbox, radio, dropdown, chip / badge,
-      dialog, side panel, toast, progress bar
-- [ ] Living style guide: a dev-only page showing the tokens and every primitive state
-- [ ] Restyle the current shell to the sidebar layout (Dashboard with bubbles and Launch,
-      Library, the launch dialog), as the proof
-
-Exit: the tokens, font and primitives are in the codebase, the style guide page shows them,
-and the shell uses the new navigation.
-
-## Phase 5 — Screens
+## Phase 5 — Screens (in progress)
 
 Every screen sits on commands that exist or are small additions. Order: what unblocks
-installs first, then the screens in the order users meet them.
+installs first, then the screens in the order users meet them. Started 2026-10-24: RAR
+and the backend for the install flow are done; the next work is the rest of the backend
+list, then the screens.
+
+**Carried over from Phase 4**
+- [ ] Game banner source (your decision, 08): swap the styled banners for it once chosen
+- [ ] Theme choice into `gmm-db` settings with the Settings screen (Dark / Light / Match
+      Windows; `src/theme.ts` already handles all three)
 
 **Backend additions**
-- [ ] **RAR support** first (about a quarter of mods): `gmm-extract` helper with libarchive,
-      sandboxed, two-pass checks in the parent, R7 amended; fall back to UnRAR if libarchive
-      fails real archives ([09](09-archive-formats.md#rar-plan-decision-record))
-- [ ] Install in two steps for the confirmation dialog: `prepare_install` (fetch into the
-      cache and analyze: files, versions, blocked files, conflicts between versions) and
-      `install` (the chosen file, versions, skip-blocked, switch on or not). `gmm-core`
-      already has `fetch_archive` + `analyze` + `install_analyzed`
-- [ ] Versions as one mod: group installed folders by GameBanana mod and file, list the
-      archive's other versions, install one more from the cached archive, remove one, switch
-      which one is on (exclusive when they conflict)
-- [ ] An install queue with per-item state for the Downloads page; cancel hook in
-      `gmm-core::install`; pause / resume via `gmm-net`'s resumable downloads
-- [ ] Startup check: newest catalogue pages per game (cached), update check for installed
-      mods (`_tsDateUpdated`, new file ids; moved here from Phase 6), and the app-update
-      step once the Phase 7 updater exists
+- [x] **RAR support** (2026-10-24): the `gmm-extract` helper process, sandboxed (job object
+      and self-lockdown on Windows, resource caps on Linux), two-pass checks in GMM, which
+      writes every file itself; R7 amended, CI checks the launch places and `unsafe` files;
+      19 RAR cases in the malicious-archive corpus. libarchive failed one of five real RAR
+      mods, so the helper uses UnRAR 7.23 (vendored; license exception); all five extract
+      ([09](09-archive-formats.md#rar-plan-decision-record))
+- [x] Install in two steps (2026-10-24): `gmm_core::prepare` + `install_plan` (file, other
+      files, versions with blocked files and warnings, installed versions, conflicts between
+      versions, target folder) behind the `prepare_install` command; `install_prepared`, and
+      `InstallOptions::start_disabled` for "Switch it on after installing"
+- [x] Versions as one mod (2026-10-24): the library groups folders by GameBanana mod and
+      file (`ModRow.group`); `prepare_install` marks the versions already installed, and
+      installing one more reuses the cached archive; removing one is `uninstall`;
+      `switch_version` turns one on and the clashing ones off
+- [x] Install queue (2026-10-24): `gmm_core::InstallQueue` (per-item state, one install at
+      a time) and `StopSignal` (the cancel hook, checked between steps and during the
+      download); the app runs one worker; commands `queue_install`, `queue_jobs`,
+      `queue_watch` (a channel with the list), `queue_pause` / `queue_resume` (the partial
+      download is kept and resumed), `queue_cancel`, `queue_dismiss`, `queue_clear_finished`
+- [x] Startup check (2026-10-24): `startup_check` streams its steps: the GMM app step
+      (skipped until the Phase 7 updater), the newest catalogue page per game
+      (`refresh_catalog`), and the update check of GMM-installed mods (`check_updates`: a
+      newer clean file than the installed one; failures become notes)
 - [ ] Trending: `CatalogSource::top_subs` over `apiv11/Game/{id}/TopSubs` (safe-for-work
       entries first, backfilled)
 - [ ] Download counts for cards: the mod pages of visible cards in the background
@@ -177,6 +145,15 @@ Epic install to confirm the Epic reader (fixture-tested only).
   with the disk instead.
 - SQLite may reuse the id of the most recently deleted mod.
 - The conflict index is rebuilt on every call (fine at today's sizes; cache it if it gets slow).
+- The install queue and the startup check's update list live in memory: a restart empties
+  the Downloads page (a paused download's partial file stays in the cache and resumes when
+  the same file is installed again) and the next startup checks again.
+- A cancelled download's partial file stays in `cache/downloads` until that file is
+  installed again or the download cache is cleared.
+- The RAR helper's Linux lockdown has no seccomp filter yet, and on Windows it runs at Low
+  integrity rather than in an AppContainer (it could still read the user's files or open a
+  connection if UnRAR were exploited). Phase 7 hardening.
+- RAR "file copy" entries (identical files stored once, `rar -oi`) are refused, not copied.
 
 ## Open questions
 

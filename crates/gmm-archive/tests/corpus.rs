@@ -9,7 +9,7 @@
 mod common;
 
 use common::{E, Env, mark_zip_encrypted, patch, sevenz_bytes, zip_bytes, zip_stored};
-use gmm_archive::{ArchiveError, Format, Limits};
+use gmm_archive::{ArchiveError, Format, Helper, Limits, extract_with};
 use gmm_fsguard::PathError;
 use zip::CompressionMethod;
 
@@ -332,10 +332,21 @@ fn unknown_and_unsupported_formats() {
         env.extract(b"MZ\x90\x00\x03\x00\x00\x00", &Limits::default()),
         Err(ArchiveError::UnknownFormat)
     ));
+    // RAR goes to the helper process; without it nothing is created. (RAR cases with the
+    // real helper are in crates/gmm-extract/tests.)
+    let (archive, dest) = env.stage(b"Rar!\x1A\x07\x01\x00rest");
+    let missing = Helper::at(env.outside.join("no-such-helper.exe"));
     assert!(matches!(
-        env.extract(b"Rar!\x1A\x07\x01\x00rest", &Limits::default()),
-        Err(ArchiveError::UnsupportedFormat("RAR"))
+        extract_with(
+            &env.guard,
+            &archive,
+            &dest,
+            &Limits::default(),
+            Some(&missing)
+        ),
+        Err(ArchiveError::HelperMissing(_))
     ));
+    assert!(!env.guard.exists(&dest).unwrap());
     assert!(matches!(
         env.extract(b"", &Limits::default()),
         Err(ArchiveError::UnknownFormat)

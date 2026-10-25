@@ -9,7 +9,7 @@ use std::io::Write;
 use gmm_adapters::GameManifest;
 use gmm_archive::Severity;
 use gmm_catalog::{CatalogSource, GameBanana};
-use gmm_core::{AppDirs, FetchEvent, Workspace, analyze, fetch_archive};
+use gmm_core::{AppDirs, FetchEvent, StopSignal, Workspace, analyze, fetch_archive};
 use gmm_db::Db;
 use gmm_net::Client;
 use serde::Serialize;
@@ -83,7 +83,8 @@ pub async fn run(
 ) -> Result<(), AnyError> {
     let game = game_of(gb, mod_id).await?;
     let ws = Workspace::open(&AppDirs::system()?.cache)?;
-    let fetched = fetch_archive(gb, net, db, &ws, mod_id, file_id, progress(json)).await?;
+    let stop = StopSignal::new();
+    let fetched = fetch_archive(gb, net, db, &ws, mod_id, file_id, &stop, progress(json)).await?;
     let analysis = analyze(&ws, game, &fetched.archive)?;
     analysis.cleanup(&ws);
 

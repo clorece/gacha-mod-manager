@@ -1524,6 +1524,7 @@ dependencies = [
  "sevenz-rust2",
  "tempfile",
  "thiserror 2.0.21",
+ "windows-sys 0.61.2",
  "zip",
 ]
 
@@ -1631,6 +1632,18 @@ dependencies = [
  "tempfile",
  "ts-rs",
  "winreg",
+]
+
+[[package]]
+name = "gmm-extract"
+version = "0.1.0"
+dependencies = [
+ "cc",
+ "gmm-archive",
+ "gmm-fsguard",
+ "libc",
+ "tempfile",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

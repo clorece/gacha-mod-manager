@@ -6,10 +6,10 @@
 |---|---|---|
 | Shell | Tauri 2 | Small native app; WebView2 on Windows, WebKitGTK on Linux; capability-based IPC; NSIS/MSI installers |
 | Core logic | Rust workspace | All file, archive, network and process work lives here |
-| UI | React 19 + TypeScript + Vite, Tailwind 4 (in use); shadcn/ui, TanStack Query/Virtual, Embla (carousel) as the screens need them | Widely used, well documented |
+| UI | React 19 + TypeScript + Vite, Tailwind 4, Nunito (bundled); primitives built by hand in `src/ui` (no component library); TanStack Query/Virtual, Embla (carousel) as the screens need them | Widely used, well documented; a dozen primitives didn't justify a library |
 | UI ↔ Rust types | `ts-rs`: `apps/desktop/src/bindings.ts` is generated from the Rust types | The two can't drift; a test fails when the file is stale |
 | Local DB | SQLite via `sqlx`, migrations in repo | One file in the app data dir |
-| Archives | `zip`, `sevenz-rust2`, `unrar` (feature-gated), wrapped by our `gmm-archive` crate | All extraction goes through one hardened path |
+| Archives | `zip`, `sevenz-rust2` (pure Rust, in process); RAR through UnRAR 7.23 (vendored C++) in the sandboxed `gmm-extract` helper; all wrapped by our `gmm-archive` crate | All extraction goes through one hardened path, and GMM writes every file itself |
 | HTTP | `reqwest` (rustls), wrapped by our `gmm-net` crate | One place to enforce the host allowlist |
 | Recycle Bin | `trash` crate | Deletes are recoverable |
 | Tooling | pnpm (via corepack), Biome (lint + format), cargo workspace, `just` task runner | |
@@ -39,6 +39,7 @@ flowchart LR
   CORE --> CAT[gmm-catalog: CatalogSource]
   CAT --> GB[GameBanana apiv11 client]
   CORE --> ARC[gmm-archive: extract + classify + scan]
+  ARC -- stdin: archive, stdout: frames --> HLP[gmm-extract: sandboxed UnRAR helper]
   CORE --> MIG[gmm-migoto: ini parser, hash index]
   CORE --> XX[gmm-xxmi: XXMI setup + per-game state]
   XX --> DET
@@ -59,7 +60,9 @@ gacha-mod-manager/
 ├─ crates/
 │  ├─ gmm-fsguard/            # ✅ ScopedPath, RelPath, root registry, denylist
 │  ├─ gmm-net/                # ✅ allowlisted HTTP, rate limiting, resumable verified downloads
-│  ├─ gmm-archive/            # ✅ hardened zip/7z extraction, policy scan
+│  ├─ gmm-archive/            # ✅ hardened zip/7z/rar extraction, policy scan, RAR helper
+│  │                          #    protocol and launcher (sandboxed job on Windows)
+│  ├─ gmm-extract/            # ✅ the RAR helper binary: vendored UnRAR, lockdown, frames
 │  ├─ gmm-catalog/            # ✅ CatalogSource trait, cache, GameBanana client
 │  ├─ gmm-adapters/           # ✅ game manifests (games/*.toml), schema, validation, registry
 │  ├─ gmm-detect/             # ✅ Steam / HoYoPlay / Epic / manual detection, VDF parser,
@@ -248,12 +251,15 @@ will sanitize and rewrite that HTML.
 ## Desktop app (`apps/desktop`)
 
 `gmm-desktop` (`apps/desktop/src-tauri`, a workspace member) is a Tauri 2 shell with one
-command per CLI action, all in `src/commands.rs`: `games`, `statuses`, `catalog_list`,
+command per CLI action, in `src/commands.rs`: `games`, `statuses`, `catalog_list`,
 `catalog_search`, `catalog_mod`, `catalog_updates`, `catalog_categories`, `install`,
 `library`, `set_enabled`, `uninstall_preview`, `uninstall`, `conflicts`, `storage`,
 `clear_download_cache`, `launch_plan`, `launch`, `settings`, `pick_xxmi_folder`,
-`clear_xxmi_folder`, `pick_game_folder`, `remove_game_folder`. Each calls the same
-`gmm-core` functions as the CLI.
+`clear_xxmi_folder`, `pick_game_folder`, `remove_game_folder`; plus, for the Phase 5
+screens, `prepare_install` and `switch_version` there, the queue in `src/queue.rs`
+(`queue_install`, `queue_jobs`, `queue_watch`, `queue_pause`, `queue_resume`,
+`queue_cancel`, `queue_dismiss`, `queue_clear_finished`) and `startup_check` in
+`src/startup.rs`. Each calls the same `gmm-core` functions as the CLI.
 
 - **Arguments are ids**: game ids, GameBanana ids, GMM mod ids, and `ModKey`
   (`{type: "managed", id}` or `{type: "unmanaged", path}`, where `path` must exactly match an
@@ -265,8 +271,16 @@ command per CLI action, all in `src/commands.rs`: `games`, `statuses`, `catalog_
 - **Errors** are a tagged `CmdError`: `choose_variant` (with the variant names) and
   `blocked` (with the file names) from `install`, `conflicts` from `set_enabled` (with the
   conflicts; call again with `anyway`), `not_ready`, and `other`.
-- **Install progress** goes over a Tauri `Channel` passed to `install` (no event
-  permissions needed).
+- **Install progress** goes over a Tauri `Channel` passed to `install` and
+  `prepare_install` (no event permissions needed); `queue_watch` and `startup_check` use
+  channels the same way.
+- **Install confirmation, then the queue**: `prepare_install` fetches the file into the
+  download cache, analyses it and returns a `gmm_core::InstallPlan` (versions, blocked files,
+  installed versions, conflicts between versions, target folder), then removes the
+  extraction folder; nothing is installed. The confirmed choice goes to `queue_install`. One
+  worker task (`queue::spawn_worker`) runs queued installs in order through `gmm_core::install`
+  (the archive comes from the cache), with the job's `StopSignal` for pause and cancel, and
+  sends the list to every watcher when it changes (progress at most every 200 ms).
 - **Launch** is two steps: `launch_plan` shows the exe and whether it was confirmed;
   `launch(game, confirm)` records the confirmation and starts XXMI.
 - **Uninstall** is two steps: `uninstall_preview` returns each folder's full path (and size,
@@ -276,9 +290,22 @@ command per CLI action, all in `src/commands.rs`: `games`, `statuses`, `catalog_
   `ts` feature (`gmm-catalog`, `gmm-detect`, `gmm-xxmi`, `gmm-core`), and
   `src-tauri/src/bindings.rs` writes them into `src/bindings.ts` (64-bit integers as
   `number`). `src/api.ts` wraps `invoke` with those types.
-- **Frontend**: `App.tsx` (game rail, top bar with the XXMI state pill and Launch with XXMI),
-  `components/SetupCard.tsx` (state, steps, folder pickers), `components/Library.tsx` (mods
-  with toggles and the conflict prompt), `components/LaunchButton.tsx` (exe confirmation).
+- **Frontend** (`apps/desktop/src`, look and layout from [08](08-design-system.md)):
+  - `styles.css`: the tokens for both themes (`.t-dark` / `.t-light` on `<html>`, also
+    exposed to Tailwind as `bg-card`, `text-muted`, ...), base styles, scrollbars, and the
+    classes for the primitives, shell and pages. `theme.ts` applies dark / light / match
+    Windows (kept per window in `localStorage` for now).
+  - `ui/`: the primitives (`Button`, `IconButton`, `Switch`, `Checkbox`, `Radio`,
+    `Segmented`, `Dropdown`, `Badge`, `Chip`, `Notice`, `Dialog` and `SidePanel` on the
+    native `<dialog>`, `ToastProvider` / `useToast`, `ProgressBar`, `Spinner`, `Icon`).
+  - `App.tsx` + `shell/`: the sidebar (`Sidebar`, `GamePicker`) and page switching;
+    `data.ts` loads games, setup states and every game's library once for all pages.
+  - `pages/`: `Dashboard` (bubbles, Launch, recently installed, setup), `Library` (game
+    cards, search, enable / disable all, mod cards, conflict prompt), `Placeholders` (the
+    Phase 5 pages and Report a Bug), `StyleGuide` (dev builds only, dropped from release
+    builds by `import.meta.env.DEV`).
+  - `components/`: `Launch` (exe confirmation dialog), `SetupCard`, `ModSettings` (side
+    panel: switch, details, Uninstall with the itemized confirmation).
 - Logic both front ends need lives below them, not in either: `Page::hide_sensitive`
   (`gmm-catalog`, the NSFW filter), `game_for_mod`, `Machine::launch_plan` and
   `conflicts_after_install` (`gmm-core`).
@@ -298,7 +325,8 @@ mod page ─► refuse trashed / withheld / obsolete mods, and mods whose _aGame
 pick GB file (newest clean one, or --file) ─► _sAvResult must be "clean"
             ─► download into cache/downloads (allowlisted host after every redirect, exact
                _nFilesize, MD5 if given), or reuse the cached copy; record SHA-256 in download_cache
-            ─► extract to cache/extract/<id> (all hardening rules) ─► policy scan
+            ─► extract to cache/extract/<id> (all hardening rules; RAR through the
+               gmm-extract helper, GMM writing the files) ─► policy scan
             ─► classify: a folder is a mod root when it directly holds an .ini with one of the
                manifest's markers ([TextureOverride / [ShaderOverride, case-insensitive) and no
                folder above it does. DISABLED* names and d3dx.ini don't count

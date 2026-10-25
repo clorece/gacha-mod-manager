@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use gmm_adapters::GameManifest;
 use gmm_catalog::GameBanana;
 use gmm_core::{
-    CoreError, InstallEvent, InstallOptions, InstallRequest, ModsTarget, SetupHints, VariantChoice,
-    conflicts_after_install, install,
+    CoreError, InstallEvent, InstallOptions, InstallRequest, ModsTarget, SetupHints, StopSignal,
+    VariantChoice, conflicts_after_install, install,
 };
 use gmm_db::Db;
 use gmm_net::Client;
@@ -60,6 +60,7 @@ pub async fn run(
                 VariantChoice::Named(args.variants)
             },
             skip_blocked: args.skip_blocked,
+            start_disabled: false,
         },
     };
     let mut show_fetch = progress(json);
@@ -71,6 +72,8 @@ pub async fn run(
         target.mods,
         game,
         &request,
+        // The CLI has no pause button; Ctrl+C ends the process (a download resumes next time).
+        &StopSignal::new(),
         |event| match event {
             InstallEvent::Fetch(e) => show_fetch(e),
             InstallEvent::Extracting if !json => eprintln!("extracting and scanning"),

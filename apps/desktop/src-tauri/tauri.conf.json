@@ -3,9 +3,9 @@
   "productName": "Gacha Mod Manager",
   "identifier": "dev.gacha-mod-manager.desktop",
   "build": {
-    "beforeDevCommand": "corepack pnpm dev",
+    "beforeDevCommand": "cargo build -p gmm-extract && corepack pnpm dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "corepack pnpm build",
+    "beforeBuildCommand": "cargo build -p gmm-extract --release && corepack pnpm build",
     "frontendDist": "../dist"
   },
   "app": {

@@ -15,8 +15,8 @@ use std::time::Duration;
 use gmm_adapters::{GameManifest, Registry};
 use gmm_catalog::{GameBanana, NoCache};
 use gmm_core::{
-    Analysis, CoreError, InstallOptions, InstallRequest, ModMeta, Sidecar, VariantChoice,
-    Workspace, analyze, fetch_archive, install, install_analyzed,
+    Analysis, CoreError, InstallOptions, InstallRequest, ModMeta, Sidecar, StopSignal,
+    VariantChoice, Workspace, analyze, fetch_archive, install, install_analyzed,
 };
 use gmm_db::Db;
 use gmm_fsguard::{RootId, ScopedPath};
@@ -468,9 +468,20 @@ async fn end_to_end_install_and_cache_reuse() {
     let (_server, gb) = mock_gamebanana(19567, "clean", &archive).await;
     let mut events = Vec::new();
 
-    let report = install(&gb, &net(), &f.db, &f.ws, f.mods, zzz(), &request(), |e| {
-        events.push(e);
-    })
+    let stop = StopSignal::new();
+    let report = install(
+        &gb,
+        &net(),
+        &f.db,
+        &f.ws,
+        f.mods,
+        zzz(),
+        &request(),
+        &stop,
+        |e| {
+            events.push(e);
+        },
+    )
     .await
     .unwrap();
     assert_eq!(report.file_id, 1_400_001);
@@ -504,7 +515,7 @@ async fn end_to_end_install_and_cache_reuse() {
             .unwrap()
             .unwrap();
     assert_eq!(cached.sha256, report.archive_sha256);
-    let again = fetch_archive(&gb, &net(), &f.db, &f.ws, 900001, None, |_| {})
+    let again = fetch_archive(&gb, &net(), &f.db, &f.ws, 900001, None, &stop, |_| {})
         .await
         .unwrap();
     assert!(again.from_cache);
@@ -525,13 +536,35 @@ async fn refuses_other_games_and_unscanned_files() {
 
     let (_server, gb) = mock_gamebanana(20357, "clean", &archive).await;
     assert!(matches!(
-        install(&gb, &net(), &f.db, &f.ws, f.mods, zzz(), &request(), |_| {}).await,
+        install(
+            &gb,
+            &net(),
+            &f.db,
+            &f.ws,
+            f.mods,
+            zzz(),
+            &request(),
+            &StopSignal::new(),
+            |_| {}
+        )
+        .await,
         Err(CoreError::WrongGame { found: 20357, .. })
     ));
 
     let (_server, gb) = mock_gamebanana(19567, "", &archive).await;
     assert!(matches!(
-        install(&gb, &net(), &f.db, &f.ws, f.mods, zzz(), &request(), |_| {}).await,
+        install(
+            &gb,
+            &net(),
+            &f.db,
+            &f.ws,
+            f.mods,
+            zzz(),
+            &request(),
+            &StopSignal::new(),
+            |_| {}
+        )
+        .await,
         Err(CoreError::NoCleanFile(900001))
     ));
     assert!(f.tree().is_empty());
@@ -1138,4 +1171,279 @@ async fn hand_installed_mods_can_be_switched_and_uninstalled() {
     assert!(!f.mods_dir.join("Phoenix").exists());
     assert!(f.gmm().join("Managed [gb-9]/m.ini").exists());
     assert!(f.db.installed_mod(managed).await.unwrap().is_some());
+}
+
+// ---- Phase 5: two-step install, versions, update check, stopping ------------------------
+
+const INI_OTHER: &[u8] = b"[TextureOverrideHair]\nhash = ffff0000\nib = ResourceHairIB\n";
+
+#[tokio::test]
+async fn installs_switched_off_when_asked() {
+    let f = Fixture::new().await;
+    let a = f.analyze(&[("Ellen/ellen.ini", INI)]);
+    let installed = f
+        .install(
+            &a,
+            InstallOptions {
+                start_disabled: true,
+                ..InstallOptions::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert!(
+        f.gmm()
+            .join("DISABLED Ellen - Maid [gb-652373]/ellen.ini")
+            .exists()
+    );
+    let row = f.db.installed_mod(installed[0].id).await.unwrap().unwrap();
+    assert!(!row.enabled);
+    let lib = gmm_core::library(&f.db, &f.ws, f.mods, zzz())
+        .await
+        .unwrap();
+    assert_eq!(lib.managed[0].disk, gmm_core::DiskState::Disabled);
+}
+
+#[tokio::test]
+async fn versions_that_replace_the_same_thing_conflict() {
+    let f = Fixture::new().await;
+    let a = f.analyze(&[
+        ("Pack/A/a.ini", INI),
+        ("Pack/B/b.ini", INI),
+        ("Pack/C/c.ini", INI_OTHER),
+    ]);
+    let names: Vec<&str> = a.variants.iter().map(|v| v.name.as_str()).collect();
+    assert_eq!(names, ["A", "B", "C"]);
+    assert_eq!(
+        a.version_conflicts,
+        [gmm_core::VersionConflict {
+            a: 0,
+            b: 1,
+            hashes: 1
+        }]
+    );
+}
+
+#[tokio::test]
+async fn switching_a_version_turns_off_the_ones_it_clashes_with() {
+    let f = Fixture::new().await;
+    let a = f.analyze(&[
+        ("Pack/A/a.ini", INI),
+        ("Pack/B/b.ini", INI),
+        ("Pack/C/c.ini", INI_OTHER),
+    ]);
+    let installed = f
+        .install(
+            &a,
+            InstallOptions {
+                variants: VariantChoice::All,
+                ..InstallOptions::default()
+            },
+        )
+        .await
+        .unwrap();
+    let id = |name: &str| {
+        installed
+            .iter()
+            .find(|i| i.variant.as_deref() == Some(name))
+            .unwrap()
+            .id
+    };
+    let changes = gmm_core::switch_version(&f.db, &f.ws, f.mods, zzz(), id("B"))
+        .await
+        .unwrap();
+    let summary: Vec<(i64, bool)> = changes.iter().map(|c| (c.id, c.enabled)).collect();
+    assert_eq!(summary, [(id("B"), true), (id("A"), false)]);
+    let on =
+        |rows: &[gmm_db::InstalledMod], i: i64| rows.iter().find(|m| m.id == i).unwrap().enabled;
+    let rows = f.db.installed_mods(Some("zzz")).await.unwrap();
+    assert!(!on(&rows, id("A")));
+    assert!(on(&rows, id("B")));
+    assert!(on(&rows, id("C")), "a version that doesn't clash stays on");
+
+    // Not a GameBanana version: refused.
+    let mut plain = meta("Loose", 1);
+    plain.gb_file_id = None;
+    let loose = f.analyze(&[("L/l.ini", INI_OTHER)]);
+    let one = install_analyzed(
+        &f.db,
+        &f.ws,
+        f.mods,
+        zzz(),
+        &plain,
+        &loose,
+        &InstallOptions::default(),
+        |_| {},
+    )
+    .await
+    .unwrap();
+    assert!(matches!(
+        gmm_core::switch_version(&f.db, &f.ws, f.mods, zzz(), one[0].id).await,
+        Err(CoreError::NotAVersion { .. })
+    ));
+}
+
+#[tokio::test]
+async fn two_step_install_shows_the_plan_then_installs_from_it() {
+    let f = Fixture::new().await;
+    let archive = zip_of(&[
+        ("Pack/Red/red.ini", INI),
+        ("Pack/Blue/blue.ini", INI),
+        ("Pack/Blue/tool.exe", b"MZ"),
+    ]);
+    let (_server, gb) = mock_gamebanana(19567, "clean", &archive).await;
+    let stop = StopSignal::new();
+
+    let prepared = gmm_core::prepare(
+        &gb,
+        &net(),
+        &f.db,
+        &f.ws,
+        zzz(),
+        900001,
+        None,
+        &stop,
+        |_| {},
+    )
+    .await
+    .unwrap();
+    let plan = gmm_core::install_plan(&f.db, zzz(), &prepared)
+        .await
+        .unwrap();
+    assert_eq!(plan.mod_name, "Test Outfit A");
+    assert_eq!(plan.install_to, r"ZZMI\Mods\GMM");
+    assert!(!plan.from_cache);
+    let names: Vec<&str> = plan.versions.iter().map(|v| v.name.as_str()).collect();
+    assert_eq!(names, ["Blue", "Red"]);
+    assert_eq!(plan.versions[0].blocked, ["tool.exe"]);
+    assert_eq!(plan.versions[0].folder, "Test Outfit A [gb-900001] (Blue)");
+    assert!(plan.versions.iter().all(|v| v.installed.is_none()));
+    assert_eq!(plan.version_conflicts.len(), 1);
+    assert!(f.tree().is_empty(), "preparing installs nothing");
+
+    let report = gmm_core::install_prepared(
+        &f.db,
+        &f.ws,
+        f.mods,
+        zzz(),
+        &prepared,
+        &InstallOptions {
+            variants: VariantChoice::Named(vec!["Red".into()]),
+            ..InstallOptions::default()
+        },
+        |_| {},
+    )
+    .await
+    .unwrap();
+    prepared.discard(&f.ws);
+    assert_eq!(report.installed.len(), 1);
+
+    // Preparing again reuses the cached archive and marks the installed version.
+    let again = gmm_core::prepare(
+        &gb,
+        &net(),
+        &f.db,
+        &f.ws,
+        zzz(),
+        900001,
+        None,
+        &stop,
+        |_| {},
+    )
+    .await
+    .unwrap();
+    let plan = gmm_core::install_plan(&f.db, zzz(), &again).await.unwrap();
+    again.discard(&f.ws);
+    assert!(plan.from_cache);
+    assert_eq!(plan.versions[1].installed, Some(report.installed[0].id));
+    assert_eq!(plan.versions[0].installed, None);
+    assert!(
+        fs::read_dir(f.cache_dir.join("extract"))
+            .unwrap()
+            .next()
+            .is_none(),
+        "discard removes the extraction folders"
+    );
+}
+
+#[tokio::test]
+async fn a_stopped_install_does_nothing() {
+    let f = Fixture::new().await;
+    let archive = zip_of(&[("m.ini", INI)]);
+    let (_server, gb) = mock_gamebanana(19567, "clean", &archive).await;
+    for (stop_how, want) in [
+        (
+            StopSignal::cancel as fn(&StopSignal),
+            gmm_core::StopReason::Cancelled,
+        ),
+        (StopSignal::pause, gmm_core::StopReason::Paused),
+    ] {
+        let stop = StopSignal::new();
+        stop_how(&stop);
+        let result = install(
+            &gb,
+            &net(),
+            &f.db,
+            &f.ws,
+            f.mods,
+            zzz(),
+            &request(),
+            &stop,
+            |_| {},
+        )
+        .await;
+        assert!(matches!(result, Err(CoreError::Stopped(r)) if r == want));
+    }
+    assert!(f.tree().is_empty());
+}
+
+#[tokio::test]
+async fn update_check_finds_newer_files() {
+    let f = Fixture::new().await;
+    let archive = zip_of(&[("m.ini", INI)]);
+    let (_server, gb) = mock_gamebanana(19567, "clean", &archive).await;
+    let a = f.analyze(&[("m.ini", INI)]);
+    let mut old = meta("Test Outfit A", 900001);
+    old.gb_file_id = Some(1_399_999);
+    old.file_date = Some(1_780_000_000);
+    install_analyzed(
+        &f.db,
+        &f.ws,
+        f.mods,
+        zzz(),
+        &old,
+        &a,
+        &InstallOptions::default(),
+        |_| {},
+    )
+    .await
+    .unwrap();
+
+    let check = gmm_core::check_updates(&gb, &f.db, zzz()).await.unwrap();
+    assert_eq!(check.checked, 1);
+    assert_eq!(check.updates.len(), 1);
+    assert_eq!(check.updates[0].newest.id, 1_400_001);
+    assert_eq!(check.updates[0].installed_file_id, Some(1_399_999));
+    assert!(check.notes.is_empty());
+
+    // A mod GameBanana no longer has becomes a note, not a failure.
+    let mut gone = meta("Gone", 123);
+    gone.gb_file_id = Some(5);
+    let b = f.analyze(&[("g.ini", INI_OTHER)]);
+    install_analyzed(
+        &f.db,
+        &f.ws,
+        f.mods,
+        zzz(),
+        &gone,
+        &b,
+        &InstallOptions::default(),
+        |_| {},
+    )
+    .await
+    .unwrap();
+    let check = gmm_core::check_updates(&gb, &f.db, zzz()).await.unwrap();
+    assert_eq!(check.checked, 2);
+    assert_eq!(check.updates.len(), 1);
+    assert_eq!(check.notes.len(), 1);
 }

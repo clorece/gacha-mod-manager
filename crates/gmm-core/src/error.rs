@@ -88,6 +88,11 @@ pub enum CoreError {
     ModFolderMissing(String),
     #[error("both {0:?} and its DISABLED copy exist in the Mods folder; remove one by hand first")]
     ModFolderAmbiguous(String),
+    /// The install was paused or cancelled ([`crate::StopSignal`]).
+    #[error("{}", match .0 { crate::StopReason::Paused => "paused", crate::StopReason::Cancelled => "cancelled" })]
+    Stopped(crate::StopReason),
+    #[error("no installed version {id} of a GameBanana mod in {game}")]
+    NotAVersion { id: i64, game: String },
     /// An image key GMM never handed out (see [`crate::ImageCache`]).
     #[error("unknown image")]
     UnknownImage,

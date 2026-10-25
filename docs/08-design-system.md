@@ -6,11 +6,20 @@ GameBanana names and stats (mod preview images are placeholders, since GMM never
 them). This doc is the written source of truth the app is built from. Screen-level detail for
 the catalogue and mod page fields stays in [07](07-frontend-design.md).
 
-**Status (2026-10-25): second draft.** The layout and theme are signed off; this round added
-the startup check, the install confirmation (versions and files), mod settings with
-versions, and the sticky search and filter bar. Every state was checked in both themes
-(screenshots plus an automated contrast and overlap check over 62 states). Nothing below is
-built in the app yet beyond the logo and icons.
+**Status (2026-10-25): signed off, in the app.** The layout and theme are signed off; the
+second round added the startup check, the install confirmation (versions and files), mod
+settings with versions, and the sticky search and filter bar. Every state was checked in both
+themes (screenshots plus an automated contrast and overlap check over 62 states).
+
+**In the app** (Phase 4): the tokens below, base styles, scrollbars and the `:where()`
+button base are in `apps/desktop/src/styles.css`; Nunito is bundled; the primitives are in
+`apps/desktop/src/ui` and shown in every state on the dev-only **Style guide** page (sidebar,
+Development, dev builds only). Built screens: the sidebar with Select Game, the Dashboard
+(bubbles, Launch, recently installed, setup), the Mods Library (game cards, search, enable /
+disable all, switches, conflict notice; category, character and select mode wait for stored
+categories) and a first Mod settings panel (switch, details, Uninstall). The rest follow in
+Phase 5. Two details differ from the canvas on purpose: "Last played" isn't shown until GMM
+records it (Phase 5), and mod cards use placeholder art until previews are wired.
 
 ## Direction
 
@@ -146,8 +155,9 @@ to three parts:
 Always shown: the file and size, where it installs ("Zenless Zone Zero › ZZMI\Mods\GMM"),
 the safety line (GameBanana's scan plus GMM's own), and **Switch it on after installing**.
 The button says what happens ("Install", "Install 2 versions", disabled as "Pick a version"
-when nothing is chosen). A RAR archive shows a red notice instead (GMM can't open RAR yet,
-nothing downloaded) with View on GameBanana. Blocked files (executables, scripts) are listed
+when nothing is chosen). A file GMM can't install (password-protected or split into several
+parts, [09](09-archive-formats.md)) shows a red notice instead, with View on GameBanana;
+RAR itself is supported since Phase 5. Blocked files (executables, scripts) are listed
 in the same dialog with the option to install without them. Confirming starts the download
 and goes to the Downloads page.
 
@@ -257,8 +267,8 @@ All colors are CSS custom properties on the app root; `.t-dark` and `.t-light` s
   offer them). Cards show likes and views at once and fill in downloads as each visible mod's
   page loads (cached for an hour); the mockup shows that loading state.
 - **RAR is common**: of 15 mod files sampled across both games (2026-10-24/25), 9 were zip,
-  4 rar and 2 7z. GMM can't extract RAR yet, so about a quarter of mods would fail; RAR
-  support comes first in Phase 5. Details and the plan: [09](09-archive-formats.md).
+  4 rar and 2 7z. RAR support landed first in Phase 5 (2026-10-24), so these install like
+  any other mod. Details: [09](09-archive-formats.md).
 - **Versions come two ways on GameBanana**: as separate files on the mod page (Homewear Belle:
   three zips with descriptions), or as several mod folders inside one archive (Fixed Yae
   Sakura Sword Pack: 8). The first is known from the API; the second only after looking inside
@@ -286,5 +296,5 @@ All colors are CSS custom properties on the app root; `.t-dark` and `.t-light` s
 2. Game banner source (above).
 3. "Powered by GameBanana" in the lockup is descriptive, but ask GameBanana before release
    along with the API questions (roadmap open question 2).
-4. Component library: build the few primitives by hand (current lean) or adopt Radix-based
-   shadcn/ui.
+4. ~~Component library~~: built by hand (`src/ui`, 2026-10-25); dialogs use the native
+   `<dialog>` element for focus trapping and Escape.

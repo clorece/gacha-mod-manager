@@ -36,6 +36,11 @@ unused-allowed-license = "allow"
 exceptions = [
   # Mozilla's CA certificate list (data, not code), used by the TLS certificate verifier.
   { crate = "webpki-root-certs", allow = ["CDLA-Permissive-2.0"] },
+  # The RAR helper vendors RARLAB's UnRAR source (crates/gmm-extract/vendor/unrar): free to use
+  # for extracting RAR archives, not for writing a RAR compressor; its license text ships with
+  # GMM (THIRD-PARTY-NOTICES.md). libarchive couldn't read real mod archives
+  # (docs/09-archive-formats.md, RAR decision record).
+  { crate = "gmm-extract", allow = ["LicenseRef-UnRAR"] },
 ]
 
 [bans]

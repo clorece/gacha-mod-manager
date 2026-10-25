@@ -8,6 +8,8 @@
 
 mod commands;
 mod error;
+mod queue;
+mod startup;
 mod views;
 
 #[cfg(test)]
@@ -16,7 +18,7 @@ mod bindings;
 use std::sync::Arc;
 
 use gmm_catalog::GameBanana;
-use gmm_core::{AppDirs, ImageCache, open_db};
+use gmm_core::{AppDirs, ImageCache, InstallQueue, open_db};
 use gmm_db::Db;
 use gmm_net::{Client, NetConfig, RateLimit};
 use tauri::http::{Response, StatusCode, header};
@@ -29,6 +31,11 @@ pub struct AppState {
     pub gb: GameBanana,
     pub images: Arc<ImageCache>,
     pub dirs: AppDirs,
+    /// The Downloads page's installs, run one at a time by `queue::spawn_worker`.
+    pub queue: InstallQueue,
+    /// Wakes the worker when an install is queued or resumed.
+    pub wake: tokio::sync::Notify,
+    pub watchers: queue::Watchers,
 }
 
 impl AppState {
@@ -52,6 +59,9 @@ impl AppState {
             gb,
             images,
             dirs,
+            queue: InstallQueue::new(),
+            wake: tokio::sync::Notify::new(),
+            watchers: queue::Watchers::default(),
         })
     }
 }
@@ -114,6 +124,7 @@ fn main() {
         .setup(|app| {
             let state = tauri::async_runtime::block_on(AppState::open())?;
             app.manage(state);
+            queue::spawn_worker(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -124,8 +135,19 @@ fn main() {
             commands::catalog_mod,
             commands::catalog_updates,
             commands::catalog_categories,
+            commands::prepare_install,
             commands::install,
+            queue::queue_install,
+            queue::queue_jobs,
+            queue::queue_watch,
+            queue::queue_pause,
+            queue::queue_resume,
+            queue::queue_cancel,
+            queue::queue_dismiss,
+            queue::queue_clear_finished,
+            startup::startup_check,
             commands::library,
+            commands::switch_version,
             commands::set_enabled,
             commands::uninstall_preview,
             commands::uninstall,

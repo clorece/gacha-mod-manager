@@ -11,11 +11,12 @@ use std::path::PathBuf;
 use gmm_adapters::{GameManifest, Registry};
 use gmm_catalog::{CatalogSource, Category, ListQuery, ModProfile, ModUpdate, Page, SearchQuery};
 use gmm_core::{
-    ClearedCache, ConflictReport, InstallOptions, InstallRequest, Machine, ModsTarget, RecycleBin,
-    SetupHints, cache_storage, clear_downloads, confirm_exe, conflicts_after_install,
-    conflicts_for, conflicts_for_unmanaged, game_storage, library as core_library,
-    listed_unmanaged, set_enabled as core_set_enabled, set_unmanaged_enabled_at, start,
-    uninstall as core_uninstall, uninstall_unmanaged, unmanaged_size,
+    ClearedCache, ConflictReport, InstallOptions, InstallPlan, InstallRequest, Machine, ModsTarget,
+    RecycleBin, SetupHints, StopSignal, ToggleOutcome, cache_storage, clear_downloads, confirm_exe,
+    conflicts_after_install, conflicts_for, conflicts_for_unmanaged, game_storage,
+    library as core_library, listed_unmanaged, set_enabled as core_set_enabled,
+    set_unmanaged_enabled_at, start, uninstall as core_uninstall, uninstall_unmanaged,
+    unmanaged_size,
 };
 use gmm_xxmi::GameStatus;
 use tauri::ipc::Channel;
@@ -30,17 +31,17 @@ use crate::views::{
     Toggled, UninstallItem, Uninstalled, rewrite_categories, rewrite_profile, rewrite_summary,
 };
 
-fn registry() -> CmdResult<&'static Registry> {
+pub(crate) fn registry() -> CmdResult<&'static Registry> {
     Registry::builtin().map_err(|e| CmdError::other(e.to_string()))
 }
 
-fn game_by_id(id: &str) -> CmdResult<&'static GameManifest> {
+pub(crate) fn game_by_id(id: &str) -> CmdResult<&'static GameManifest> {
     registry()?
         .get(id)
         .ok_or_else(|| CmdError::other(format!("unknown game {id:?}")))
 }
 
-async fn mods_target(state: &AppState, game: &GameManifest) -> CmdResult<ModsTarget> {
+pub(crate) async fn mods_target(state: &AppState, game: &GameManifest) -> CmdResult<ModsTarget> {
     Ok(ModsTarget::open(&state.db, game, SetupHints::default()).await?)
 }
 
@@ -155,6 +156,49 @@ pub async fn catalog_categories(
     Ok(categories)
 }
 
+/// Step one of the install confirmation: fetches the file into the download cache (or finds
+/// it there), looks inside and returns what the dialog shows: the versions, their blocked
+/// files, which are already installed, which clash, where it installs. Nothing is installed;
+/// the confirmed choice goes to `queue_install`, which reuses the cached archive.
+#[tauri::command]
+pub async fn prepare_install(
+    state: State<'_, AppState>,
+    mod_id: u64,
+    file_id: Option<u64>,
+    on_progress: Channel<InstallProgress>,
+) -> CmdResult<InstallPlan> {
+    let game = gmm_core::game_for_mod(&state.gb.mod_profile(mod_id).await?)?;
+    let target = mods_target(&state, game).await?;
+    let prepared = gmm_core::prepare(
+        &state.gb,
+        &state.net,
+        &state.db,
+        &target.ws,
+        game,
+        mod_id,
+        file_id,
+        &StopSignal::new(),
+        |event| drop(on_progress.send(event.into())),
+    )
+    .await?;
+    let plan = gmm_core::install_plan(&state.db, game, &prepared).await;
+    prepared.discard(&target.ws);
+    Ok(plan?)
+}
+
+/// Switches one version of a mod on and the versions that clash with it off. Returns every
+/// change, the chosen version first.
+#[tauri::command]
+pub async fn switch_version(
+    state: State<'_, AppState>,
+    game: String,
+    id: i64,
+) -> CmdResult<Vec<ToggleOutcome>> {
+    let game = game_by_id(&game)?;
+    let target = mods_target(&state, game).await?;
+    Ok(gmm_core::switch_version(&state.db, &target.ws, target.mods, game, id).await?)
+}
+
 /// Downloads a mod and installs it under `Mods/GMM/` (the whole `gmm install` pipeline).
 /// Progress goes to `on_progress`. When the archive holds several mods or contains blocked
 /// files, the error says so (`choose_variant`, `blocked`) and the UI asks, then calls again;
@@ -173,6 +217,7 @@ pub async fn install(
         options: InstallOptions {
             variants: args.variants.into(),
             skip_blocked: args.skip_blocked,
+            start_disabled: args.start_disabled,
         },
     };
     let report = gmm_core::install(
@@ -183,6 +228,7 @@ pub async fn install(
         target.mods,
         game,
         &request,
+        &StopSignal::new(),
         // The window may have closed; installing carries on regardless.
         |event| drop(on_progress.send(event.into())),
     )
@@ -227,7 +273,9 @@ pub async fn library(state: State<'_, AppState>, game: String) -> CmdResult<Libr
             enabled: m.row.enabled,
             disk: m.disk,
             variant: m.row.variant,
+            group: gmm_core::version_group(m.row.gb_mod_id, m.row.gb_file_id),
             gb_mod_id: m.row.gb_mod_id,
+            gb_file_id: m.row.gb_file_id,
             version: m.row.version,
             size_bytes: m.row.size_bytes,
             installed_at: m.row.installed_at,

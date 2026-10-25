@@ -20,8 +20,12 @@ const ALLOWED = new Set([
   "BlueOak-1.0.0",
 ]);
 
-// Per-package exceptions, as [name, license], each with a reason. None so far.
-const EXCEPTIONS = new Map([]);
+// Per-package exceptions, as [name, license], each with a reason.
+const EXCEPTIONS = new Map([
+  // Font files only (no code): the UI font, Nunito. OFL-1.1 allows bundling it with software;
+  // it can't be sold on its own. Listed in THIRD-PARTY-NOTICES.md (docs/06).
+  ["@fontsource-variable/nunito", "OFL-1.1"],
+]);
 
 /** True when an SPDX expression is satisfied by allowed licenses (OR: any side; AND: all). */
 function allowed(expr) {

@@ -8,6 +8,7 @@ use gmm_fsguard::ScopedPath;
 use gmm_net::{Client, DownloadRequest, Progress, Url};
 
 use crate::error::CoreError;
+use crate::stop::{StopReason, StopSignal};
 use crate::workspace::{Workspace, hash_file};
 
 /// Downloads above this are refused outright, whatever the catalogue says.
@@ -72,7 +73,10 @@ pub fn choose_file(
 }
 
 /// Puts a GameBanana file into the download cache (or finds it there) and records it in the
-/// database. The file list is fetched fresh, since it's read right before a download.
+/// database. The file list is fetched fresh, since it's read right before a download. A pause
+/// or cancel on `stop` ends the download early ([`CoreError::Stopped`]); the partial file is
+/// kept, so fetching again resumes it.
+#[allow(clippy::too_many_arguments)]
 pub async fn fetch_archive<C: CatalogSource>(
     catalog: &C,
     net: &Client,
@@ -80,8 +84,10 @@ pub async fn fetch_archive<C: CatalogSource>(
     ws: &Workspace,
     mod_id: u64,
     file_id: Option<u64>,
+    stop: &StopSignal,
     mut on_event: impl FnMut(FetchEvent),
 ) -> Result<FetchedArchive, CoreError> {
+    stop.check()?;
     let files = catalog.mod_files(mod_id).await?;
     let file = choose_file(&files, mod_id, file_id)?;
     let guard = ws.guard();
@@ -120,9 +126,18 @@ pub async fn fetch_archive<C: CatalogSource>(
         let outcome = net
             .download(guard, &request, |p| {
                 on_event(FetchEvent::Progress(p));
-                ControlFlow::Continue(())
+                match stop.requested() {
+                    Some(_) => ControlFlow::Break(()),
+                    None => ControlFlow::Continue(()),
+                }
             })
-            .await?;
+            .await
+            .map_err(|e| match e {
+                gmm_net::NetError::Paused => {
+                    CoreError::Stopped(stop.requested().unwrap_or(StopReason::Paused))
+                }
+                other => other.into(),
+            })?;
         (outcome.sha256, outcome.bytes, false, outcome.resumed)
     };
 

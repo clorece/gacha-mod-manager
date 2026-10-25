@@ -6,8 +6,9 @@ use gmm_fsguard::{Guard, RelPath, ScopedPath};
 
 use crate::error::ArchiveError;
 use crate::format::{Format, detect_format};
+use crate::helper::Helper;
 use crate::limits::Limits;
-use crate::{sevenz_fmt, zip_fmt};
+use crate::{rar_fmt, sevenz_fmt, zip_fmt};
 
 /// One file or folder entry from the archive, as written. Folders that only exist because a
 /// file sits inside them are created on disk but not listed.
@@ -36,6 +37,8 @@ impl ExtractReport {
 }
 
 /// Extracts `archive` into `dest`, which must not exist yet and must be in a read-write root.
+/// RAR archives go through the helper next to the running program
+/// ([`Helper::beside_current_exe`]).
 ///
 /// On error, `dest` is removed again, so a rejected archive leaves nothing behind.
 pub fn extract(
@@ -44,6 +47,17 @@ pub fn extract(
     dest: &ScopedPath,
     limits: &Limits,
 ) -> Result<ExtractReport, ArchiveError> {
+    extract_with(guard, archive, dest, limits, None)
+}
+
+/// [`extract`] with an explicit RAR helper (`None`: the one next to the running program).
+pub fn extract_with(
+    guard: &Guard,
+    archive: &ScopedPath,
+    dest: &ScopedPath,
+    limits: &Limits,
+    helper: Option<&Helper>,
+) -> Result<ExtractReport, ArchiveError> {
     let format = {
         let mut file = guard.open_read(archive)?;
         let mut header = [0u8; 8];
@@ -51,19 +65,21 @@ pub fn extract(
             read_up_to(&mut file, &mut header).map_err(|e| ArchiveError::Corrupt(e.to_string()))?;
         detect_format(&header[..n]).ok_or(ArchiveError::UnknownFormat)?
     };
-    if format == Format::Rar {
-        // RAR needs the C unrar library; it will run in a sandboxed subprocess (see roadmap).
-        return Err(ArchiveError::UnsupportedFormat("RAR"));
-    }
+    // Found before anything is created, so a missing helper leaves nothing behind.
+    let rar_helper = match (format, helper) {
+        (Format::Rar, Some(h)) => Some(h.clone()),
+        (Format::Rar, None) => Some(Helper::beside_current_exe()?),
+        _ => None,
+    };
     if guard.exists(dest)? {
         return Err(ArchiveError::DestinationExists);
     }
     guard.create_dir_all(dest)?;
 
-    let result = match format {
-        Format::Zip => zip_fmt::extract(guard, archive, dest, limits),
-        Format::SevenZ => sevenz_fmt::extract(guard, archive, dest, limits),
-        Format::Rar => Err(ArchiveError::UnsupportedFormat("RAR")),
+    let result = match (&rar_helper, format) {
+        (Some(h), _) => rar_fmt::extract(guard, archive, dest, limits, h),
+        (None, Format::Zip) => zip_fmt::extract(guard, archive, dest, limits),
+        (None, _) => sevenz_fmt::extract(guard, archive, dest, limits),
     };
     match result {
         Ok(mut entries) => {

@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use gmm_catalog::{Category, Image, ImageVariant, Member, ModProfile, ModSummary, Page};
 use gmm_core::{
     CacheStorage, Conflict, DiskState, FetchEvent, GameStorage, ImageCache, InstallEvent,
-    InstallReport, UnmanagedMod, VariantChoice,
+    InstallReport, ModUpdateInfo, UnmanagedMod, VariantChoice,
 };
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -68,6 +68,9 @@ pub struct ModRow {
     pub disk: DiskState,
     pub variant: Option<String>,
     pub gb_mod_id: Option<u64>,
+    pub gb_file_id: Option<u64>,
+    /// Folders with the same group are versions of one mod (same GameBanana mod and file).
+    pub group: Option<String>,
     pub version: Option<String>,
     pub size_bytes: u64,
     pub installed_at: i64,
@@ -126,6 +129,9 @@ pub struct InstallArgs {
     /// Install without the blocked files (after the user saw them listed).
     #[serde(default)]
     pub skip_blocked: bool,
+    /// Install switched off ("Switch it on after installing" unticked).
+    #[serde(default)]
+    pub start_disabled: bool,
 }
 
 /// Install progress, sent on the command's channel.
@@ -161,6 +167,35 @@ pub struct InstallResult {
     pub setup_warnings: Vec<String>,
     /// Mods already on that the new ones clash with (both stay on).
     pub conflicts: Vec<Conflict>,
+}
+
+/// Where a startup-check step is.
+#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum StepState {
+    Working,
+    Done,
+    Skipped,
+    Failed,
+}
+
+/// One step of the startup check, sent as it starts and as it ends.
+#[derive(Debug, Clone, Serialize, TS)]
+pub struct StartupStep {
+    /// 0 is the GMM app, then one per game, then the installed mods.
+    pub step: u32,
+    pub label: String,
+    pub state: StepState,
+    pub detail: String,
+}
+
+#[derive(Debug, Default, Serialize, TS)]
+pub struct StartupReport {
+    /// GameBanana mods compared with their pages.
+    pub checked: usize,
+    pub updates: Vec<ModUpdateInfo>,
+    /// Mods or games that couldn't be checked.
+    pub notes: Vec<String>,
 }
 
 #[derive(Debug, Serialize, TS)]

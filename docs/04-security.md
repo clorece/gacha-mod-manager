@@ -80,8 +80,13 @@ does is the failure we design out.
   it gets `gmmimg` keys.
 - **R6 — No debug or automation bridges in release.** Devtools and test hooks sit behind a `dev`
   feature that release CI asserts is off.
-- **R7 — Process launching is minimal.** GMM starts exactly one kind of process: the XXMI
-  Launcher exe inside a confirmed XXMI root, with fixed arguments (`--nogui --xxmi <IMP>`).
+- **R7 — Process launching is minimal.** GMM starts exactly two kinds of process, each from
+  one place, both with fixed arguments. (1) The XXMI Launcher exe inside a confirmed XXMI
+  root, with `--nogui --xxmi <IMP>`. (2) Its own RAR helper, `gmm-extract`, from the folder of
+  the running program, with one argument (`list` or `extract`), an empty environment and the
+  archive (opened read-only through `gmm-fsguard`) as its stdin; never a path from a download.
+  The helper is started only in `crates/gmm-archive/src/helper.rs` and sandboxed (see
+  "Archive hardening" below).
   "Open folder" uses the OS shell to open a directory, never a file. Nothing from a mod archive is
   ever executed. All launching is in `crates/gmm-xxmi/src/launch.rs`; the exe path is fixed
   relative to the validated root and the arguments come from the importer id in code (refused
@@ -90,10 +95,13 @@ does is the failure we design out.
   `requireAdministrator`; a plain process start fails with Windows error 740), so on Windows
   it is started with `ShellExecuteExW` and the default verb, like Explorer starting XXMI's own
   Quick Start shortcut: Windows shows its UAC prompt, and declining it is reported, not retried.
-  That call is the **only `unsafe` code in GMM**: the workspace sets `unsafe_code = "deny"`,
-  this one module allows it, and CI fails if `allow(unsafe_code)` appears in any other file.
-  Other platforms use `std::process::Command` in the same module (the only place past the
-  clippy ban).
+  Reviewed `unsafe` code is limited to three files: this module, the helper's job object
+  (`gmm-archive/src/helper.rs`) and the helper itself (`gmm-extract/src/main.rs` with its
+  `ffi` and `lockdown` modules: the UnRAR calls and the helper's own lockdown). The workspace
+  sets `unsafe_code = "deny"`; CI fails if `allow(unsafe_code)` appears in any other file, and
+  if `Command::new` appears outside `gmm-xxmi/src/launch.rs` and `gmm-archive/src/helper.rs`
+  (tests excepted). Other platforms start XXMI with `std::process::Command` in the launch
+  module (past the clippy ban there and in the helper module only).
 - **R8 — Recoverable deletes.** Uninstall and storage deletes go through the Recycle Bin
   (`gmm_fsguard::Guard::move_to_trash`, the only caller of the `trash` crate; it applies the
   same read-write-root checks as any write). Unmanaged (hand-installed) mods are never deleted
@@ -105,7 +113,8 @@ does is the failure we design out.
 ## Archive hardening (gmm-archive)
 
 - Detect the format from magic bytes, never the extension. Supported: zip, 7z (pure-Rust
-  decoders only; 7z BZip2 is left out for licensing). Encrypted archives are rejected.
+  decoders in process; 7z BZip2 is left out for licensing) and RAR4 / RAR5 (the `gmm-extract`
+  helper, below). Encrypted archives are rejected.
 - Validate **every** entry's metadata before writing anything (two passes).
 - Extract into a fresh temp dir under the app cache (`cache/extract/<id>`), then copy the
   chosen mod into `Mods/GMM/DISABLED .staging/<id>/` and rename it into place. On any error
@@ -129,11 +138,32 @@ does is the failure we design out.
   - Warn: `d3dx.ini` / `d3d11.dll` inside a mod (XXMI also flags rogue `d3dx.ini`), `.ini`
     references outside the mod folder (`..\`), unusually large files.
   - Scan report stored with the mod and shown on its library entry.
-- RAR (C `unrar`) extraction runs in a subprocess with a restricted token / job object on Windows
-  (seccomp on Linux). RAR support is planned for Phase 5 (it's common on GameBanana); until
-  then RAR archives are refused. The helper would be a second kind of process GMM starts
-  (its own extractor, never anything from an archive), so R7 is amended in the same change.
-  Design and the libarchive / UnRAR choice: [09](09-archive-formats.md#rar-plan-decision-record).
+- **RAR** (Phase 5) is read by the `gmm-extract` helper process: RARLAB's UnRAR 7.23, vendored
+  and built from source. Design and the libarchive / UnRAR choice:
+  [09](09-archive-formats.md#rar-plan-decision-record).
+  - The helper gets the archive as stdin and no path or output folder; it reopens only that
+    file (by the name of its stdin handle) because UnRAR reads archives by name.
+  - Windows: GMM starts it suspended, puts it in a job object (one process, 2 GiB committed
+    memory, 10 minutes of CPU, no desktop / clipboard / global-atom / system-setting access,
+    killed when GMM drops the job) and only then resumes it. Before reading a byte the
+    helper removes all its privileges, lowers itself to Low integrity (no writes to the
+    user's files or registry) and turns on process mitigations (no dynamic code, no
+    extension-point DLLs, no remote or low-label images, strict handle checks). If any step
+    fails it refuses to run.
+  - Linux: no-new-privileges, a file-size cap of 0 (no file writes), address-space and CPU
+    caps. ⏳ seccomp (Phase 7 hardening).
+  - UnRAR runs in test mode, so it never writes a file: every entry and its data come back
+    over a pipe as frames (`gmm_archive::rar_protocol`, every length bounded before
+    allocating). GMM checks the whole list first (pass 1, the same checks as zip and 7z),
+    then a second run streams the data and GMM writes each file itself through
+    `gmm-fsguard`, counting real bytes against the limits. The entries must match between
+    the passes, and anything unexpected from the helper ends the extraction.
+  - Refused: links of every kind (symlinks, junctions, hard links, "file copy" references),
+    special files, encrypted entries or headers, multi-part archives, and RAR 7 dictionaries
+    over 4 GB.
+  - Residual risk, accepted for now: a Low-integrity Windows process can still read files the
+    user can read and open network connections. An AppContainer would remove both
+    (Phase 7 hardening).
 
 ## Catalogue / UI hardening
 
@@ -165,15 +195,19 @@ does is the failure we design out.
   is enabled without it (R6). Note that WebView2 itself accepts a remote-debugging port from
   the `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` environment variable in any build; that needs
   control of the user's environment, which is outside the threat model.
-- No inline `style` attributes in the UI (`style-src 'self'`); use Tailwind classes.
+- No `style` attributes in the UI (`style-src 'self'`); use classes. The one exception is a
+  value only known at runtime (the progress bar's width), set through React's `style` prop,
+  which writes a CSSOM property; the CSP allows that and still blocks style attributes in
+  markup. The UI font is bundled, so `font-src` needs nothing beyond `'self'`.
 
 ## Test harnesses, grown phase by phase
 
 | Phase | Harness | Proves |
 |---|---|---|
 | 1 | Malicious archive corpus (`crates/gmm-archive/tests/corpus.rs`, archives built in code) incl. Windows-specific tricks; randomized corruption tests (`tests/robustness.rs`) | Extractor rejects each case, never panics, never writes outside its root |
+| 5 | **RAR corpus** (✅ done, `crates/gmm-extract/tests/rar.rs`, RAR5 and RAR4 archives built byte by byte, run through the real helper): traversal and drive-letter names, symlinks, hard links, Unix special files, case collisions, entry / depth / path-length limits, declared and actual size limits, encrypted headers and files, truncated and corrupted archives, a missing helper, and the helper refusing any other arguments. The frame reader's bounds have unit tests (`rar_protocol.rs`). Real mods checked by hand (2026-10-24): five RAR files from GameBanana, 0.7 to 113 MiB, all extracted | T2, R7 |
 | 1 | Property tests (✅ done): `RelPath`, archive corruption, VDF parser and (Phase 2) the migoto ini parser never panic. `cargo-fuzz` targets (extractor, migoto ini parser, VDF/ACF, GB JSON, XXMI config) as a nightly job: ⏳ | No panics or escapes |
-| 1 | Lint gates (✅ done): clippy `disallowed_methods` (`std::fs`, `Command::new`) and `disallowed_types` (HTTP clients, raw sockets, `winreg::RegKey`) outside their crates, including the desktop crate; `cargo-deny` (advisories included); Phase 3: `pnpm audit` and the npm license check (`scripts/check-npm-licenses.mjs`) in CI | R1–R3, R7 can't be bypassed silently |
+| 1 | Lint gates (✅ done): clippy `disallowed_methods` (`std::fs`, `Command::new`) and `disallowed_types` (HTTP clients, raw sockets, `winreg::RegKey`) outside their crates, including the desktop crate; `cargo-deny` (advisories included); Phase 3: `pnpm audit` and the npm license check (`scripts/check-npm-licenses.mjs`) in CI; Phase 5: CI checks that `allow(unsafe_code)` stays in its three reviewed files and `Command::new` in its two launch places | R1–R3, R7 can't be bypassed silently |
 | 0b | **XXMI config secret test** (✅ done): fixture configs with canary `github_token`, proxy password and signatures; asserts they never appear in parsed config, `GameStatus` JSON or `Debug`, and parse errors don't echo content. Phase 2: the conformance suite checks the DB file, cache and mod folders too. ⏳ logs and IPC output when those exist | R4 |
 | 0b | Detection on a fake machine (✅ done): Steam libraries, HoYoPlay data with a default path for an uninstalled game, Epic manifest, hostile `installdir` (`..\..\Windows`), planted `loginusers.vdf` canary | R3/R4, correct detection |
 | 2 | **Egress harness** (✅ done, `crates/gmm-cli/tests/privacy.rs`): the real `gmm` binary runs every network command behind an in-test proxy that logs and refuses each request. Every `CONNECT` target must pass `Allowlist::production()` on port 443, at least one must be seen, and local commands (detect, status, config, list, conflicts, storage, launch) must make none. On Linux CI each `gmm` process also runs under `strace`, and any IPv4/IPv6 connection that isn't loopback (traffic bypassing the proxy) fails the run. ⏳ a Windows equivalent of the bypass check (firewall rule) | R2 |

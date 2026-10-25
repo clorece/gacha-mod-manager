@@ -18,7 +18,7 @@ GMM detects the format from the file's first bytes, never from its extension.
 |---|---|---|---|---|
 | **.zip** | ✅ Supported | `zip` crate, pure Rust | Stored, Deflate, Deflate64, LZMA | Encrypted (ZipCrypto, AES), BZip2, Zstandard, XZ, split zips (`.z01`) |
 | **.7z** | ✅ Supported | `sevenz-rust2`, pure Rust | LZMA, LZMA2, Deflate, PPMd | Encrypted, BZip2 (left out for licensing, see [06](06-licensing-and-provenance.md)), multi-volume (`.7z.001`) |
-| **.rar** (RAR4, RAR5) | ⏳ Phase 5, first item | Planned: a sandboxed helper process (below) | Target: RAR4 and RAR5, solid archives | Encrypted, multi-volume (`.part1.rar`) |
+| **.rar** (RAR4, RAR5) | ✅ Supported (2026-10-24) | UnRAR 7.23 in the sandboxed `gmm-extract` helper process (below) | RAR4 and RAR5 including solid archives and the RAR 7 format | Encrypted, multi-volume (`.part1.rar`), "file copy" references, links, RAR 7 dictionaries over 4 GB |
 | Archive inside an archive | ⏳ Planned (quality of life) | Same pipeline, limits apply to both levels | When the outer archive holds only one archive, offer to open it | Deeper nesting |
 | .tar, .tar.gz, .gz | ❌ Not planned | Not seen on GameBanana for these games | — | Would come almost free with the RAR helper if ever needed |
 | Self-extracting .exe | ❌ Never | GMM never runs anything from a download | — | Refused as a blocked file |
@@ -29,9 +29,8 @@ Local archives (drag and drop, Phase 6) use the same formats and the same pipeli
 
 | Case | When | Message |
 |---|---|---|
-| RAR (until Phase 5) | In the install confirmation, before anything downloads (the file name on GameBanana says `.rar`; the first bytes confirm it after download) | "This mod is packed as a RAR archive. GMM can't open RAR files yet; support is planned before the beta." with View on GameBanana |
 | Encrypted archive | After download, before anything is extracted | "This archive is password-protected. GMM can't install it." The archive stays in the cache |
-| Unsupported method (e.g. BZip2 inside a 7z) | During extraction; nothing is installed | "This archive uses a compression method GMM doesn't support (BZip2)." |
+| Unsupported method (e.g. BZip2 inside a 7z, a RAR 7 dictionary over 4 GB) | During extraction; nothing is installed | "This archive uses a compression method GMM doesn't support (BZip2)." |
 | Multi-part archive | Before download when the name shows it | "This mod is split into several files, which GMM can't install." |
 | Not an archive | After download | "This file isn't an archive GMM can open." |
 | Archive with blocked files | In the install confirmation | The files are listed; install without them or cancel |
@@ -53,17 +52,44 @@ Local archives (drag and drop, Phase 6) use the same formats and the same pipeli
 against the sampled RAR mods (including a 113 MiB one) before committing; if it fails on real
 archives, switch to UnRAR with a license exception.
 
-**Helper design**
-- GMM starts the helper with fixed arguments only: the archive's path inside GMM's cache and
-  an output folder inside `cache/extract/`. Nothing from the archive is ever run.
-- Sandboxed: on Windows a restricted token and a job object (no network, memory and time
-  limits, killed when GMM exits); on Linux seccomp.
-- Two passes, like the in-process formats: the helper first reports every entry's name, type
-  and sizes; GMM runs its checks (paths, links, sizes, ratios, entry count) on that list and
-  only then lets it extract. GMM verifies the real sizes afterwards.
-- Security rule R7 says GMM starts exactly one kind of process (XXMI). The helper becomes the
-  second, GMM's own binary with fixed arguments; R7 is amended in the same change, and CI
-  checks that process launching stays in its two places.
+**Outcome (2026-10-24): UnRAR.** libarchive 3.8.10's RAR readers, built into the helper, read
+4 of 5 real RAR mods and failed `claretalt.rar` (Goth Claret Outfit, mod 731223) with
+"Block checksum error"; Windows' own `tar.exe` (libarchive 3.8.9) fails it the same way,
+while the download's MD5 matched GameBanana's. So the helper now carries RARLAB's UnRAR
+7.23 source instead (vendored, built with the `cc` crate; provenance in
+`crates/gmm-extract/vendor/README.md`), with a per-crate license exception and its license
+text in `THIRD-PARTY-NOTICES.md`. The `unrar` crates on crates.io were not used: they carry
+an older UnRAR (7.1.0) and declare the UnRAR code as MIT / Apache-2.0.
 
-**Tests**: the malicious-archive corpus gets RAR cases (path traversal, links, bombs, lying
-sizes, encrypted headers), plus real RAR mods in a manual check.
+| Real mod (GameBanana) | Archive | libarchive 3.8.10 | UnRAR 7.23 |
+|---|---|---|---|
+| Goth Claret Outfit (731223) | `claretalt.rar`, 40.2 MiB, RAR5 | ❌ block checksum error | ✅ 52 files, 217.8 MiB |
+| Phoebe x Robin (595638) | `phoebe_x_robin.rar`, 17.5 MiB | ✅ | ✅ 45 files, 84.3 MiB |
+| Hsin Bob Hair (729726) | `woju_mod_hsin_w_cute_bob_hair.rar`, 19.2 MiB | ✅ | ✅ 29 files, 51.1 MiB (two `.url` files blocked by the scan) |
+| phoebe (574999) | `2_e2be0.rar`, 731 KiB | ✅ | ✅ 1 file, 4.0 MiB |
+| Miasmic Hunter Color Choices (675310) | `yanagi_yuying_pack_color_options.rar`, 113 MiB | ✅ | ✅ 60 files, 377.9 MiB, both passes in about 3 s |
+
+**Helper design, as built** (details in [04](04-security.md#archive-hardening-gmm-archive))
+- GMM starts `gmm-extract` (shipped next to `gmm.exe` and the app) with one fixed argument,
+  `list` or `extract`, an empty environment, and the archive as stdin. It gets no path and
+  no output folder: UnRAR runs in test mode and the helper sends every entry and its data
+  back over a pipe, so it never writes a file. Nothing from the archive is ever run.
+- Sandboxed: on Windows a job object (one process, memory and CPU-time caps, no UI access,
+  killed with GMM) and, inside the helper before it reads anything, no privileges, Low
+  integrity and process mitigations; on Linux no-new-privileges and resource caps
+  (seccomp still to do).
+- Two passes: the helper lists every entry's name, type and size; GMM runs its checks on the
+  whole list (paths, links, sizes, entry count, collisions) and only then runs the helper
+  again to stream the data, which GMM writes itself, counting the real bytes.
+- Security rule R7 was amended: GMM starts two kinds of process (XXMI and this helper), each
+  from one place, and CI checks it stays that way.
+- Builds: `cargo build --workspace` builds the helper; `tauri dev` and `tauri build` build it
+  first (`beforeDevCommand` / `beforeBuildCommand`). A missing helper is reported ("GMM's RAR
+  reader is missing"), and nothing is extracted.
+
+**Tests**: `crates/gmm-extract/tests/rar.rs` builds RAR5 and RAR4 archives byte by byte (no
+RAR writer exists as a library) and runs them through the real helper: traversal names,
+links, special files, collisions, limits, lying sizes, encrypted headers and files,
+truncation and corruption (19 cases). Compression bombs can't be built without a RAR
+compressor; the ratio checks are the same code as for zip and 7z. Real RAR mods: the five
+in the table above, checked by hand with `gmm fetch`.

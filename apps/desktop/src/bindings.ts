@@ -22,7 +22,11 @@ export type ModRow = { id: number, name: string,
 /**
  * The folder's name on disk right now (with `DISABLED ` when off).
  */
-folder: string, enabled: boolean, disk: DiskState, variant: string | null, gb_mod_id: number | null, version: string | null, size_bytes: number, installed_at: number, };
+folder: string, enabled: boolean, disk: DiskState, variant: string | null, gb_mod_id: number | null, gb_file_id: number | null, 
+/**
+ * Folders with the same group are versions of one mod (same GameBanana mod and file).
+ */
+group: string | null, version: string | null, size_bytes: number, installed_at: number, };
 
 export type LibraryView = { game: string, 
 /**
@@ -42,7 +46,11 @@ file_id: number | null, variants: VariantPick,
 /**
  * Install without the blocked files (after the user saw them listed).
  */
-skip_blocked: boolean, };
+skip_blocked: boolean, 
+/**
+ * Install switched off ("Switch it on after installing" unticked).
+ */
+start_disabled: boolean, };
 
 export type InstallProgress = { "type": "using_cache" } | { "type": "downloading", size: number, } | { "type": "progress", downloaded: number, total: number | null, } | { "type": "extracting" } | { "type": "installing", folder: string, };
 
@@ -105,6 +113,24 @@ export type Settings = { database: string,
  * The XXMI folder the user picked, or `None` when it's found automatically.
  */
 xxmi_root: string | null, confirmed_xxmi_exe: string | null, manual_folders: Array<FolderRow>, http_cache_entries: number, http_cache_bytes: number, download_cache_entries: number, download_cache_bytes: number, };
+
+export type StepState = "working" | "done" | "skipped" | "failed";
+
+export type StartupStep = { 
+/**
+ * 0 is the GMM app, then one per game, then the installed mods.
+ */
+step: number, label: string, state: StepState, detail: string, };
+
+export type StartupReport = { 
+/**
+ * GameBanana mods compared with their pages.
+ */
+checked: number, updates: Array<ModUpdateInfo>, 
+/**
+ * Mods or games that couldn't be checked.
+ */
+notes: Array<string>, };
 
 export type GameStatus = { game_id: string, game_name: string, state: SetupState, 
 /**
@@ -361,3 +387,90 @@ skipped: Array<string>,
 warnings: Array<string>, };
 
 export type InstallReport = { game: string, mod_id: number, mod_name: string, file_id: number, file_name: string, archive_sha256: string, from_cache: boolean, installed: Array<InstalledFolder>, };
+
+export type ToggleOutcome = { id: number, folder_name: string, enabled: boolean, 
+/**
+ * False when the mod already was in that state.
+ */
+changed: boolean, };
+
+export type InstallPlan = { game: string, mod_id: number, mod_name: string, 
+/**
+ * The file that was fetched and analysed.
+ */
+file: ModFile, 
+/**
+ * The mod's other current files, newest first (for "Choose a file").
+ */
+other_files: Array<ModFile>, archive_bytes: number, from_cache: boolean, 
+/**
+ * The mod kind from the game's manifest, or `None` when nothing in the archive looks
+ * like a mod for this game (installing would fail).
+ */
+kind: string | null, versions: Array<VersionPlan>, 
+/**
+ * Versions that replace the same things; only one of each pair should be on.
+ */
+version_conflicts: Array<VersionConflict>, 
+/**
+ * Where it installs, relative to XXMI: `ZZMI\Mods\GMM`.
+ */
+install_to: string, };
+
+export type VersionPlan = { 
+/**
+ * Empty for an archive with one mod; otherwise what `install` takes as a version name.
+ */
+name: string, 
+/**
+ * The folder it gets under `Mods/GMM/`.
+ */
+folder: string, files: number, bytes: number, 
+/**
+ * The installed copy's id, when this version is already installed.
+ */
+installed: number | null, 
+/**
+ * Files that are never installed (executables, scripts), relative to the version.
+ */
+blocked: Array<string>, 
+/**
+ * Scan warnings, as `path: reason`.
+ */
+warnings: Array<string>, };
+
+export type VersionConflict = { 
+/**
+ * Positions in [`Analysis::variants`].
+ */
+a: number, b: number, 
+/**
+ * How many hashes both replace.
+ */
+hashes: number, };
+
+export type Job = { id: number, game: string, mod_id: number, mod_name: string, file_name: string | null, 
+/**
+ * How many versions were chosen (0 when the archive holds one mod).
+ */
+versions: number, state: JobState, 
+/**
+ * Unix seconds.
+ */
+queued_at: number, finished_at: number | null, };
+
+export type JobState = { "type": "queued" } | { "type": "downloading", downloaded: number, total: number | null, } | { "type": "extracting" } | { "type": "installing", folder: string, } | { "type": "paused" } | { "type": "done", installed: Array<InstalledFolder>, } | { "type": "failed", message: string, } | { "type": "cancelled" };
+
+export type ModUpdateInfo = { game: string, gb_mod_id: number, name: string, 
+/**
+ * The installed folders (versions) of this mod.
+ */
+installed_ids: Array<number>, installed_file_id: number | null, 
+/**
+ * Upload date of the installed file (Unix seconds).
+ */
+installed_file_date: number | null, 
+/**
+ * The newest file GameBanana scanned as clean.
+ */
+newest: ModFile, };

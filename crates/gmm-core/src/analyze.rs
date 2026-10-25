@@ -13,6 +13,8 @@ use std::collections::BTreeSet;
 use gmm_adapters::GameManifest;
 use gmm_archive::{ExtractReport, Limits, ScanOptions, ScanReport, extract, scan};
 use gmm_fsguard::{Guard, RelPath, ScopedPath};
+use gmm_migoto::{Override, parse};
+use serde::Serialize;
 
 use crate::error::CoreError;
 use crate::workspace::Workspace;
@@ -32,6 +34,17 @@ pub struct Variant {
     pub bytes: u64,
 }
 
+/// Two versions in one archive that replace the same things, so only one should be on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct VersionConflict {
+    /// Positions in [`Analysis::variants`].
+    pub a: usize,
+    pub b: usize,
+    /// How many hashes both replace.
+    pub hashes: usize,
+}
+
 /// An extracted, scanned and classified archive. The extraction folder stays in the cache
 /// until [`Analysis::cleanup`] (which [`crate::install`] calls).
 #[derive(Debug, Clone)]
@@ -43,6 +56,9 @@ pub struct Analysis {
     pub kind: Option<String>,
     /// In path order. Empty when `kind` is `None`.
     pub variants: Vec<Variant>,
+    /// Pairs of variants that replace the same things (same rule as conflicts between
+    /// installed mods).
+    pub version_conflicts: Vec<VersionConflict>,
 }
 
 impl Analysis {
@@ -65,14 +81,16 @@ pub fn analyze(
         .map_err(CoreError::from)
         .and_then(|scan| {
             let (kind, variants) = classify(guard, &report, game)?;
-            Ok((scan, kind, variants))
+            let version_conflicts = version_conflicts(guard, &report, &variants);
+            Ok((scan, kind, variants, version_conflicts))
         });
     match classified {
-        Ok((scan, kind, variants)) => Ok(Analysis {
+        Ok((scan, kind, variants, version_conflicts)) => Ok(Analysis {
             extract: report,
             scan,
             kind,
             variants,
+            version_conflicts,
         }),
         Err(e) => {
             let _ = guard.remove_dir_all(&dest);
@@ -142,6 +160,55 @@ fn classify(
         return Ok((Some(kind.id.clone()), variants));
     }
     Ok((None, Vec::new()))
+}
+
+/// Which variants replace the same resources. Only computed when there are several.
+fn version_conflicts(
+    guard: &Guard,
+    report: &ExtractReport,
+    variants: &[Variant],
+) -> Vec<VersionConflict> {
+    if variants.len() < 2 {
+        return Vec::new();
+    }
+    let overrides: Vec<Vec<Override>> = variants
+        .iter()
+        .map(|v| {
+            report
+                .files()
+                .filter(|e| {
+                    e.path.starts_with(&v.root)
+                        && counts_as_mod_ini(&e.path)
+                        && e.size <= MAX_INI_BYTES
+                })
+                .filter_map(|e| guard.read(&report.dest.join_rel(&e.path)).ok())
+                .flat_map(|bytes| parse(&String::from_utf8_lossy(&bytes)).overrides)
+                .filter(|o| o.replaces.any())
+                .collect()
+        })
+        .collect();
+    let mut out = Vec::new();
+    for a in 0..variants.len() {
+        for b in a + 1..variants.len() {
+            let mut shared: BTreeSet<&str> = BTreeSet::new();
+            for oa in &overrides[a] {
+                if overrides[b]
+                    .iter()
+                    .any(|ob| ob.hash == oa.hash && oa.overlaps(ob))
+                {
+                    shared.insert(oa.hash.as_str());
+                }
+            }
+            if !shared.is_empty() {
+                out.push(VersionConflict {
+                    a,
+                    b,
+                    hashes: shared.len(),
+                });
+            }
+        }
+    }
+    out
 }
 
 /// `.ini` files 3DMigoto would load: not XXMI's own config, and no `DISABLED*` component

@@ -79,20 +79,28 @@ Our dependencies must fit this license. `cargo-deny` and an npm license checker
 an allowlist (MIT, Apache-2.0, BSD-2/3-Clause, ISC, Zlib, MPL-2.0, Unicode-3.0, CC0-1.0; the npm
 check also allows 0BSD and BlueOak-1.0.0, common permissive npm licenses). Any GPL,
 LGPL or AGPL dependency fails the build. Watch out for:
-- **`unrar` crate:** uses the freeware *UnRAR license*, which bans using the code to build a RAR
-  compressor. Shipping it is fine, but it isn't OSI-approved. Keep RAR support behind a Cargo
-  feature and list it in the third-party notices.
+- **UnRAR** (vendored in `crates/gmm-extract`, Phase 5): RARLAB's freeware *UnRAR license*
+  lets any software use the source to handle RAR archives, free of charge, but bans using it
+  to build a RAR-compatible archiver or re-create the RAR compression algorithm. GMM only
+  extracts. It isn't OSI-approved, so it's handled as GMM's one non-OSI component: the
+  helper crate's license field says `(MIT OR Apache-2.0) AND LicenseRef-UnRAR`, `deny.toml`
+  has a per-crate exception for it, the full license text is in `THIRD-PARTY-NOTICES.md`,
+  and the code lives only in the separate `gmm-extract` executable, not in GMM's main
+  binaries. Source and version: `crates/gmm-extract/vendor/README.md`.
 - **GPL crates or npm packages:** blocked by the allowlist. Find a permissive alternative.
 - **MPL-2.0 dependencies** are allowed: they stay MPL, and we must not modify their files without
   publishing those changes.
-- **Per-crate exceptions** live in `deny.toml` with a reason. Currently one: `webpki-root-certs`
-  (Mozilla's CA certificate list, `CDLA-Permissive-2.0`, a permissive data license).
+- **Per-crate exceptions** live in `deny.toml` with a reason. Currently two: `webpki-root-certs`
+  (Mozilla's CA certificate list, `CDLA-Permissive-2.0`, a permissive data license) and
+  `gmm-extract` (`LicenseRef-UnRAR`, above).
 - **Left out for licensing:** 7z BZip2 support (`libbz2-rs-sys`, `bzip2-1.0.6` license).
 - **Direct dependencies so far** (all pass `cargo deny`): `zip`, `sevenz-rust2`, `reqwest` +
   `rustls` (ring), `tokio`, `serde`/`serde_json`, `toml`, `url`, `sha2`, `md-5`, `hex`, `clap`,
   `dirs`, `thiserror`, `pelite` (MIT; reads `d3d11.dll`'s version resource), `winreg` (MIT;
-  Windows registry reads), `windows-sys` 0.61 (MIT OR Apache-2.0; only for the
-  `ShellExecuteExW` call that starts XXMI), `sqlx` 0.9 (MIT OR Apache-2.0; SQLite only, no macros), which pulls
+  Windows registry reads), `windows-sys` 0.61 (MIT OR Apache-2.0; the `ShellExecuteExW` call
+  that starts XXMI, the RAR helper's job object and its lockdown), `cc` (MIT OR Apache-2.0;
+  build-time, compiles the vendored UnRAR), `libc` (MIT OR Apache-2.0; the helper's Linux
+  lockdown), `sqlx` 0.9 (MIT OR Apache-2.0; SQLite only, no macros), which pulls
   in `libsqlite3-sys` (MIT) with SQLite's own C source **bundled**. SQLite itself is in the
   public domain; list it in `THIRD-PARTY-NOTICES` anyway. Building it needs a C compiler
   (the MSVC Build Tools the Rust Windows toolchain already uses). `trash` 5 (MIT; Recycle
@@ -103,17 +111,19 @@ LGPL or AGPL dependency fails the build. Watch out for:
   (Apache-2.0 OR MIT; Rust-side folder pickers only), `ts-rs` 12 (MIT; behind each crate's `ts`
   feature, generates the TypeScript types). On Linux Tauri brings gtk-rs 0.18; its build-time
   `proc-macro-error` is flagged unmaintained (RUSTSEC-2024-0370, not a vulnerability) and
-  ignored in `deny.toml` with that reason. npm (44 packages, all on the allowlist): `react`,
-  `react-dom`, `@tauri-apps/api` (runtime); `vite`, `@vitejs/plugin-react`, `tailwindcss`,
+  ignored in `deny.toml` with that reason. npm (45 packages): `react`, `react-dom`,
+  `@tauri-apps/api` (runtime); `@fontsource-variable/nunito` 5.3 (the UI font, OFL-1.1, font
+  files only: the one exception in `scripts/check-npm-licenses.mjs`, see below); `vite`, `@vitejs/plugin-react`, `tailwindcss`,
   `@tailwindcss/vite`, `typescript`, `@biomejs/biome`, `@tauri-apps/cli`, `@types/react*`
   (build/dev only). Every npm package must be older than pnpm's minimum release age (one day);
   no exemptions are configured.
 - **Brand assets** (`docs/brand/`, the app icons, `apps/desktop/src/assets/gmm-logo.svg`): the
   GMM mark and lockups, provided by the project owner (made with Claude Design, 2026-10-24),
-  original to this project. The planned UI font, **Nunito**, is under the SIL Open Font License
-  1.1 (OFL-1.1): free to bundle and ship with software, not sold on its own. Bundling it adds a
-  font-only OFL-1.1 exception to the npm license check and an entry in the third-party
-  notices. Game key art and logos are not used (see "Names and trademarks"); GameBanana's logo
+  original to this project. The UI font, **Nunito**, is bundled (Phase 4, through
+  `@fontsource-variable/nunito`) under the SIL Open Font License 1.1 (OFL-1.1): free to bundle
+  and ship with software, not sold on its own, and its notice and license text must travel with
+  it. The npm license check allows OFL-1.1 for that one package only, and
+  `THIRD-PARTY-NOTICES.md` (repo root) carries the copyright line and the full license. Game key art and logos are not used (see "Names and trademarks"); GameBanana's logo
   is never used, only its name as text.
 - **Facts about other software** come from observing it on the dev machine (file layouts,
   config keys, locale strings), recorded in our own words in `docs/03-game-adapters.md`. The

@@ -9,13 +9,18 @@ Development happens on Windows (primary target). Linux follows later from the sa
 
 ## Where we are (2026-10-25)
 
-**Done:** the backend (Phases 0–2) and the app foundations (Phase 3), all on 2026-10-23/24.
+**Done:** the backend (Phases 0–2), the app foundations (Phase 3) and the design (Phase 4),
+2026-10-23 to 25. Phase 5 is under way (below).
 Every feature works from the `gmm` command line: browse GameBanana, install (download, safe
 extraction, policy scan, variants), switch mods on and off, uninstall to the Recycle Bin,
 conflicts, storage, launch through XXMI. The Phase 2 exit check passed in game. The app window
 (`apps/desktop`, Tauri 2 + React) has a command for every CLI action, generated TypeScript
-types, the `gmmimg` image protocol, a locked-down capability and CSP, and a first shell (game
-rail, XXMI state pill, setup card, mod list with toggles, Launch with XXMI). Run it with
+types, the `gmmimg` image protocol, a locked-down capability and CSP, and the designed shell:
+the sidebar (General, Mods with Select Game, Development, theme switch), the Dashboard (game
+bubbles that open to Launch, recently installed, setup cards) and the Mods Library (switches,
+conflict prompt, a first Mod settings panel with Uninstall). The visual system from the
+design canvas is in the code: tokens for both themes, bundled Nunito, hand-built primitives
+(`src/ui`) and a dev-only style guide page. Run it with
 `corepack pnpm tauri dev` in `apps/desktop` (or `just app-dev`). A cleanup pass followed
 (dead code removed, CLI/app duplicates merged into shared functions).
 
@@ -23,35 +28,42 @@ rail, XXMI state pill, setup card, mod list with toggles, Launch with XXMI). Run
 |---|---|
 | `gmm-fsguard` | Every file access: registered read-only/read-write roots, safe relative paths, junction/symlink escape checks, denylist for secrets |
 | `gmm-net` | Every network request: GameBanana-only allowlist (every redirect hop), rate limiting, retries, verified resumable downloads |
-| `gmm-archive` | Safe zip/7z extraction (two-pass checks, bomb limits) and a policy scan of what came out |
+| `gmm-archive` | Safe zip/7z/rar extraction (two-pass checks, bomb limits) and a policy scan of what came out; starts the RAR helper |
+| `gmm-extract` | The RAR helper: a separate, sandboxed program with RARLAB's UnRAR that streams entries to GMM and never writes a file |
 | `gmm-catalog` | GameBanana client: list, search, mod page, files, updates, categories |
 | `gmm-adapters` | The ZZZ and WuWa manifests and their validation |
 | `gmm-detect` | Finds games: Steam, HoYoPlay, Epic, manual folders |
 | `gmm-xxmi` | Reads XXMI's setup (allowlisted config fields only) and works out each game's setup state |
 | `gmm-migoto` | Reads 3DMigoto mod `.ini` files: override hashes, what they replace, namespaces, key bindings |
 | `gmm-db` | SQLite database (`%APPDATA%\GMM\gmm.db`): settings, manual game folders, installed mods, download cache, GameBanana response cache |
-| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`), the library (list with disk state, unmanaged mods, enable/disable, uninstall to the Recycle Bin), conflict detection, storage accounting, launching through XXMI (with exe confirmation), app folders, the image cache behind `gmmimg` |
-| `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, one command per CLI action (ids only), the `gmmimg` protocol, navigation guard; the React UI is in `apps/desktop/src` |
+| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`, in one go or in two steps with an install plan), the install queue and stop signal, versions (grouping, switching), the update check, the library (list with disk state, unmanaged mods, enable/disable, uninstall to the Recycle Bin), conflict detection, storage accounting, launching through XXMI (with exe confirmation), app folders, the image cache behind `gmmimg` |
+| `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, a command per CLI action plus the install confirmation, queue, versions and startup check (ids only), the queue worker, the `gmmimg` protocol, navigation guard; the React UI is in `apps/desktop/src` |
 | `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm list`, `gmm enable/disable/uninstall`, `gmm conflicts`, `gmm storage`, `gmm launch`, `gmm detect`, `gmm status`, `gmm config` |
 
 On the dev machine, `gmm status` and the app report ZZZ `Ready` (HoYoPlay install) and WuWa
 `Ready` (Steam install; its Steam copy runs with XXMI's Game Launch on Direct).
 
-**Now:** Phase 4, design, is mostly done (2026-10-24/25). The layout and theme are signed off.
-The design canvas has 23 artboards: every screen in dark and light, plus the startup check,
-the install confirmation (one version, choose a file, choose versions, add versions, RAR
-notice) and mod settings with versions; the search and filter row stays at the top of the
-store and library. Every state passed a contrast and overlap check in both themes. Written up
-in [08-design-system.md](08-design-system.md); file formats and the RAR plan in
-[09-archive-formats.md](09-archive-formats.md). The logo and app icons are in the app.
+**Design** (Phase 4): the canvas (23 artboards, every screen dark and light, signed off
+2026-10-25) is written up in [08-design-system.md](08-design-system.md); file formats and the
+RAR plan in [09-archive-formats.md](09-archive-formats.md).
 
 **Waiting on you:** the game banner source (see 08); screenshots of each XXMI setup step, for
 the setup guide; the product name, if it changes.
 
-**Next:** finish Phase 4 in the app (tokens, Nunito, primitives, style guide page, the shell
-restyled to the sidebar), then Phase 5: RAR support first (about a quarter of mods are RAR),
-the two-step install for the confirmation dialog, versions, the install queue and startup
-check, then the screens. See the roadmap.
+**Phase 5** (started 2026-10-24): **RAR works.** GMM extracts RAR4 and RAR5 through
+`gmm-extract`, a separate sandboxed helper with RARLAB's UnRAR 7.23 that streams entries
+back while GMM checks and writes every file (libarchive was tried first and failed one of
+five real mods; details in [09](09-archive-formats.md)). All five sampled RAR mods extract,
+including the 113 MiB Yanagi pack. The backend for the install flow is in place too: the
+two-step install (`prepare_install` returns the plan the confirmation dialog shows),
+versions as one mod (grouping, installing more from the cache, `switch_version`), the
+install queue with pause, resume and cancel, and the startup check (newest catalogue pages,
+update check of installed mods).
+
+**Next:** the rest of the Phase 5 backend list (trending, download counts, stored
+categories, open-in-browser / open-folder commands, description sanitizing), then the
+screens, starting with the startup check, Downloads and the install confirmation. See the
+roadmap.
 
 ## Docs
 

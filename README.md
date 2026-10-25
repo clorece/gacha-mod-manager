@@ -11,9 +11,10 @@ A desktop app for finding, downloading and organizing GameBanana mods for gacha 
 **Status:** early development. The backend is complete and works from the `gmm` command
 line: browse GameBanana, check your setup (`gmm status`), install mods into XXMI's Mods folder
 with a safety scan (`gmm install`), switch them on and off, uninstall them to the Recycle Bin,
-spot conflicts, show disk use, and start a game with mods through XXMI (`gmm launch`). The app
-window has a first shell over every command; its design is done (Phase 4) and being built
-into the app, then the remaining screens.
+spot conflicts, show disk use, and start a game with mods through XXMI (`gmm launch`). Zip,
+7z and RAR mods are supported. The app
+window has the designed sidebar shell with the Dashboard (Launch) and the Mods Library; the
+remaining screens come next.
 Progress and plans: [docs/README.md](docs/README.md).
 
 First games: Zenless Zone Zero and Wuthering Waves.
@@ -28,6 +29,13 @@ cargo run -p gmm-cli -- status
 
 ```bash
 cargo run -p gmm-cli -- catalog list --game zzz --sort downloads
+```
+
+RAR mods go through a separate helper program; build it once next to `gmm` (the app's
+`tauri dev` and `tauri build` do this themselves):
+
+```bash
+cargo build -p gmm-extract
 ```
 
 The app window needs Node 24 too (pnpm comes through corepack):

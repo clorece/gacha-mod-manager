@@ -1,0 +1,45 @@
+[package]
+name = "gmm-extract"
+description = "GMM's sandboxed RAR reader: UnRAR in a helper process that streams entries to GMM"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+# Our code is MIT OR Apache-2.0; the vendored UnRAR source (vendor/unrar) is under the UnRAR
+# license (free to use for extracting RAR, not for making a RAR compressor). See
+# docs/06-licensing-and-provenance.md and the exception in deny.toml.
+license = "(MIT OR Apache-2.0) AND LicenseRef-UnRAR"
+repository.workspace = true
+publish = false
+build = "build.rs"
+
+[[bin]]
+name = "gmm-extract"
+path = "src/main.rs"
+
+[dependencies]
+gmm-archive.workspace = true
+
+# Lowering the helper's own rights before it reads anything (src/lockdown.rs), and finding
+# the file behind stdin (src/main.rs).
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Console",
+  "Win32_System_SystemServices",
+  "Win32_System_Threading",
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
+[build-dependencies]
+cc = "1"
+
+[dev-dependencies]
+gmm-fsguard.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

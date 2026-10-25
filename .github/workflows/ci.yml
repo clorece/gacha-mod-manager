@@ -42,15 +42,29 @@ jobs:
         run: |
           sudo apt-get install -y -qq strace
           GMM_PRIVACY_STRACE=1 cargo test -p gmm-cli --test privacy --locked -- --nocapture
-      # The workspace denies unsafe code; the one reviewed exception is the ShellExecuteExW call
-      # that starts XXMI with its administrator prompt (docs/04-security.md, R7).
-      - name: unsafe code only in the reviewed launch call
+      # The workspace denies unsafe code. Reviewed exceptions (docs/04-security.md, R7): the
+      # ShellExecuteExW call that starts XXMI, the RAR helper's job object, and the helper
+      # itself (UnRAR calls and its own lockdown).
+      - name: unsafe code only in the reviewed files
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          found=$(grep -rl --include='*.rs' 'allow(unsafe_code)' crates $( [ -d apps ] && echo apps ) | sort || true)
-          if [ "$found" != "crates/gmm-xxmi/src/launch.rs" ]; then
-            echo "allow(unsafe_code) found outside gmm-xxmi/src/launch.rs:"; echo "$found"; exit 1
+          found=$(grep -rl --include='*.rs' 'allow(unsafe_code)' crates $( [ -d apps ] && echo apps ) | sort | tr '\n' ' ' || true)
+          want="crates/gmm-archive/src/helper.rs crates/gmm-extract/src/main.rs crates/gmm-xxmi/src/launch.rs "
+          if [ "$found" != "$want" ]; then
+            echo "allow(unsafe_code) found outside the reviewed files:"; echo "$found"; exit 1
+          fi
+      # Security rule R7: GMM starts two kinds of process, each from one place: XXMI
+      # (gmm-xxmi/src/launch.rs) and its RAR helper (gmm-archive/src/helper.rs). Tests may
+      # start the helper directly.
+      - name: Process launching only in its two places
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          found=$(grep -rl --include='*.rs' 'Command::new' crates $( [ -d apps ] && echo apps ) | grep -v '/tests/' | sort | tr '\n' ' ' || true)
+          want="crates/gmm-archive/src/helper.rs crates/gmm-xxmi/src/launch.rs "
+          if [ "$found" != "$want" ]; then
+            echo "Command::new found outside the two launch places:"; echo "$found"; exit 1
           fi
       # Security rule R6: the test-only network feature (plain HTTP to localhost) must never
       # reach a shipped binary.

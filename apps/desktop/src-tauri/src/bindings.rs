@@ -28,7 +28,8 @@ fn render() -> String {
         // Commands' own types.
         CmdError, GameInfo, CatalogQuery, CatalogPage, ModRow, LibraryView, ModKey, VariantPick,
         InstallArgs, InstallProgress, InstallResult, Toggled, UninstallItem, Uninstalled,
-        GameStorageView, StorageView, LaunchInfo, Launched, FolderRow, Settings,
+        GameStorageView, StorageView, LaunchInfo, Launched, FolderRow, Settings, StepState,
+        StartupStep, StartupReport,
         // Setup (gmm-xxmi, gmm-detect).
         gmm_xxmi::GameStatus, gmm_xxmi::SetupState, gmm_xxmi::ImporterInfo,
         gmm_xxmi::ModsSummary, gmm_detect::GameInstall, gmm_detect::InstallSource,
@@ -43,7 +44,10 @@ fn render() -> String {
         gmm_core::DiskState, gmm_core::UnmanagedMod, gmm_core::ModRef, gmm_core::Conflict,
         gmm_core::ConflictReport, gmm_core::Size, gmm_core::ModUsage, gmm_core::GameStorage,
         gmm_core::CacheStorage, gmm_core::ClearedCache, gmm_core::InstalledFolder,
-        gmm_core::InstallReport,
+        gmm_core::InstallReport, gmm_core::ToggleOutcome,
+        // Two-step install, versions, queue, update check (gmm-core, Phase 5).
+        gmm_core::InstallPlan, gmm_core::VersionPlan, gmm_core::VersionConflict,
+        gmm_core::Job, gmm_core::JobState, gmm_core::ModUpdateInfo,
     ];
     let mut out = String::from(
         "// SPDX-License-Identifier: MIT OR Apache-2.0\n\

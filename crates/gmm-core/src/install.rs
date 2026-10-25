@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use gmm_adapters::GameManifest;
 use gmm_archive::{Finding, Severity};
-use gmm_catalog::{CatalogSource, ModFile};
+use gmm_catalog::{CatalogSource, ModFile, ModFiles};
 use gmm_db::{Db, NewInstalledMod};
 use gmm_fsguard::{Guard, RelPath, RootId, ScopedPath};
 use gmm_net::Client;
@@ -15,8 +15,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::analyze::{Analysis, Variant, analyze};
 use crate::error::CoreError;
-use crate::fetch::{FetchEvent, fetch_archive};
+use crate::fetch::{FetchEvent, FetchedArchive, fetch_archive};
 use crate::names::{GMM_DIR, SIDECAR_FILE, STAGING_DIR, mod_folder_name, on_disk_name};
+use crate::stop::StopSignal;
 use crate::workspace::{STALE_TEMP, Workspace, remove_stale, unique_id};
 
 const SIDECAR_FORMAT: u32 = 1;
@@ -38,6 +39,8 @@ pub struct InstallOptions {
     /// Install even though the mod contains blocked files (executables, scripts). Those
     /// files are left out; they stay only in the cached archive and are never run.
     pub skip_blocked: bool,
+    /// Install switched off (`DISABLED ` folders) instead of on.
+    pub start_disabled: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -164,21 +167,42 @@ pub fn install_gate(status: &GameStatus) -> Result<Vec<String>, CoreError> {
     }
 }
 
-/// The whole pipeline for one GameBanana mod: catalogue checks, download (or cache),
-/// extraction, scan, variants, staging, rename into `<Mods>/GMM/`, database. `mods` must be
-/// the game's `Mods/` root, registered in `ws`.
+/// A GameBanana mod fetched into the download cache and analysed, before anything is
+/// installed. The install confirmation is built from it ([`crate::install_plan`]);
+/// [`install_prepared`] installs from it. Its extraction folder stays in the cache until
+/// [`Prepared::discard`].
+#[derive(Debug, Clone)]
+pub struct Prepared {
+    pub mod_id: u64,
+    pub mod_name: String,
+    pub mod_version: Option<String>,
+    /// The mod's files on GameBanana, for choosing another one.
+    pub files: ModFiles,
+    pub fetched: FetchedArchive,
+    pub analysis: Analysis,
+}
+
+impl Prepared {
+    /// Removes the extraction folder (the archive stays in the download cache).
+    pub fn discard(&self, ws: &Workspace) {
+        self.analysis.cleanup(ws);
+    }
+}
+
+/// Step one of an install: catalogue checks, download (or the cached copy), extraction, scan,
+/// variants and the conflicts between them. Nothing is installed.
 #[allow(clippy::too_many_arguments)]
-pub async fn install<C: CatalogSource>(
+pub async fn prepare<C: CatalogSource>(
     catalog: &C,
     net: &Client,
     db: &Db,
     ws: &Workspace,
-    mods: RootId,
     game: &GameManifest,
-    request: &InstallRequest,
+    mod_id: u64,
+    file_id: Option<u64>,
+    stop: &StopSignal,
     mut on_event: impl FnMut(InstallEvent),
-) -> Result<InstallReport, CoreError> {
-    let mod_id = request.mod_id;
+) -> Result<Prepared, CoreError> {
     let profile = catalog.mod_profile(mod_id).await?;
     if profile.is_trashed {
         return Err(CoreError::NotInstallable {
@@ -208,17 +232,43 @@ pub async fn install<C: CatalogSource>(
         });
     }
 
-    let fetched = fetch_archive(catalog, net, db, ws, mod_id, request.file_id, |e| {
+    let fetched = fetch_archive(catalog, net, db, ws, mod_id, file_id, stop, |e| {
         on_event(InstallEvent::Fetch(e));
     })
     .await?;
+    stop.check()?;
     on_event(InstallEvent::Extracting);
     let analysis = analyze(ws, game, &fetched.archive)?;
+    if let Err(e) = stop.check() {
+        analysis.cleanup(ws);
+        return Err(e);
+    }
+    Ok(Prepared {
+        mod_id,
+        mod_name: profile.summary.name,
+        mod_version: profile.summary.version,
+        files: profile.files,
+        fetched,
+        analysis,
+    })
+}
+
+/// Step two: installs the chosen variant(s) of a prepared mod. Doesn't discard `prepared`.
+pub async fn install_prepared(
+    db: &Db,
+    ws: &Workspace,
+    mods: RootId,
+    game: &GameManifest,
+    prepared: &Prepared,
+    options: &InstallOptions,
+    on_event: impl FnMut(InstallEvent),
+) -> Result<InstallReport, CoreError> {
+    let fetched = &prepared.fetched;
     let meta = ModMeta {
-        gb_mod_id: Some(mod_id),
+        gb_mod_id: Some(prepared.mod_id),
         ..ModMeta::from_gamebanana(
-            &profile.summary.name,
-            profile.summary.version.as_deref(),
+            &prepared.mod_name,
+            prepared.mod_version.as_deref(),
             &fetched.file,
             &fetched.sha256,
         )
@@ -229,22 +279,67 @@ pub async fn install<C: CatalogSource>(
         mods,
         game,
         &meta,
-        &analysis,
-        &request.options,
-        &mut on_event,
+        &prepared.analysis,
+        options,
+        on_event,
     )
-    .await;
-    analysis.cleanup(ws);
+    .await?;
     Ok(InstallReport {
         game: game.id().to_owned(),
-        mod_id,
-        mod_name: profile.summary.name,
+        mod_id: prepared.mod_id,
+        mod_name: prepared.mod_name.clone(),
         file_id: fetched.file.id,
-        file_name: fetched.file.name,
-        archive_sha256: fetched.sha256,
+        file_name: fetched.file.name.clone(),
+        archive_sha256: fetched.sha256.clone(),
         from_cache: fetched.from_cache,
-        installed: installed?,
+        installed,
     })
+}
+
+/// The whole pipeline for one GameBanana mod ([`prepare`], then [`install_prepared`]):
+/// catalogue checks, download (or cache), extraction, scan, variants, staging, rename into
+/// `<Mods>/GMM/`, database. `mods` must be the game's `Mods/` root, registered in `ws`.
+#[allow(clippy::too_many_arguments)]
+pub async fn install<C: CatalogSource>(
+    catalog: &C,
+    net: &Client,
+    db: &Db,
+    ws: &Workspace,
+    mods: RootId,
+    game: &GameManifest,
+    request: &InstallRequest,
+    stop: &StopSignal,
+    mut on_event: impl FnMut(InstallEvent),
+) -> Result<InstallReport, CoreError> {
+    let prepared = prepare(
+        catalog,
+        net,
+        db,
+        ws,
+        game,
+        request.mod_id,
+        request.file_id,
+        stop,
+        &mut on_event,
+    )
+    .await?;
+    let result = match stop.check() {
+        Ok(()) => {
+            install_prepared(
+                db,
+                ws,
+                mods,
+                game,
+                &prepared,
+                &request.options,
+                &mut on_event,
+            )
+            .await
+        }
+        Err(e) => Err(e),
+    };
+    prepared.discard(ws);
+    result
 }
 
 /// Installs the chosen variant(s) of an analysed archive into `<Mods>/GMM/`. Each one is
@@ -295,8 +390,8 @@ pub async fn install_analyzed(
                 folder,
             });
         }
-        for enabled in [true, false] {
-            if guard.exists(&gmm_dir.join(&on_disk_name(&folder, enabled))?)? {
+        for on in [true, false] {
+            if guard.exists(&gmm_dir.join(&on_disk_name(&folder, on))?)? {
                 return Err(CoreError::FolderTaken { folder });
             }
         }
@@ -398,10 +493,15 @@ pub async fn install_analyzed(
         }
 
         // Record, then rename. If the rename fails the row is removed again.
+        let enabled = !options.start_disabled;
         let mut installed = Vec::with_capacity(staged.len());
         for (dir, row, mut folder) in staged {
             let id = db.insert_installed_mod(&row).await?;
-            let target = gmm_dir.join(&on_disk_name(&row.folder_name, true))?;
+            if !enabled && let Err(e) = db.set_mod_enabled(id, false).await {
+                let _ = db.delete_installed_mod(id).await;
+                return Err(e.into());
+            }
+            let target = gmm_dir.join(&on_disk_name(&row.folder_name, enabled))?;
             if let Err(e) = guard.rename(&dir, &target) {
                 let _ = db.delete_installed_mod(id).await;
                 return Err(e.into());
