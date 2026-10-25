@@ -26,7 +26,7 @@ fn render() -> String {
     let cfg = &Config::new().with_large_int("number");
     let decls: Vec<String> = declarations![cfg;
         // Commands' own types.
-        CmdError, GameInfo, CatalogQuery, CatalogPage, ModRow, LibraryView, ModKey, VariantPick,
+        CmdError, GameInfo, GameCategory, CatalogQuery, CatalogPage, ModRow, LibraryView, ModKey, VariantPick,
         InstallArgs, InstallProgress, InstallResult, Toggled, UninstallItem, Uninstalled,
         GameStorageView, StorageView, LaunchInfo, Launched, FolderRow, Settings, StepState,
         StartupStep, StartupReport, CardStats, NetworkStatus,

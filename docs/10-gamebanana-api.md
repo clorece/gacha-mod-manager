@@ -109,6 +109,7 @@ likely), then the comparison.
 | The startup update check accepts a file list up to 6 h old, so starting GMM several times a day doesn't ask about every installed mod each time | `check_updates`, `mod_files_within` |
 | Only the counters are asked for card download counts (`_csvProperties`), at most 60 cards per call, never the whole mod page | `catalog_stats` |
 | Downloads one at a time; nothing downloads twice (cache) | install queue, download cache |
+| The Store pages on scroll (30 cards a page) and reads one list per request; ticking several characters (at most 6) or "All games" costs one request per list per page, and its search uses the list's name filter instead of a second endpoint. Download counts are asked only for cards on screen, once each | `gmm_core::browse`, `catalog_stats`, `pages/Store.tsx` |
 | No polling: GMM asks GameBanana only when the user does something, plus the startup check | by design |
 
 ### Comparison: why mitigation leads
@@ -135,7 +136,7 @@ likely), then the comparison.
 |---|---|---|
 | No published API contract; apiv11 is the website's own API | Field names or types can change without notice | Lenient decoding (missing or odd fields fall back to defaults); ignored `live_*` tests to spot drift; plain errors instead of crashes |
 | Mostly sensitive content | With sensitive mods hidden (default), a page of 20 can keep 3 | The store asks for more pages and shows "N hidden"; the featured gallery filters and backfills |
-| Page sizes | Lists at most 50 per page; search fixed at 15 | GMM asks for 20–50 and pages on scroll |
+| Page sizes | Lists at most 50 per page; search fixed at 15 | The Store asks for 30 a page and pages on scroll; its search is the list's name filter (any page size, with category and sort), so the fixed-15 search endpoint is only used by `gmm catalog search` |
 | Download counts aren't in listings | Cards fill them in as they arrive | `catalog_stats` (counters only, background budget) |
 | Archive contents can't be listed (`RawFileList` is empty) | Versions are only known after fetching | The confirmation fetches into the cache first; the install reuses it |
 | Files can be trashed, withheld, made obsolete or still awaiting a virus scan | Install refused with the reason | Checked at every install (`prepare`) |

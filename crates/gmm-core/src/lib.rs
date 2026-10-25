@@ -85,7 +85,7 @@ pub use storage::{
     CacheStorage, ClearedCache, GameStorage, ModUsage, Size, cache_storage, clear_downloads,
     game_storage, unmanaged_size,
 };
-pub use store::{FEATURED_COUNT, FeaturedMod, featured};
+pub use store::{Browse, FEATURED_COUNT, FeaturedMod, MAX_BROWSE_STREAMS, browse, featured};
 pub use toggles::{USER_INI, restore_pending};
 pub use update::{ChangedFolder, FileChangeReport, change_file, rollback_choices};
 pub use updates::{ModUpdateInfo, UpdateCheck, check_updates, refresh_catalog};

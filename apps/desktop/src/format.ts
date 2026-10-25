@@ -34,3 +34,11 @@ export function ago(unixSeconds: number, now = Date.now() / 1000): string {
   if (days < 7) return `${days} days ago`;
   return day(unixSeconds);
 }
+
+/** Card counters: `950`, `1.2k`, `48k`, `3.1M`. */
+export function compact(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 10_000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  if (n < 1_000_000) return `${Math.round(n / 1000)}k`;
+  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+}

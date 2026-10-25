@@ -181,6 +181,17 @@ impl CatalogSource for GameBanana {
         if let Some(category) = q.category_id {
             query.push(("_aFilters[Generic_Category]", category.to_string()));
         }
+        let name: String = q
+            .name
+            .as_deref()
+            .unwrap_or("")
+            .trim()
+            .chars()
+            .take(MAX_NAME_FILTER)
+            .collect();
+        if !name.is_empty() {
+            query.push(("_aFilters[Generic_Name]", format!("contains,{name}")));
+        }
         if let Some(sort) = sort_alias(q.sort) {
             query.push(("_sSort", sort.to_owned()));
         }

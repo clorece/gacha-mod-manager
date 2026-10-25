@@ -14,10 +14,12 @@ with a safety scan (`gmm install`), switch them on and off (keeping their saved 
 toggles), uninstall them for good, spot conflicts, show disk use, and start a game with mods
 through XXMI (`gmm launch`). Zip, 7z and RAR mods are supported. The app window has the
 designed sidebar shell with the startup check, a first-run preferences screen, the Dashboard
-(game banners, Launch, last played, a setup guide), the Mods Library (with profiles),
-Downloads (the install queue) and the install confirmation. Power features have started:
-update and roll back, profiles, key bindings, adopting hand-installed mods, and installing
-from a local archive. The Mods Store and the remaining screens come next.
+(game banners, Launch, last played, a setup guide), the Mods Store (trending gallery, search
+and filters, a scrolling grid) with a mod page for every mod, the Mods Library (with
+profiles), Downloads (the install queue) and the install confirmation. Power features have
+started: update and roll back, profiles, key bindings, adopting hand-installed mods, and
+installing from a local archive. Settings, Documentation and the rest of the Library come
+next.
 Progress and plans: [docs/README.md](docs/README.md).
 
 First games: Zenless Zone Zero and Wuthering Waves.
@@ -75,7 +77,8 @@ Gacha Mod Manager is an open-source interface built on other people's work:
   Wuthering Waves (© Kuro Games), cropped for the game banners. Not covered by GMM's license;
   see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 - **Open-source libraries**, among them [Tauri](https://tauri.app), [React](https://react.dev),
-  [DOMPurify](https://github.com/cure53/DOMPurify), [SQLx](https://github.com/launchbadge/sqlx),
+  [DOMPurify](https://github.com/cure53/DOMPurify), [TanStack Virtual](https://tanstack.com/virtual),
+  [SQLx](https://github.com/launchbadge/sqlx),
   [reqwest](https://github.com/seanmonstar/reqwest), [rustls](https://github.com/rustls/rustls),
   [zip](https://github.com/zip-rs/zip2) and [sevenz-rust2](https://github.com/hasenbanck/sevenz-rust).
   The full list with licenses comes with each release.

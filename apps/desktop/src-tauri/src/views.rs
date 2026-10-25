@@ -42,6 +42,17 @@ pub struct GameInfo {
     pub gamebanana_id: u64,
     /// When GMM's Launch button last started it (Unix seconds).
     pub last_played: Option<i64>,
+    /// The Store's Category filter, from the game's manifest (GameBanana's order).
+    pub categories: Vec<GameCategory>,
+}
+
+/// One of a game's root categories on GameBanana.
+#[derive(Debug, Serialize, TS)]
+pub struct GameCategory {
+    pub id: u64,
+    pub name: String,
+    /// Its subcategories are characters (the Store's Characters filter).
+    pub characters: bool,
 }
 
 /// A page of catalogue cards. `hidden` counts mods left out as sensitive (NSFW) because the
@@ -52,6 +63,9 @@ pub struct CatalogPage {
     pub hidden: u32,
 }
 
+/// A Store page. `game` is a game id or `"all"`; `categories` are one root category or
+/// several subcategories (characters) of one game, merged (`gmm_core::browse`); empty means
+/// the whole catalogue. `text` filters by name.
 #[derive(Debug, Deserialize, TS)]
 pub struct CatalogQuery {
     pub game: String,
@@ -59,8 +73,8 @@ pub struct CatalogQuery {
     pub page: u32,
     pub per_page: u32,
     pub sort: gmm_catalog::Sort,
-    /// Root category or subcategory (character).
-    pub category: Option<u64>,
+    pub categories: Vec<u64>,
+    pub text: Option<String>,
     pub show_nsfw: bool,
 }
 

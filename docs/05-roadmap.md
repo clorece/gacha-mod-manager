@@ -34,9 +34,9 @@ installs first, then the screens in the order users meet them. Started 2026-10-2
 far: RAR, the whole backend list (2026-10-25), the startup check, Downloads, the install
 confirmation, and (2026-10-25, first review checkpoint) the Dashboard polish, the setup
 guide, the first-run preferences screen and the banner art, each checked in a real `tauri
-dev` window against the real XXMI setup. Next: the Mods Store (which gives the install
-confirmation its Download buttons) and the mod page (second checkpoint), then the Library,
-Mod settings, Settings and Documentation (third checkpoint), then the tests.
+dev` window against the real XXMI setup; and (2026-10-25, second checkpoint) the Mods Store
+and GMM's own mod page. Next: the Library, Mod settings, Settings and Documentation (third
+checkpoint), then the tests.
 
 **Decisions for the rest of Phase 5** (the project owner, 2026-10-25): Store sort offers all
 six GameBanana sorts (Recommended first); **Hide installed** and **Show sensitive** are toggle
@@ -120,20 +120,35 @@ edited by the owner); the contrast and overlap audit runs with Playwright on Lin
       text-only steps in XXMI (install XXMI, select the game, Install, follow XXMI's prompts),
       opening at the step the `SetupState` needs, Check again; the CLI-only "run `gmm status`"
       lines are hidden in the app
-- [ ] Mods Store: featured gallery, sticky toolbar, virtualized grid (`@tanstack/react-virtual`),
-      filters (category, character, sort: the six GameBanana sorts), Hide installed and Show
-      sensitive toggle chips, "N hidden as sensitive", download counts via `catalog_stats`,
-      state badges (installed, off, update available, conflict on installed mods); clicking
-      a card opens the mod page, every Download opens InstallDialog ("Add versions" when
-      installed); move the dev style guide's install form out
+- [x] Mods Store (2026-10-25): `pages/Store.tsx`. Featured gallery (trending per game,
+      interleaved under All games; hidden while searching), the sticky toolbar (search,
+      Category from the manifest, Characters multi-select with GameBanana's icons, up to 6,
+      Sort with the six GameBanana sorts, Hide installed and Show sensitive toggle chips, the
+      count with "N hidden as sensitive"), a grid virtualized with `@tanstack/react-virtual`
+      that pages on scroll (30 a page) and keeps reading while filters leave the screen
+      half empty, download counts for cards on screen (`catalog_stats`), state badges
+      (Installed, Off, Update, Conflict, Sensitive, the game under All games), skeleton,
+      empty (Reset filters) and error (Try again) states. Backend: `ListQuery::name` (the
+      list's name filter, so search combines with category and sort), `gmm_core::browse`
+      (one list per character or game, merged), `GameInfo.categories`. A click on a card
+      opens the mod page; Download opens the install confirmation, or for an installed
+      single-version mod its settings in the Library, or "Add versions". The style guide's
+      install form is gone
 - [x] Install confirmation (2026-10-25): `components/InstallDialog.tsx` from `InstallPlan`:
       one version, choose a file, choose versions (installed ones locked), the clash note,
       blocked files, "no mod found" and unsupported-file notices; the first version picked
       stays on and clashing ones are switched off after install (queue worker). Opened from
-      the dev style guide until the Store's Download buttons exist
-- [ ] Mod page (full page, Back to the Store): hero + hand-built slideshow + lightbox, header
-      / stats / license, Description (RichText), Files (with archived), Credits, Updates
-      (`catalog_updates`), a link out to GameBanana
+      every Download button (Store, featured, mod page) and per file from the mod page
+      (`initialFileId`)
+- [x] Mod page (2026-10-25): `pages/ModPage.tsx`, a full page over the page it came from
+      (which stays mounted, so Back keeps the Store's filters and scroll position): a
+      hand-built slideshow (arrows, ←/→, thumbnails, a `<dialog>` lightbox), the header
+      (category › character, author, version, dates, likes / downloads / views), the license
+      checklist with the full text in a dialog, tabs for the Description (RichText), Files
+      (scan result, per-file Install, archived files folded away), Updates (paged) and
+      Credits; Download / Add versions / Mod settings by install state; "View on
+      GameBanana" through the confirmed opener. Opened from Store cards, the featured
+      gallery and Mod settings ("View mod page")
 - [ ] Mods Library: category and character filters (ModRow categories), Show sensitive chip
       (content rating stored at install), stored preview images on cards, select mode with
       Enable / Disable / Delete selected (`UninstallDialog`), version groups with
@@ -209,7 +224,8 @@ Phase 5 screen.
 - [ ] 1-click install deep links (`gmm://`): needs GameBanana to add GMM as a mod-manager
       integration for ZZZ/WuWa (none listed today, [10](10-gamebanana-api.md)); then T6
 - [ ] UI still to come with Phase 5 screens: version groups and switching in the Library,
-      Update badges on cards, profiles in the Dashboard
+      Update badges on Library cards (the Store's cards have them since 2026-10-25), profiles
+      in the Dashboard
 
 ## Phase 7 — Release
 
@@ -271,6 +287,10 @@ Epic install to confirm the Epic reader (fixture-tested only).
   profile keeps each mod's last choices; it doesn't store different choices per profile.
 - Deletes are permanent (R8): there is no undo for an uninstall beyond installing again.
 - Updating an adopted mod replaces the files that were there by hand with GameBanana's.
+- Store: several ticked characters (or "All games") are merged page by page, so the order is
+  exact within a page and close across pages; GameBanana's own order and "most downloaded"
+  are interleaved, not sorted (downloads aren't in listings). The result count is
+  GameBanana's total before sensitive and installed mods are left out.
 
 ## Open questions
 

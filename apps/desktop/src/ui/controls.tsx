@@ -106,3 +106,30 @@ export function Segmented<T extends string>({
     </fieldset>
   );
 }
+
+/** A filter pill with a small slider switch ("Hide installed", "Show sensitive"), styled like
+ *  the sidebar's theme switch. The whole pill is the switch. */
+export function ToggleChip({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      className={`toggle-chip${checked ? " is-on" : ""}`}
+      onClick={() => onChange(!checked)}
+    >
+      <span className="toggle-chip-track" aria-hidden="true">
+        <span className="toggle-chip-knob" />
+      </span>
+      {label}
+    </button>
+  );
+}

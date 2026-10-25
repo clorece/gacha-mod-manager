@@ -9,14 +9,14 @@
 use std::path::PathBuf;
 
 use gmm_adapters::{GameManifest, Registry};
-use gmm_catalog::{CatalogSource, Category, ListQuery, ModProfile, ModUpdate, Page, SearchQuery};
+use gmm_catalog::{CatalogSource, Category, ModProfile, ModUpdate, Page, SearchQuery};
 use gmm_core::{
-    ClearedCache, ConflictReport, DeleteForever, FeaturedMod, InstallOptions, InstallPlan,
-    InstallRequest, Machine, ModsTarget, SetupHints, StopSignal, ToggleOutcome, cache_storage,
-    clear_downloads, confirm_exe, conflicts_after_install, conflicts_for, conflicts_for_unmanaged,
-    game_storage, library as core_library, listed_unmanaged, restore_pending,
-    set_enabled as core_set_enabled, set_unmanaged_enabled_at, start, uninstall as core_uninstall,
-    uninstall_unmanaged, unmanaged_size,
+    Browse, ClearedCache, ConflictReport, DeleteForever, FeaturedMod, InstallOptions, InstallPlan,
+    InstallRequest, MAX_BROWSE_STREAMS, Machine, ModsTarget, SetupHints, StopSignal, ToggleOutcome,
+    cache_storage, clear_downloads, confirm_exe, conflicts_after_install, conflicts_for,
+    conflicts_for_unmanaged, game_storage, library as core_library, listed_unmanaged,
+    restore_pending, set_enabled as core_set_enabled, set_unmanaged_enabled_at, start,
+    uninstall as core_uninstall, uninstall_unmanaged, unmanaged_size,
 };
 use gmm_xxmi::GameStatus;
 use tauri::ipc::Channel;
@@ -26,8 +26,8 @@ use tauri_plugin_dialog::DialogExt;
 use crate::AppState;
 use crate::error::{CmdError, CmdResult};
 use crate::views::{
-    CardStats, CatalogPage, CatalogQuery, FolderRow, GameInfo, GameStorageView, InstallArgs,
-    InstallProgress, InstallResult, LaunchInfo, Launched, LibraryView, ModKey, ModRow,
+    CardStats, CatalogPage, CatalogQuery, FolderRow, GameCategory, GameInfo, GameStorageView,
+    InstallArgs, InstallProgress, InstallResult, LaunchInfo, Launched, LibraryView, ModKey, ModRow,
     NetworkStatus, Preferences, ProgressThrottle, RollbackFile, Settings, StorageView, Toggled,
     UninstallItem, Uninstalled, rewrite_categories, rewrite_profile, rewrite_summary,
     rewrite_updates,
@@ -61,6 +61,16 @@ pub async fn games(state: State<'_, AppState>) -> CmdResult<Vec<GameInfo>> {
             importer: g.xxmi.importer.as_str().to_owned(),
             gamebanana_id: g.gamebanana.game_id,
             last_played: played.iter().find(|(id, _)| id == g.id()).map(|(_, t)| *t),
+            categories: g
+                .gamebanana
+                .root_categories
+                .iter()
+                .map(|c| GameCategory {
+                    id: c.id,
+                    name: c.name.clone(),
+                    characters: c.subcategories_are_characters,
+                })
+                .collect(),
         })
         .collect())
 }
@@ -89,23 +99,46 @@ fn catalog_page(
     CatalogPage { page, hidden }
 }
 
-/// A page of a game's catalogue.
+/// A Store page: one game's catalogue or every game's (`"all"`), optionally narrowed to a
+/// root category or to several characters, and by name (see [`CatalogQuery`]).
 #[tauri::command]
 pub async fn catalog_list(
     state: State<'_, AppState>,
     query: CatalogQuery,
 ) -> CmdResult<CatalogPage> {
-    let game = game_by_id(&query.game)?;
-    let list = ListQuery {
+    let streams: Vec<(u64, Option<u64>)> = if query.game == ALL_GAMES {
+        // Categories belong to one game, so "All games" lists each catalogue whole.
+        registry()?
+            .games()
+            .iter()
+            .map(|g| (g.gamebanana.game_id, None))
+            .collect()
+    } else {
+        let game = game_by_id(&query.game)?.gamebanana.game_id;
+        if query.categories.is_empty() {
+            vec![(game, None)]
+        } else {
+            query
+                .categories
+                .iter()
+                .take(MAX_BROWSE_STREAMS)
+                .map(|&c| (game, Some(c)))
+                .collect()
+        }
+    };
+    let browse = Browse {
+        streams,
         page: query.page.max(1),
         per_page: query.per_page,
         sort: query.sort,
-        category_id: query.category,
-        ..ListQuery::new(game.gamebanana.game_id)
+        name: query.text,
     };
-    let page = state.gb.list_mods(&list).await?;
+    let page = gmm_core::browse(&state.gb, &browse).await?;
     Ok(catalog_page(&state, page, query.show_nsfw))
 }
+
+/// The Store's "every game" scope in [`CatalogQuery::game`].
+const ALL_GAMES: &str = "all";
 
 /// Mods of a game whose name matches `text`.
 #[tauri::command]

@@ -3,7 +3,7 @@
 // one in every state.
 
 export { Button, type ButtonVariant, IconButton } from "./buttons";
-export { Checkbox, Radio, Segmented, Switch } from "./controls";
+export { Checkbox, Radio, Segmented, Switch, ToggleChip } from "./controls";
 export { Dialog, SidePanel } from "./Dialog";
 export { Dropdown, type Option } from "./Dropdown";
 export { Badge, type BadgeTone, Chip, Notice, ProgressBar, Spinner, type Tone } from "./feedback";

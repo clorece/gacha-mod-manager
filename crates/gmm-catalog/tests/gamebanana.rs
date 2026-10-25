@@ -52,6 +52,43 @@ async fn serve(server: &MockServer, p: &str, file: &str) {
 }
 
 #[tokio::test]
+async fn list_mods_sends_a_trimmed_capped_name_filter() {
+    let server = MockServer::start().await;
+    let long = "m".repeat(150);
+    Mock::given(path("/apiv11/Mod/Index"))
+        .and(query_param(
+            "_aFilters[Generic_Name]",
+            format!("contains,{}", &long[..100]),
+        ))
+        .and(query_param("_aFilters[Generic_Category]", "30336"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(fixture("mod_index.json")))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(path("/apiv11/Mod/Index"))
+        .and(query_param("_sSort", "Generic_Newest"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(fixture("mod_index.json")))
+        .mount(&server)
+        .await;
+    let gb = catalog(&server, Arc::new(NoCache));
+    let query = ListQuery {
+        category_id: Some(30336),
+        name: Some(format!("  {long}  ")),
+        ..ListQuery::new(19567)
+    };
+    gb.list_mods(&query).await.unwrap();
+    // A blank name sends no filter at all.
+    let blank = ListQuery {
+        sort: Sort::Newest,
+        name: Some("   ".to_owned()),
+        ..ListQuery::new(19567)
+    };
+    gb.list_mods(&blank).await.unwrap();
+    let requests = server.received_requests().await.unwrap();
+    assert!(!requests[1].url.query().unwrap().contains("Generic_Name"));
+}
+
+#[tokio::test]
 async fn list_mods_sends_filters_and_maps_records() {
     let server = MockServer::start().await;
     Mock::given(path("/apiv11/Mod/Index"))

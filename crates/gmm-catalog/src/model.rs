@@ -30,7 +30,15 @@ pub struct ListQuery {
     pub sort: Sort,
     /// Root category or subcategory (e.g. a character).
     pub category_id: Option<u64>,
+    /// Only mods whose name contains this (case-insensitive on GameBanana's side). Trimmed and
+    /// capped at [`MAX_NAME_FILTER`] characters; empty means no filter. Unlike `search`, it
+    /// combines with a category and a sort and pages like any list (observed 2026-10-25:
+    /// `_aFilters[Generic_Name]=contains,<text>`).
+    pub name: Option<String>,
 }
+
+/// Longest name filter sent to GameBanana.
+pub const MAX_NAME_FILTER: usize = 100;
 
 impl ListQuery {
     pub fn new(game_id: u64) -> Self {
@@ -40,6 +48,7 @@ impl ListQuery {
             per_page: 20,
             sort: Sort::Default,
             category_id: None,
+            name: None,
         }
     }
 }

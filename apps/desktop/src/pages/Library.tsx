@@ -4,7 +4,7 @@
 // Switching on a mod that conflicts with one that's on asks first ("Enable anyway").
 // Category, character and select mode come with Phase 5's stored categories.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, asCmdError, type Conflict, type GameInfo, type ModKey, type ModRef, type ModUpdateInfo } from "../api";
 import { ModSettings } from "../components/ModSettings";
 import { ProfilesPanel } from "../components/ProfilesPanel";
@@ -95,6 +95,9 @@ export function Library({
   onScope,
   updates,
   onQueued,
+  focus,
+  onFocusDone,
+  onOpenMod,
 }: {
   data: AppData;
   scope: Scope;
@@ -102,6 +105,11 @@ export function Library({
   /** Newer files found by the startup check. */
   updates: ModUpdateInfo[];
   onQueued: () => void;
+  /** A mod whose settings to open (asked for from the Store or a mod page). */
+  focus: { game: string; key: ModKey } | null;
+  onFocusDone: () => void;
+  /** GMM's mod page for a GameBanana mod. */
+  onOpenMod: (gbModId: number) => void;
 }) {
   const toast = useToast();
   const [query, setQuery] = useState("");
@@ -109,6 +117,12 @@ export function Library({
   const [blocked, setBlocked] = useState<string[]>([]);
   const [settingsFor, setSettingsFor] = useState<string | null>(null);
   const [profilesOpen, setProfilesOpen] = useState(false);
+
+  useEffect(() => {
+    if (!focus) return;
+    setSettingsFor(keyId(focus.game, focus.key));
+    onFocusDone();
+  }, [focus, onFocusDone]);
 
   const inScope = scope === ALL ? data.games : data.games.filter((g) => g.id === scope);
   const items = itemsFor(data, inScope);
@@ -263,7 +277,7 @@ export function Library({
         <div className="card empty">Loading mods…</div>
       ) : shown.length === 0 ? (
         <div className="card empty">
-          {items.length === 0 ? "No mods here yet. The Mods Store comes next." : "No mods match your search."}
+          {items.length === 0 ? "No mods here yet. Find some in the Mods Store." : "No mods match your search."}
         </div>
       ) : (
         <div className="grid">
@@ -303,6 +317,10 @@ export function Library({
           onChanged={async () => {
             setSettingsFor(null);
             await data.refreshLibrary(settingsItem.game.id);
+          }}
+          onOpenMod={(id) => {
+            setSettingsFor(null);
+            onOpenMod(id);
           }}
         />
       )}

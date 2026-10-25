@@ -99,3 +99,110 @@ async fn add_picks<C: CatalogSource>(
         });
     }
 }
+
+/// Most lists one Store page merges: characters ticked at once, or games under "All games".
+pub const MAX_BROWSE_STREAMS: usize = 6;
+
+/// A Store page: one list per `(GameBanana game id, category)` pair, merged. GameBanana
+/// filters by one category per request (a comma list is refused, observed 2026-10-25), so
+/// several ticked characters, or "All games", become several lists read side by side.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Browse {
+    pub streams: Vec<(u64, Option<u64>)>,
+    /// 1-based; page `n` of the merge is page `n` of every list.
+    pub page: u32,
+    /// For the whole merged page; split between the lists (at least 10 each).
+    pub per_page: u32,
+    pub sort: Sort,
+    pub name: Option<String>,
+}
+
+/// Reads one Store page (see [`Browse`]). With one list it is just that list. With several,
+/// each list's page is read in turn and merged in the chosen order where listings carry the
+/// key (newest, recently updated, likes, views); GameBanana's own order and "most downloaded"
+/// (downloads aren't in listings) are interleaved instead. A list that fails is left out;
+/// the call fails only when every list does. Lists past the cap are ignored.
+pub async fn browse<C: CatalogSource>(
+    catalog: &C,
+    q: &Browse,
+) -> Result<gmm_catalog::Page<ModSummary>, CoreError> {
+    let streams = &q.streams[..q.streams.len().min(MAX_BROWSE_STREAMS)];
+    let n = u32::try_from(streams.len()).unwrap_or(1).max(1);
+    let per_list = if streams.len() > 1 {
+        q.per_page.div_ceil(n).max(10)
+    } else {
+        q.per_page
+    };
+    let mut pages = Vec::with_capacity(streams.len());
+    let mut last_error = None;
+    for &(game_id, category_id) in streams {
+        let query = ListQuery {
+            page: q.page.max(1),
+            per_page: per_list,
+            sort: q.sort,
+            category_id,
+            name: q.name.clone(),
+            ..ListQuery::new(game_id)
+        };
+        match catalog.list_mods(&query).await {
+            Ok(page) => pages.push(page),
+            Err(e) => last_error = Some(e),
+        }
+    }
+    if pages.is_empty() {
+        return match last_error {
+            Some(e) => Err(e.into()),
+            None => Ok(gmm_catalog::Page {
+                items: Vec::new(),
+                total: 0,
+                page: q.page.max(1),
+                per_page: q.per_page,
+                is_last: true,
+            }),
+        };
+    }
+    if pages.len() == 1 && last_error.is_none() {
+        return Ok(pages.remove(0));
+    }
+    let total = pages.iter().map(|p| p.total).sum();
+    let is_last = pages.iter().all(|p| p.is_last);
+    let per_page = pages.iter().map(|p| p.per_page).sum();
+    let items = merge(pages.into_iter().map(|p| p.items).collect(), q.sort);
+    Ok(gmm_catalog::Page {
+        items,
+        total,
+        page: q.page.max(1),
+        per_page,
+        is_last,
+    })
+}
+
+/// Merges lists into one, by `sort` where the listing has the key, else round-robin.
+fn merge(lists: Vec<Vec<ModSummary>>, sort: Sort) -> Vec<ModSummary> {
+    let key: Option<fn(&ModSummary) -> i64> = match sort {
+        Sort::Newest => Some(|m| m.date_added),
+        Sort::RecentlyUpdated => Some(|m| m.date_updated.unwrap_or(m.date_modified)),
+        Sort::MostLiked => Some(|m| i64::try_from(m.stats.likes).unwrap_or(i64::MAX)),
+        Sort::MostViewed => Some(|m| i64::try_from(m.stats.views).unwrap_or(i64::MAX)),
+        Sort::Default | Sort::MostDownloaded => None,
+    };
+    let mut iters: Vec<_> = lists.into_iter().map(Vec::into_iter).collect();
+    let mut out = Vec::new();
+    loop {
+        let mut took = false;
+        for it in &mut iters {
+            if let Some(m) = it.next() {
+                out.push(m);
+                took = true;
+            }
+        }
+        if !took {
+            break;
+        }
+    }
+    if let Some(key) = key {
+        // Stable, so equal keys keep the interleaved order.
+        out.sort_by_key(|m| std::cmp::Reverse(key(m)));
+    }
+    out
+}

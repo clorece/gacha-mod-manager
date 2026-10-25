@@ -8,17 +8,23 @@ export type GameInfo = { id: string, name: string, short_name: string, importer:
 /**
  * When GMM's Launch button last started it (Unix seconds).
  */
-last_played: number | null, };
+last_played: number | null, 
+/**
+ * The Store's Category filter, from the game's manifest (GameBanana's order).
+ */
+categories: Array<GameCategory>, };
+
+export type GameCategory = { id: number, name: string, 
+/**
+ * Its subcategories are characters (the Store's Characters filter).
+ */
+characters: boolean, };
 
 export type CatalogQuery = { game: string, 
 /**
  * 1-based.
  */
-page: number, per_page: number, sort: Sort, 
-/**
- * Root category or subcategory (character).
- */
-category: number | null, show_nsfw: boolean, };
+page: number, per_page: number, sort: Sort, categories: Array<number>, text: string | null, show_nsfw: boolean, };
 
 export type CatalogPage = { page: Page<ModSummary>, hidden: number, };
 

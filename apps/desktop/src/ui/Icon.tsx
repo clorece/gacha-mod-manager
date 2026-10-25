@@ -77,6 +77,16 @@ const paths = {
   pause: <path d="M9 5v14M15 5v14" />,
   play: <path d="M8 5v14l11-7z" />,
   plus: <path d="M12 5v14M5 12h14" />,
+  arrowLeft: <path d="M19 12H5M11 18l-6-6 6-6" />,
+  trending: <path d="M3 17l6-6 4 4 8-8M14 7h7v7" />,
+  external: <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />,
+  image: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <circle cx="9" cy="10" r="2" />
+      <path d="M21 16l-5-5-9 9" />
+    </>
+  ),
   clock: (
     <>
       <circle cx="12" cy="12" r="9" />

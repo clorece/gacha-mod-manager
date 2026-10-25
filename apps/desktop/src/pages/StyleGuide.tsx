@@ -93,12 +93,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export default function StyleGuide({
   theme,
   onTheme,
-  onInstall,
 }: {
   theme: "dark" | "light";
   onTheme: (t: "dark" | "light") => void;
-  /** Opens the real install confirmation (until the Mods Store has Download buttons). */
-  onInstall: (modId: number) => void;
 }) {
   const toast = useToast();
   const [on, setOn] = useState(true);
@@ -108,7 +105,6 @@ export default function StyleGuide({
   const [chars, setChars] = useState<string[]>(["anby"]);
   const [dialog, setDialog] = useState(false);
   const [panel, setPanel] = useState(false);
-  const [modId, setModId] = useState("");
 
   return (
     <>
@@ -129,30 +125,6 @@ export default function StyleGuide({
       </div>
 
       <div className="stack">
-        <Section title="Install confirmation (real commands)">
-          <form
-            className="sg-row"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const id = Number.parseInt(modId, 10);
-              if (id > 0) onInstall(id);
-            }}
-          >
-            <div className="search">
-              <Icon name="download" size={18} stroke={2.4} />
-              <input
-                inputMode="numeric"
-                placeholder="GameBanana mod id"
-                aria-label="GameBanana mod id"
-                value={modId}
-                onChange={(e) => setModId(e.target.value.replace(/D/g, ""))}
-              />
-            </div>
-            <Button type="submit" variant="primary" icon="download">
-              Open
-            </Button>
-          </form>
-        </Section>
         <Section title="Color tokens">
           <div className="sg-swatches">
             {colorTokens.map((t) => (

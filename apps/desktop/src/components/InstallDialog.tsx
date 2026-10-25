@@ -22,11 +22,14 @@ type Loading = { kind: "loading"; progress: InstallProgress | null } | { kind: "
 
 export function InstallDialog({
   modId,
+  initialFileId = null,
   gameName,
   onClose,
   onQueued,
 }: {
   modId: number;
+  /** A file picked on the mod page's Files tab; GameBanana's newest clean file otherwise. */
+  initialFileId?: number | null;
   /** For "where it installs" ("Zenless Zone Zero › ZZMI\Mods\GMM"). */
   gameName: (gameId: string) => string;
   onClose: () => void;
@@ -34,7 +37,7 @@ export function InstallDialog({
 }) {
   const toast = useToast();
   const [profile, setProfile] = useState<ModProfile | null>(null);
-  const [fileId, setFileId] = useState<number | null>(null);
+  const [fileId, setFileId] = useState<number | null>(initialFileId);
   const [plan, setPlan] = useState<InstallPlan | null>(null);
   const [status, setStatus] = useState<Loading>({ kind: "loading", progress: null });
   const [picked, setPicked] = useState<string[]>([]);

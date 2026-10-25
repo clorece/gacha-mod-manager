@@ -237,8 +237,8 @@ on 2026-10-22 and are implemented in `crates/gmm-catalog`:
 |---|---|
 | Root categories | `GET /apiv11/Mod/Categories?_idGameRow={gameId}&_sSort=a_to_z&_bShowEmpty=true` |
 | Subcategories (characters) | `GET /apiv11/Mod/Categories?_idCategoryRow={categoryId}&_sSort=a_to_z&_bShowEmpty=true` |
-| Browse | `GET /apiv11/Mod/Index?_nPage=N&_nPerpage=N&_aFilters[Generic_Game]={gameId}` + optional `_aFilters[Generic_Category]={id}` and `_sSort=` one of `Generic_Newest`, `Generic_LatestUpdated` (only updated mods), `Generic_MostDownloaded`, `Generic_MostLiked`, `Generic_MostViewed`. Unknown sorts → HTTP 400 `INPUT_ERRORS` |
-| Search | `GET /apiv11/Util/Search/Results?_sModelName=Mod&_sOrder=best_match&_idGameRow={gameId}&_sSearchString=…&_nPage=N` (fixed 15 per page) |
+| Browse | `GET /apiv11/Mod/Index?_nPage=N&_nPerpage=N&_aFilters[Generic_Game]={gameId}` + optional `_aFilters[Generic_Category]={id}` and `_sSort=` one of `Generic_Newest`, `Generic_LatestUpdated` (only updated mods), `Generic_MostDownloaded`, `Generic_MostLiked`, `Generic_MostViewed`. Unknown sorts → HTTP 400 `INPUT_ERRORS`. Observed 2026-10-25: `_aFilters[Generic_Name]=contains,<text>` filters by name and combines with the category, the sort and any page size (`ListQuery::name`, what the Store's search uses); a comma list of categories is refused (`INVALID_FILTER_VALUE`), so one category per request; records carry the character as `_aSubCategory` |
+| Search | `GET /apiv11/Util/Search/Results?_sModelName=Mod&_sOrder=best_match&_idGameRow={gameId}&_sSearchString=…&_nPage=N` (fixed 15 per page, no category or sort; `gmm catalog search` only) |
 | Mod page | `GET /apiv11/Mod/{id}/ProfilePage` (404 `NO_SUCH_RECORD` if missing) |
 | Files | `GET /apiv11/Mod/{id}/DownloadPage` |
 | Updates/changelog | `GET /apiv11/Mod/{id}/Updates?_nPage=N&_nPerpage=N` (`_aChangeLog[]` of `{text, cat}`) |
@@ -253,6 +253,14 @@ requests work (HTTP 206), so downloads can be paused and resumed. Images live on
 
 GameBanana's JSON is loosely typed (numbers as strings, `[]` for empty objects), so the client
 decodes every field leniently.
+
+**Store pages** (`gmm_core::browse`, 2026-10-25): the app's `catalog_list` takes a game or
+`"all"`, a root category or several characters, a name filter and a sort. Each `(game,
+category)` pair is one list; with several (up to six characters, or every game under "All
+games") page *n* of each list is read in turn and merged: by date, likes or views where the
+listing has them, interleaved for GameBanana's own order and "most downloaded" (downloads
+aren't in listings). A failing list is left out unless all fail. Each list gets a share of
+the page (at least 10), so a merged page costs one request per list.
 
 Rules ([10](10-gamebanana-api.md) has the reasoning): HTTP cache (SQLite `http_cache`
 table in `gmm-db`) with lists cached for minutes and detail pages for an hour, and saved

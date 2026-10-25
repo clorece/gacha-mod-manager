@@ -430,7 +430,19 @@ fn egress_and_file_access() {
     let mut after = snapshot(&w.profile, &[&w.mods, &w.user_ini]);
     after.remove(importer_dir);
     assert_eq!(after, expected, "a file outside GMM's folders changed");
-    assert_eq!(fs::read_to_string(&w.user_ini).unwrap(), USER_INI);
+    // GMM never writes the file while the game runs; on a machine where ZZZ is open the
+    // write-back waits (and the file must be exactly as the "game" left it).
+    let zzz = gmm_adapters::Registry::builtin()
+        .unwrap()
+        .get("zzz")
+        .unwrap();
+    let user_ini = fs::read_to_string(&w.user_ini).unwrap();
+    if gmm_xxmi::game_running(zzz) {
+        eprintln!("note: Zenless Zone Zero is running here, so the toggle write-back waited");
+        assert_eq!(user_ini, USER_INI.replace(MANUAL_KEY, ""));
+    } else {
+        assert_eq!(user_ini, USER_INI);
+    }
 
     // No canary content in GMM's own files.
     for file in files_below(&w.gmm_home) {

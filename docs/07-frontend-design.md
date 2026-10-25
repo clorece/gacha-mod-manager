@@ -73,7 +73,9 @@ follows that choice.
 
 ## Mods Store (catalogue)
 
-Layout, featured gallery and filters: [08](08-design-system.md#mods-store). Contents:
+Layout, featured gallery and filters: [08](08-design-system.md#mods-store). **Built
+2026-10-25** (`pages/Store.tsx`; what differs from the sketch below is noted in the list).
+Contents:
 
 ```
 [Search…………]  Category ▾  Character ▾  Sort: Recommended ▾  (○ Hide installed) (○ Show sensitive)
@@ -92,10 +94,13 @@ Layout, featured gallery and filters: [08](08-design-system.md#mods-store). Cont
   the original (`_sBaseUrl` + `_sFile530` / `_sFile`, verified; exposed as
   `gmm_catalog::Image::url_for_width`). Cropped with `object-fit: cover`. A placeholder shows
   when a mod has no image.
-- Card fields: name, submitter avatar + name, character (subcategory), likes, downloads, relative
-  "updated" date, state badge (*Installed*, *Disabled*, *Update available*, *Conflict*). The
+- Card fields (built): name, submitter avatar + name, character (or the root category, e.g.
+  "UI") as a badge, likes, views, downloads (filled in for the cards on screen), the game
+  under All games, *Sensitive* when shown, and one state badge: *Update* (the startup check
+  found a newer file), *Conflict*, *Installed*, or *Off* (installed, every version off). The
   *Conflict* badge is only for installed mods that clash with a mod that's on (a mod that
-  isn't installed can't be checked before its archive is fetched).
+  isn't installed can't be checked before its archive is fetched). No relative "updated"
+  date on cards (the sort covers it).
 - **Clicking a card** (anywhere but its Download button) opens GMM's own mod page.
 - **Sort** (decided 2026-10-25): Recommended (GameBanana's default, the default here),
   Recently updated, Newest, Most downloaded, Most liked, Most viewed.
@@ -105,9 +110,15 @@ Layout, featured gallery and filters: [08](08-design-system.md#mods-store). Cont
 - **NSFW**: `_sInitialVisibility = warn/hide` or content ratings → hidden by default. If the user
   shows them, they are blurred until hovered (the "blur" preference), in the grid and in the
   featured gallery, which then includes them too.
-- Infinite scroll with a virtualized grid (TanStack Virtual), cached pages, and skeleton cards
-  while loading.
-- Filters map to GB categories. The character list comes from the game's subcategories.
+- Infinite scroll with a virtualized grid (TanStack Virtual; rows of cards, columns from the
+  width), 30 cards a page, skeleton rows while loading; when sensitive or installed mods are
+  left out and a page comes back thin, it keeps reading (up to 12 pages) until the screen is
+  full.
+- Filters map to GB categories: Category lists the game's root categories (from its
+  manifest; disabled under All games), Characters the chosen skins category's subcategories
+  with their icons (up to 6 at once; "Bangboo" for ZZZ's Bangboo Skins), and the search is
+  GameBanana's name filter, so it combines with both and with the sort.
+- The featured gallery is hidden while a search is typed, so results start at the top.
 
 ## Mod page
 
@@ -126,6 +137,10 @@ Layout, featured gallery and filters: [08](08-design-system.md#mods-store). Cont
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
+**Built 2026-10-25** (`pages/ModPage.tsx`, `components/Slideshow.tsx`): the slideshow sits
+above the header rather than behind it, the install button is a plain Download (the file
+choice happens in the install confirmation, or per file on the Files tab), and an
+installed mod shows its state with Add versions (several versions) and Mod settings.
 **A full page of its own** (decided 2026-10-25), built from this sketch and the existing
 tokens and pieces (not designed on the canvas first; reviewed from screenshots of the real
 app). It opens from a click anywhere on a Store card, the featured banner's View details,

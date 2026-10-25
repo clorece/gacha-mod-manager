@@ -784,7 +784,8 @@ async fn uninstalling_the_last_version_deletes_its_cached_archives() {
     assert!(f.db.cached_downloads().await.unwrap().is_empty());
 }
 
-/// 3DMigoto drops a switched-off mod's keys from d3dx_user.ini; GMM puts them back.
+/// 3DMigoto drops a switched-off mod's keys from d3dx_user.ini; GMM puts them back. While
+/// the game runs (the test machine may have ZZZ open) the lines wait as pending instead.
 #[tokio::test]
 async fn switching_off_and_on_keeps_the_saved_in_game_toggles() {
     let f = Fixture::new().await;
@@ -792,54 +793,38 @@ async fn switching_off_and_on_keeps_the_saved_in_game_toggles() {
     let user_ini = f.mods_dir.parent().unwrap().join("d3dx_user.ini");
     let ours = r"$\mods\gmm\ellen - maid [gb-652373]\m.ini\swapvar = 2";
     let xxmi = r"$\zzmiv1\shown = 1";
-    fs::write(
-        &user_ini,
-        format!(
-            "; generated
-[Constants]
-{xxmi}
-{ours}
-"
-        ),
-    )
-    .unwrap();
+    let with_ours = format!("; generated\r\n[Constants]\r\n{xxmi}\r\n{ours}\r\n");
+    let without = format!("; generated\r\n[Constants]\r\n{xxmi}\r\n");
+    fs::write(&user_ini, &with_ours).unwrap();
 
     gmm_core::set_enabled(&f.db, &f.ws, f.mods, zzz(), id, false)
         .await
         .unwrap();
     assert_eq!(
-        fs::read_to_string(&user_ini)
-            .unwrap()
-            .matches("swapvar")
-            .count(),
-        1,
+        fs::read_to_string(&user_ini).unwrap(),
+        with_ours,
         "switching off doesn't edit the file"
     );
     // The game saves without the mod: its keys are gone.
-    fs::write(
-        &user_ini,
-        format!(
-            "; generated
-[Constants]
-{xxmi}
-"
-        ),
-    )
-    .unwrap();
+    fs::write(&user_ini, &without).unwrap();
 
     gmm_core::set_enabled(&f.db, &f.ws, f.mods, zzz(), id, true)
         .await
         .unwrap();
-    assert_eq!(
-        fs::read_to_string(&user_ini).unwrap(),
-        format!(
-            "; generated
-[Constants]
-{xxmi}
-{ours}
-"
-        )
-    );
+    if gmm_xxmi::game_running(zzz()) {
+        assert_eq!(
+            fs::read_to_string(&user_ini).unwrap(),
+            without,
+            "never while it runs"
+        );
+        assert_eq!(
+            f.db.pending_toggles("zzz").await.unwrap().len(),
+            1,
+            "kept for later"
+        );
+        return;
+    }
+    assert_eq!(fs::read_to_string(&user_ini).unwrap(), with_ours);
     let backups: Vec<_> = fs::read_dir(f.cache_dir.join("backups").join("d3dx_user"))
         .unwrap()
         .collect();

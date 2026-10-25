@@ -149,7 +149,15 @@ export function KeySection({ item }: { item: LibraryItem }) {
 }
 
 /** Open folder, View or Find on GameBanana. */
-export function ActionsSection({ item, onAdopted }: { item: LibraryItem; onAdopted: () => Promise<void> }) {
+export function ActionsSection({
+  item,
+  onAdopted,
+  onOpenMod,
+}: {
+  item: LibraryItem;
+  onAdopted: () => Promise<void>;
+  onOpenMod: (gbModId: number) => void;
+}) {
   const toast = useToast();
   const [adopting, setAdopting] = useState(false);
   const fail = (e: unknown) => toast("bad", asCmdError(e).message);
@@ -164,9 +172,9 @@ export function ActionsSection({ item, onAdopted }: { item: LibraryItem; onAdopt
           <span className="sub">In File Explorer</span>
         </button>
         {gbModId !== null ? (
-          <button type="button" className="action" onClick={() => api.openModPage(gbModId).catch(fail)}>
-            <b>View on GameBanana</b>
-            <span className="sub">Opens your browser after asking</span>
+          <button type="button" className="action" onClick={() => onOpenMod(gbModId)}>
+            <b>View mod page</b>
+            <span className="sub">Details, files and updates, with a link to GameBanana</span>
           </button>
         ) : (
           item.hand &&

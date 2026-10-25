@@ -20,8 +20,10 @@ disable all, switches, conflict notice; category, character and select mode wait
 categories) and a first Mod settings panel (switch, details, Uninstall). The rest follow in
 Phase 5. Since 2026-10-25 the game banners carry real key art, the Dashboard bubbles show
 "Played … ago" (or "Not played from GMM yet"), and two screens not on the canvas are built
-from its tokens: the first-run preferences card and the setup guide. Mod cards still use
-placeholder art until previews are wired.
+from its tokens: the first-run preferences card and the setup guide. The Mods Store
+(gallery, sticky toolbar, grid with real previews) follows the canvas; the mod page isn't on
+the canvas and is built from 07's sketch and these tokens (below). Library cards still use
+placeholder art until their previews are stored (next checkpoint).
 
 ## Direction
 
@@ -211,6 +213,25 @@ A dialog from a setup card: a row of four step tiles (number, or a green tick wh
 current one ringed in `--accent`), the step's title, a short paragraph, a numbered list with
 XXMI's labels in bold, and step actions as default buttons. Footer: Check again on the left,
 Back and Next / Done on the right. Text only.
+
+### Mod page (built 2026-10-25, not on the canvas)
+A pill **Back** link ("← Mods Store"); the slideshow (28 px radius, 16:9 up to 520 px tall,
+the image contained on a near-black ground, round art arrow buttons at the sides, an
+"n / m" chip, a strip of 112 px thumbnails with the current one ringed in `--accent`); then
+the header: an overline with category › character, the 30 px title, a 28 px avatar line
+(author, version, dates), counters with icons, and on the right the primary Download (or the
+install state badge with Add versions / Mod settings) beside a link-style "View on
+GameBanana ↗". License chips use the state badges (✓ ok, ? warn, ✗ bad) with "Read the
+license" opening a dialog. Tabs are a pill group (the selected tab in `--btn`); the panel is
+a card. Files are bordered rows (mono name, version and "Scanned clean" badges, size · date ·
+downloads, the description, a small Install button); archived files fold away. The lightbox
+is a full-window `<dialog>` on a 92% dark backdrop.
+
+### Store details added while building (2026-10-25)
+The toggle chips are pills with a 30 × 18 px track (`--switch-off`, `--btn` when on).
+Sensitive previews blur (18 px) until the card, banner or thumbnail is hovered or focused.
+The current strip banner's yellow ring is drawn on a layer above the image. Skeleton cards
+shimmer while a page loads; motion is off under reduced motion.
 
 ### Settings
 Cards: Appearance (Dark / Light / Match Windows), Mods Store (show sensitive mods, blur their

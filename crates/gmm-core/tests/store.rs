@@ -149,3 +149,88 @@ async fn fails_when_nothing_can_be_read() {
         .await;
     assert!(featured(&catalog(&server), zzz(), false).await.is_err());
 }
+
+async fn category_list(server: &MockServer, category: &str, records: Vec<Value>, last: bool) {
+    Mock::given(path("/apiv11/Mod/Index"))
+        .and(query_param("_aFilters[Generic_Category]", category))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "_aMetadata": { "_nRecordCount": records.len() * 3, "_nPerpage": 10, "_bIsComplete": last },
+            "_aRecords": records,
+        })))
+        .mount(server)
+        .await;
+}
+
+fn browse_query(categories: &[u64], sort: gmm_catalog::Sort) -> gmm_core::Browse {
+    gmm_core::Browse {
+        streams: categories.iter().map(|&c| (19567, Some(c))).collect(),
+        page: 1,
+        per_page: 20,
+        sort,
+        name: Some("maid".to_owned()),
+    }
+}
+
+#[tokio::test]
+async fn several_characters_merge_in_the_chosen_order() {
+    let server = MockServer::start().await;
+    category_list(
+        &server,
+        "1",
+        vec![record(11, 90, "show"), record(12, 10, "show")],
+        true,
+    )
+    .await;
+    category_list(
+        &server,
+        "2",
+        vec![record(21, 50, "show"), record(22, 5, "show")],
+        false,
+    )
+    .await;
+    let gb = catalog(&server);
+
+    let liked = gmm_core::browse(&gb, &browse_query(&[1, 2], gmm_catalog::Sort::MostLiked))
+        .await
+        .unwrap();
+    let ids: Vec<u64> = liked.items.iter().map(|m| m.id).collect();
+    assert_eq!(ids, [11, 21, 12, 22]);
+    assert_eq!(liked.total, 12);
+    assert!(!liked.is_last, "one list has more pages");
+
+    let mixed = gmm_core::browse(&gb, &browse_query(&[1, 2], gmm_catalog::Sort::Default))
+        .await
+        .unwrap();
+    let ids: Vec<u64> = mixed.items.iter().map(|m| m.id).collect();
+    assert_eq!(ids, [11, 21, 12, 22], "interleaved");
+
+    // Every request carried the name filter and its own category.
+    for r in server.received_requests().await.unwrap() {
+        let q = r.url.query().unwrap_or("");
+        assert!(
+            q.contains("Generic_Name") && q.contains("Generic_Category"),
+            "{q}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_failing_list_is_left_out_unless_all_fail() {
+    let server = MockServer::start().await;
+    category_list(&server, "1", vec![record(11, 1, "show")], true).await;
+    Mock::given(path("/apiv11/Mod/Index"))
+        .and(query_param("_aFilters[Generic_Category]", "2"))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+    let gb = catalog(&server);
+    let page = gmm_core::browse(&gb, &browse_query(&[1, 2], gmm_catalog::Sort::Newest))
+        .await
+        .unwrap();
+    assert_eq!(page.items.len(), 1);
+    assert!(
+        gmm_core::browse(&gb, &browse_query(&[2], gmm_catalog::Sort::Newest))
+            .await
+            .is_err()
+    );
+}

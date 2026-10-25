@@ -10,10 +10,6 @@ const upcoming = {
     title: "Settings",
     line: "Appearance, the Mods Store, the XXMI folder, your games and storage. Stored on this computer only.",
   },
-  store: {
-    title: "Mods Store",
-    line: "Trending mods and the GameBanana catalogue for the selected game, with search and filters.",
-  },
   docs: {
     title: "Documentation",
     line: "How GMM works, and what to do when something doesn't.",

@@ -20,6 +20,7 @@ export function ModSettings({
   update,
   onQueued,
   onChanged,
+  onOpenMod,
 }: {
   item: LibraryItem;
   onClose: () => void;
@@ -31,6 +32,8 @@ export function ModSettings({
   onQueued: () => void;
   /** The mod changed kind (adopted): reload the library. */
   onChanged: () => Promise<void>;
+  /** GMM's mod page for its GameBanana mod. */
+  onOpenMod: (gbModId: number) => void;
 }) {
   const toast = useToast();
   const [preview, setPreview] = useState<UninstallItem[] | null>(null);
@@ -67,7 +70,7 @@ export function ModSettings({
         </section>
         <UpdateSection item={item} update={update} onQueued={onQueued} />
         <KeySection item={item} />
-        <ActionsSection item={item} onAdopted={onChanged} />
+        <ActionsSection item={item} onAdopted={onChanged} onOpenMod={onOpenMod} />
         <section className="drawer-sec">
           <h3 className="sec-h">Details</h3>
           <div className="kv">
