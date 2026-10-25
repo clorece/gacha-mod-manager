@@ -177,9 +177,13 @@ Phase 5 screen.
       (Process Monitor, a firewall rule for the bypass check); reproducible-build check;
       release feature assertion; `SECURITY.md`
 - [ ] Licensing checklist in [06](06-licensing-and-provenance.md) (third-party notices in About)
-- [ ] Courtesy contact with GameBanana before the public beta (not a permission: none is
-      needed, [10](10-gamebanana-api.md)): say what GMM requests and its User-Agent, ask about
-      a 1-click integration for ZZZ/WuWa and the "Powered by GameBanana" wording
+- [x] GameBanana relationship decided (2026-10-25): no outreach. GMM needs no permission
+      ([10](10-gamebanana-api.md)); GameBanana can find it through its User-Agent (which
+      links the repo) and the public repo, and if they ask for contact, changes or removal,
+      the project complies. The README credits GameBanana, mod creators, XXMI and the other
+      sources and says how to ask for credit changes or removal
+- [ ] Before the public beta: re-read GameBanana's Terms of Service (they can change without
+      notice) and keep the README's Credits section current
 - [ ] Public beta (Windows), then Linux (AppImage / Flatpak) from the same codebase
 
 ## Phase 8+ — More games
@@ -227,8 +231,9 @@ Epic install to confirm the Epic reader (fixture-tested only).
 
 1. **Name.** The license is decided (MIT OR Apache-2.0, see [06](06-licensing-and-provenance.md)).
    The product name still needs to be chosen and cleared before publishing.
-2. **GameBanana relationship.** No permission needed ([10](10-gamebanana-api.md)); a courtesy
-   contact before the public beta, mainly for 1-click.
+2. ~~**GameBanana relationship.**~~ Decided 2026-10-25: no permission is needed and no outreach
+   is planned; GameBanana can find GMM and ask, and the project complies with any request
+   ([10](10-gamebanana-api.md)). 1-click buttons stay out of reach unless they add GMM.
 3. **Copyright holder** for the license files (currently "The Gacha Mod Manager Contributors").
 4. **`d3dx_user.ini` in profiles**: an R3 amendment letting GMM write that one file in each
    importer folder. Your call.

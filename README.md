@@ -54,6 +54,33 @@ started through XXMI. Install XXMI from its
 [official releases](https://github.com/SpectrumQT/XXMI-Launcher/releases) and set it up for your
 game. The app detects your setup and walks you through any missing steps.
 
+## Credits
+
+Gacha Mod Manager is an open-source interface built on other people's work:
+
+- **[GameBanana](https://gamebanana.com)**: the mod catalogue, its public API and the file
+  hosting every mod comes from. GMM links back to each mod's page and never re-hosts files.
+- **Mod creators**: every mod belongs to its author on GameBanana. GMM shows their names,
+  credits and licenses as GameBanana lists them.
+- **[XXMI Launcher](https://github.com/SpectrumQT/XXMI-Launcher)** by SpectrumQT, with its
+  importers (ZZMI, WWMI and others): the mod loader. GMM detects it, reads a few of its settings
+  and starts it; it never bundles or modifies it.
+- **[3Dmigoto](https://github.com/bo3b/3Dmigoto)**, which XXMI builds on: GMM reads its `.ini`
+  format to find conflicts and key bindings.
+- **[UnRAR](https://www.rarlab.com/rar_add.htm)** by Alexander Roshal (RARLAB): opens RAR mods,
+  under its own freeware license (see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)).
+- **[Nunito](https://github.com/googlefonts/nunito)** by the Nunito Project Authors: the
+  interface font (SIL Open Font License 1.1).
+- **Open-source libraries**, among them [Tauri](https://tauri.app), [React](https://react.dev),
+  [DOMPurify](https://github.com/cure53/DOMPurify), [SQLx](https://github.com/launchbadge/sqlx),
+  [reqwest](https://github.com/seanmonstar/reqwest), [rustls](https://github.com/rustls/rustls),
+  [zip](https://github.com/zip-rs/zip2) and [sevenz-rust2](https://github.com/hasenbanck/sevenz-rust).
+  The full list with licenses comes with each release.
+
+If you are the original owner of credited work or assets and would like the credit adjusted
+or the assets removed from the project, please contact me through
+[GitHub](https://github.com/clorece/gacha-mod-manager/issues).
+
 ## License
 
 Licensed under either of

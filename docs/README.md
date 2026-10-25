@@ -80,6 +80,9 @@ cases.
 **GameBanana API** (2026-10-25, [10](10-gamebanana-api.md)): no permission or key is needed
 for what GMM does (checked: the Terms of Service, Site Rules and a site moderator's answer
 to the same question); only 1-click buttons on mod pages would need GameBanana to add GMM.
+No outreach is planned: GameBanana can find GMM through its User-Agent and the repo, and the
+project complies with any request; the root README now has a Credits section with a contact
+line for credit changes or removal.
 GMM now treats a "slow down" (429, 503 with `Retry-After`, a Cloudflare challenge) as a
 pause for all of its GameBanana traffic, shows saved data and a notice meanwhile, and the
 install queue waits and carries on. Background reads share the API budget, identical

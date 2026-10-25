@@ -33,13 +33,16 @@ What *does* need GameBanana:
   checked (729726, 553203, 688491, 731970). A staff post from 2018 describes them integrating
   mod managers that start from a custom URL scheme. So GMM can only get those buttons if
   GameBanana adds it; deep links (Phase 6) wait on that.
-- **Using their name** in the lockup ("Powered by GameBanana") is descriptive, but worth a
-  courtesy question with the above.
+- **Using their name** in the lockup ("Powered by GameBanana") is descriptive; it stays
+  unless they ask otherwise.
 
-So the Phase 7 item changes from "ask about API use" to a **courtesy contact before the public
-beta**: tell them GMM exists, its User-Agent and what it requests, and ask about a 1-click
-integration for ZZZ/WuWa and the "Powered by" wording. Not a blocker for development or a
-beta.
+**Decision (2026-10-25): no outreach.** GMM is an open-source interface for easier downloads
+and management, and needs no permission, so the project lets GameBanana find it rather than
+contacting them. They can: every request carries GMM's User-Agent, which links the public
+repo. If GameBanana asks for contact, changes or removal, the project complies. The README's
+Credits section names GameBanana, the mod creators, XXMI and the other sources, and invites
+any owner of credited work to ask for credit changes or removal through GitHub. The cost of
+not asking: no 1-click buttons unless GameBanana adds GMM on its own.
 
 ## How GMM talks to GameBanana
 
@@ -71,7 +74,8 @@ limit doesn't touch another's. Three caveats:
 2. **The User-Agent is shared by every GMM install.** If GameBanana ever judged GMM's total
    traffic abusive, it could block that User-Agent and stop every user at once. This is the
    real "many users" risk, and why per-install load must stay low and predictable (prevention,
-   below), and why the courtesy contact is worth doing.
+   below), and why the User-Agent stays honest and links the repo, so they can reach the
+   project instead of blocking it.
 3. **Bot checks aren't about rate.** Cloudflare can ask any non-browser client for a browser
    check (a challenge page) during an attack or a configuration change. GMM can't pass one and
    must not try to; it backs off and serves saved data.

@@ -314,7 +314,7 @@ All colors are CSS custom properties on the app root; `.t-dark` and `.t-light` s
 
 1. ~~Theme and layout sign-off~~ (done 2026-10-25).
 2. Game banner source (above).
-3. "Powered by GameBanana" in the lockup is descriptive, but ask GameBanana before release
-   along with the API questions (roadmap open question 2).
+3. "Powered by GameBanana" in the lockup is descriptive and stays; it changes if GameBanana
+   asks (no outreach is planned, roadmap open question 2).
 4. ~~Component library~~: built by hand (`src/ui`, 2026-10-25); dialogs use the native
    `<dialog>` element for focus trapping and Escape.

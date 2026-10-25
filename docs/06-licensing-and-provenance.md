@@ -167,5 +167,7 @@ LGPL or AGPL dependency fails the build. Watch out for:
 - [ ] No assets, strings or code from other projects (spot-check by searching distinctive strings)
 - [ ] Name cleared; disclaimer in README and About
 - [ ] Setup guide and About credit XXMI and link to its official repo/releases
-- [ ] GameBanana contacted about API use / 1-click
+- [ ] README Credits section current (GameBanana, mod creators, XXMI, 3Dmigoto, UnRAR, Nunito,
+      libraries) with the contact line for credit changes or removal. No GameBanana outreach
+      (decided 2026-10-25, [10](10-gamebanana-api.md)); comply with any request they make
 - [ ] `docs/research/` removed from the public repo or marked as prior art
