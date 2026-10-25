@@ -7,21 +7,17 @@ Impact and Honkai Impact 3rd, so each of those is one adapter away.
 
 Development happens on Windows (primary target). Linux follows later from the same codebase.
 
-## Where we are (2026-10-24)
+## Where we are (2026-10-25)
 
-**Done:** Phase 0 (discovery), Phase 0b (setup check), the parts of Phase 1 that Phase 2
-needs, and **Phase 2** (2026-10-24): the local database, the install pipeline, toggling,
-uninstalling and listing mods (GMM's and hand-installed ones), conflict detection, storage
-accounting, `gmm launch` (with XXMI's administrator prompt), the adapter conformance suite and
-the egress / file-access privacy harnesses (in CI, with strace on Linux). The exit check was
-done in game: a GameBanana mod installed with `gmm install`, started with `gmm launch zzz`,
-toggled, a conflict reported, storage listed.
-
-**Phase 3 started** (2026-10-24): its "Start here" list is done. There is an app window
-(`apps/desktop`, Tauri 2 + React): 22 commands covering every CLI action, TypeScript types
-generated from the Rust types, the `gmmimg` image protocol, a locked-down capability and CSP,
-and a first shell (game rail, XXMI state pill, setup card, mod list with toggles, Launch with
-XXMI). Run it with `corepack pnpm tauri dev` in `apps/desktop` (or `just app-dev`).
+**Done:** the backend (Phases 0–2) and the app foundations (Phase 3), all on 2026-10-23/24.
+Every feature works from the `gmm` command line: browse GameBanana, install (download, safe
+extraction, policy scan, variants), switch mods on and off, uninstall to the Recycle Bin,
+conflicts, storage, launch through XXMI. The Phase 2 exit check passed in game. The app window
+(`apps/desktop`, Tauri 2 + React) has a command for every CLI action, generated TypeScript
+types, the `gmmimg` image protocol, a locked-down capability and CSP, and a first shell (game
+rail, XXMI state pill, setup card, mod list with toggles, Launch with XXMI). Run it with
+`corepack pnpm tauri dev` in `apps/desktop` (or `just app-dev`). A cleanup pass followed
+(dead code removed, CLI/app duplicates merged into shared functions).
 
 | Crate | What it does |
 |---|---|
@@ -38,15 +34,24 @@ XXMI). Run it with `corepack pnpm tauri dev` in `apps/desktop` (or `just app-dev
 | `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, one command per CLI action (ids only), the `gmmimg` protocol, navigation guard; the React UI is in `apps/desktop/src` |
 | `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm list`, `gmm enable/disable/uninstall`, `gmm conflicts`, `gmm storage`, `gmm launch`, `gmm detect`, `gmm status`, `gmm config` |
 
-On the dev machine, `gmm status` reports ZZZ `Ready` (HoYoPlay install) and WuWa
-`LaunchModeMismatch` (Steam install, XXMI's Game Launch still on Direct).
+On the dev machine, `gmm status` and the app report ZZZ `Ready` (HoYoPlay install) and WuWa
+`Ready` (Steam install; its Steam copy runs with XXMI's Game Launch on Direct).
 
-**Waiting on you:** screenshots of each XXMI setup step, for the app's setup guide (whenever
-convenient).
+**Now:** Phase 4, design, is mostly done (2026-10-24/25). The layout and theme are signed off.
+The design canvas has 23 artboards: every screen in dark and light, plus the startup check,
+the install confirmation (one version, choose a file, choose versions, add versions, RAR
+notice) and mod settings with versions; the search and filter row stays at the top of the
+store and library. Every state passed a contrast and overlap check in both themes. Written up
+in [08-design-system.md](08-design-system.md); file formats and the RAR plan in
+[09-archive-formats.md](09-archive-formats.md). The logo and app icons are in the app.
 
-**Next:** the Phase 3 screens, in the roadmap's order: navigation and the downloads tray,
-the setup stepper, then Browse (catalogue), the mod page, the variant picker, the full
-library, conflicts, storage, settings. See "Screens" under Phase 3 in the roadmap.
+**Waiting on you:** the game banner source (see 08); screenshots of each XXMI setup step, for
+the setup guide; the product name, if it changes.
+
+**Next:** finish Phase 4 in the app (tokens, Nunito, primitives, style guide page, the shell
+restyled to the sidebar), then Phase 5: RAR support first (about a quarter of mods are RAR),
+the two-step install for the confirmation dialog, versions, the install queue and startup
+check, then the screens. See the roadmap.
 
 ## Docs
 
@@ -57,7 +62,10 @@ library, conflicts, storage, settings. See "Screens" under Phase 3 in the roadma
 | [04-security.md](04-security.md) | Threat model, hard rules, test harnesses per phase |
 | [05-roadmap.md](05-roadmap.md) | Phases (backend, then frontend), milestones, exit criteria |
 | [06-licensing-and-provenance.md](06-licensing-and-provenance.md) | Third-party licenses, clean-room rules, our license, release checklist |
-| [07-frontend-design.md](07-frontend-design.md) | Screens: catalogue, mod page, library, conflicts, storage, setup |
+| [07-frontend-design.md](07-frontend-design.md) | Screens: what each one shows (store, mod page, library, conflicts, storage, setup) |
+| [08-design-system.md](08-design-system.md) | Navigation, screen layouts, tokens (dark and light), type, motion, data constraints on the design |
+| [09-archive-formats.md](09-archive-formats.md) | Which archive formats GMM installs from, error messages, and the RAR plan |
+| [brand/](brand/) | The GMM mark and lockups, and how to use them |
 | [../crates/gmm-adapters/games/](../crates/gmm-adapters/games/) | The game manifests for ZZZ and WuWa |
 | `research/` (local only, git-ignored) | Prior-art notes and Phase 0 observations |
 

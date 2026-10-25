@@ -66,9 +66,4 @@ impl FsError {
             source,
         }
     }
-
-    /// True when the underlying I/O error was "not found".
-    pub fn is_not_found(&self) -> bool {
-        matches!(self, Self::Io { source, .. } if source.kind() == io::ErrorKind::NotFound)
-    }
 }

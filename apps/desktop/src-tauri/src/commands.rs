@@ -11,11 +11,11 @@ use std::path::PathBuf;
 use gmm_adapters::{GameManifest, Registry};
 use gmm_catalog::{CatalogSource, Category, ListQuery, ModProfile, ModUpdate, Page, SearchQuery};
 use gmm_core::{
-    ClearedCache, ConflictReport, InstallEvent, InstallOptions, InstallRequest, Machine,
-    ModsTarget, RecycleBin, SetupHints, VariantChoice, cache_storage, clear_downloads, confirm_exe,
+    ClearedCache, ConflictReport, InstallOptions, InstallRequest, Machine, ModsTarget, RecycleBin,
+    SetupHints, cache_storage, clear_downloads, confirm_exe, conflicts_after_install,
     conflicts_for, conflicts_for_unmanaged, game_storage, library as core_library,
-    listed_unmanaged, plan_launch, set_enabled as core_set_enabled, set_unmanaged_enabled_at,
-    start, uninstall as core_uninstall, uninstall_unmanaged, unmanaged_size,
+    listed_unmanaged, set_enabled as core_set_enabled, set_unmanaged_enabled_at, start,
+    uninstall as core_uninstall, uninstall_unmanaged, unmanaged_size,
 };
 use gmm_xxmi::GameStatus;
 use tauri::ipc::Channel;
@@ -27,8 +27,7 @@ use crate::error::{CmdError, CmdResult};
 use crate::views::{
     CatalogPage, CatalogQuery, FolderRow, GameInfo, GameStorageView, InstallArgs, InstallProgress,
     InstallResult, LaunchInfo, Launched, LibraryView, ModKey, ModRow, Settings, StorageView,
-    Toggled, UninstallItem, Uninstalled, VariantPick, rewrite_categories, rewrite_profile,
-    rewrite_summary,
+    Toggled, UninstallItem, Uninstalled, rewrite_categories, rewrite_profile, rewrite_summary,
 };
 
 fn registry() -> CmdResult<&'static Registry> {
@@ -72,22 +71,13 @@ pub async fn statuses(state: State<'_, AppState>) -> CmdResult<Vec<GameStatus>> 
         .collect())
 }
 
-fn hide_sensitive(page: &mut Page<gmm_catalog::ModSummary>, show: bool) -> u32 {
-    if show {
-        return 0;
-    }
-    let before = page.items.len();
-    page.items
-        .retain(|m| !m.visibility.is_sensitive() && !m.has_content_ratings);
-    u32::try_from(before - page.items.len()).unwrap_or(u32::MAX)
-}
-
 fn catalog_page(
     state: &AppState,
     mut page: Page<gmm_catalog::ModSummary>,
     show_nsfw: bool,
 ) -> CatalogPage {
-    let hidden = hide_sensitive(&mut page, show_nsfw);
+    let hidden = if show_nsfw { 0 } else { page.hide_sensitive() };
+    let hidden = u32::try_from(hidden).unwrap_or(u32::MAX);
     for item in &mut page.items {
         rewrite_summary(&state.images, item);
     }
@@ -175,24 +165,13 @@ pub async fn install(
     args: InstallArgs,
     on_progress: Channel<InstallProgress>,
 ) -> CmdResult<InstallResult> {
-    let profile = state.gb.mod_profile(args.mod_id).await?;
-    let game = profile
-        .summary
-        .game_id
-        .and_then(|id| registry().ok()?.by_gamebanana_id(id))
-        .ok_or_else(|| {
-            CmdError::other(format!("mod {} isn't for a game GMM supports", args.mod_id))
-        })?;
+    let game = gmm_core::game_for_mod(&state.gb.mod_profile(args.mod_id).await?)?;
     let target = mods_target(&state, game).await?;
     let request = InstallRequest {
         mod_id: args.mod_id,
         file_id: args.file_id,
         options: InstallOptions {
-            variants: match args.variants {
-                VariantPick::Only => VariantChoice::Only,
-                VariantPick::Named { names } => VariantChoice::Named(names),
-                VariantPick::All => VariantChoice::All,
-            },
+            variants: args.variants.into(),
             skip_blocked: args.skip_blocked,
         },
     };
@@ -204,36 +183,15 @@ pub async fn install(
         target.mods,
         game,
         &request,
-        |event| {
-            let progress = match event {
-                InstallEvent::Fetch(gmm_core::FetchEvent::UsingCache) => {
-                    InstallProgress::UsingCache
-                }
-                InstallEvent::Fetch(gmm_core::FetchEvent::Downloading { size }) => {
-                    InstallProgress::Downloading { size }
-                }
-                InstallEvent::Fetch(gmm_core::FetchEvent::Progress(p)) => {
-                    InstallProgress::Progress {
-                        downloaded: p.downloaded,
-                        total: p.total,
-                    }
-                }
-                InstallEvent::Extracting => InstallProgress::Extracting,
-                InstallEvent::Installing { folder } => InstallProgress::Installing { folder },
-            };
-            // The window may have closed; installing carries on regardless.
-            let _ = on_progress.send(progress);
-        },
+        // The window may have closed; installing carries on regardless.
+        |event| drop(on_progress.send(event.into())),
     )
     .await?;
 
     // New mods start enabled; say right away if they clash with something already on.
-    let mut conflicts = Vec::new();
-    for folder in &report.installed {
-        let found = conflicts_for(&state.db, &target.ws, target.mods, game, folder.id).await?;
-        conflicts.extend(found.conflicts);
-    }
-    conflicts.dedup();
+    let conflicts =
+        conflicts_after_install(&state.db, &target.ws, target.mods, game, &report.installed)
+            .await?;
     Ok(InstallResult {
         report,
         setup_warnings: target.warnings,
@@ -254,7 +212,7 @@ pub async fn library(state: State<'_, AppState>, game: String) -> CmdResult<Libr
     let target = match mods_target(&state, game).await {
         Ok(target) => target,
         Err(e) => {
-            view.problem = Some(message(&e));
+            view.problem = Some(e.message().to_owned());
             return Ok(view);
         }
     };
@@ -277,16 +235,6 @@ pub async fn library(state: State<'_, AppState>, game: String) -> CmdResult<Libr
         .collect();
     view.unmanaged = lib.unmanaged;
     Ok(view)
-}
-
-fn message(e: &CmdError) -> String {
-    match e {
-        CmdError::ChooseVariant { message, .. }
-        | CmdError::Blocked { message, .. }
-        | CmdError::Conflicts { message, .. }
-        | CmdError::NotReady { message }
-        | CmdError::Other { message } => message.clone(),
-    }
 }
 
 /// Switches a mod on or off (the `DISABLED ` rename). Switching on refuses with `conflicts`
@@ -456,11 +404,7 @@ pub async fn clear_download_cache(state: State<'_, AppState>) -> CmdResult<Clear
 
 async fn plan(state: &AppState, game: &GameManifest) -> CmdResult<gmm_core::LaunchPlan> {
     let machine = Machine::scan(&state.db, SetupHints::default()).await?;
-    let xxmi = machine.xxmi.as_ref().ok_or_else(|| CmdError::NotReady {
-        message: "XXMI Launcher not found".to_owned(),
-    })?;
-    let status = machine.status(game);
-    Ok(plan_launch(&state.db, xxmi, &status, game).await?)
+    Ok(machine.launch_plan(&state.db, game).await?)
 }
 
 /// What "Launch with XXMI" would run, and whether the user already confirmed that exe.

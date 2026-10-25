@@ -14,6 +14,7 @@ use gmm_db::Db;
 use gmm_xxmi::{GameStatus, LaunchCommand, SetupState, XxmiInstall, launch, launch_command};
 
 use crate::error::CoreError;
+use crate::setup::Machine;
 
 /// A checked launch, ready to run once confirmed.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,6 +43,17 @@ pub async fn plan_launch(
         .await?
         .is_some_and(|c| same_path(&c, &command.exe));
     Ok(LaunchPlan { command, confirmed })
+}
+
+impl Machine {
+    /// [`plan_launch`] for `game` with what this scan found.
+    pub async fn launch_plan(&self, db: &Db, game: &GameManifest) -> Result<LaunchPlan, CoreError> {
+        let xxmi = self.xxmi.as_ref().ok_or_else(|| CoreError::NotReady {
+            game: game.game.name.clone(),
+            reason: "XXMI Launcher not found".to_owned(),
+        })?;
+        plan_launch(db, xxmi, &self.status(game), game).await
+    }
 }
 
 /// Remembers that the user confirmed the plan's exe.

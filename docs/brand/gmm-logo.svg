@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-16 -16 272 272" width="272" height="272">
+<title>Gacha Mod Manager</title>
+<defs>
+<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7FDBFF"></stop><stop offset="1" stop-color="#3A7BFF"></stop></linearGradient>
+<linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset=".5" stop-color="#fff"></stop><stop offset="1" stop-color="#D3E6FA"></stop></linearGradient>
+<linearGradient id="y" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE766"></stop><stop offset="1" stop-color="#FFAE1A"></stop></linearGradient>
+<clipPath id="c"><circle cx="112" cy="112" r="88"></circle></clipPath><clipPath id="t"><path d="M0 0 H240 V108 L214 108 Q112 94 14 124 L0 124 Z"></path></clipPath>
+<filter id="f" filterUnits="userSpaceOnUse" x="-40" y="-40" width="320" height="320"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#2B5BB8" flood-opacity=".28"></feDropShadow></filter>
+<mask id="m" maskUnits="userSpaceOnUse" x="-40" y="-40" width="320" height="320"><rect x="-40" y="-40" width="320" height="320" fill="#fff"></rect><path d="M14 124 Q112 94 214 108" stroke="#000" stroke-width="12" fill="none"></path><path d="M188 164 V216 M162 190 H214" stroke="#000" stroke-width="46" stroke-linecap="round"></path></mask>
+</defs>
+<g mask="url(#m)"><g filter="url(#f)">
+<circle cx="112" cy="112" r="88" fill="url(#w)"></circle>
+<circle cx="112" cy="112" r="88" fill="url(#g)" clip-path="url(#t)"></circle>
+</g></g>
+<path d="M52 98 A62 62 0 0 1 98 52" stroke="#fff" stroke-width="11" stroke-linecap="round" fill="none"></path>
+<circle cx="120" cy="42" r="6" fill="#fff"></circle>
+<path d="M188 164 V216 M162 190 H214" stroke="url(#y)" stroke-width="25" stroke-linecap="round" fill="none" filter="url(#f)"></path>
+<circle cx="184" cy="174" r="3.5" fill="#fff"></circle>
+<path d="M210 26 Q212 38 224 40 Q212 42 210 54 Q208 42 196 40 Q208 38 210 26 Z" fill="#3A7BFF"></path>
+<path d="M226 64 Q227 70 233 71 Q227 72 226 78 Q225 72 219 71 Q225 70 226 64 Z" fill="#7FDBFF"></path>
+</svg>

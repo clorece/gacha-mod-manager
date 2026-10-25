@@ -2,9 +2,5 @@
   "name": "gacha-mod-manager",
   "private": true,
   "license": "MIT OR Apache-2.0",
-  "packageManager": "pnpm@12.15.0",
-  "scripts": {
-    "desktop:dev": "pnpm --filter gmm-desktop tauri dev",
-    "desktop:build": "pnpm --filter gmm-desktop build"
-  }
+  "packageManager": "pnpm@12.15.0"
 }

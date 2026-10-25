@@ -5,7 +5,7 @@
 use std::io::{BufRead, IsTerminal, Write};
 
 use gmm_adapters::GameManifest;
-use gmm_core::{Machine, SetupHints, confirm_exe, plan_launch, start};
+use gmm_core::{Machine, SetupHints, confirm_exe, start};
 use gmm_db::Db;
 
 use crate::AnyError;
@@ -17,10 +17,10 @@ pub async fn run(
     hints: SetupHints,
     json: bool,
 ) -> Result<(), AnyError> {
-    let machine = Machine::scan(db, hints).await?;
-    let xxmi = machine.xxmi.as_ref().ok_or("XXMI Launcher not found")?;
-    let status = machine.status(game);
-    let mut plan = plan_launch(db, xxmi, &status, game).await?;
+    let mut plan = Machine::scan(db, hints)
+        .await?
+        .launch_plan(db, game)
+        .await?;
 
     if !plan.confirmed {
         let exe = plan.command.exe.display().to_string();

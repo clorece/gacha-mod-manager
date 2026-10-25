@@ -1,287 +1,182 @@
 # 05 — Roadmap
 
-Backend and frontend are separate phases. Phases 1–2 build every feature behind the `gmm` CLI.
-Phase 3 builds the UI on top of it. Security harnesses are added in the same phase as the code
-they guard ([04](04-security.md)). When a phase finishes, every doc gets updated (see
-`CLAUDE.md`).
+Backend first (Phases 0–2, every feature behind the `gmm` CLI), then the app: foundations
+(Phase 3), design (Phase 4), screens (Phase 5). Security harnesses land in the same phase as
+the code they guard ([04](04-security.md)). When a phase finishes, every doc gets updated (see
+`CLAUDE.md`). Finished phases are summarized here; the details live in the other docs, in
+`docs/research/phase0-observations.md` (local only) and in git history.
 
-## Phase 0 — Discovery on the dev machine (no app code) ✅ done 2026-10-23
+## Done
 
-Details: `docs/research/phase0-observations.md` (local only).
+| Phase | Finished | What it delivered |
+|---|---|---|
+| 0 — Discovery | 2026-10-23 | Facts from the dev machine: XXMI layout and config keys, ZZZ/WuWa installs, `d3dx.ini` rules (`include_recursive = Mods`, `exclude_recursive = DISABLED*`), the Quick Start command line, GameBanana endpoints and image fields ([02](02-architecture.md), [03](03-game-adapters.md)) |
+| 0b — Setup check | 2026-10-23 | `gmm-detect` (Steam, HoYoPlay, Epic, manual), `gmm-xxmi` (allowlisted config read, importer checks), the setup states with fix steps, `gmm detect` / `gmm status` |
+| In-game checks | 2026-10-24 | Confirmed in game: `DISABLED ` hides a mod, nested `Mods/GMM/<mod>/` loads, Quick Start works, WuWa's Steam copy runs with Game Launch = Direct |
+| 1 — Foundations | 2026-10-23 | Workspace, CI (Windows + Linux), `cargo-deny`; `gmm-fsguard`, `gmm-net`, `gmm-archive` (zip/7z, malicious corpus), `gmm-catalog`, `gmm-adapters`; `gmm catalog`, `gmm fetch` |
+| 2 — Backend features | 2026-10-24 | `gmm-db`, `gmm-core` (install pipeline, library, toggle, uninstall to the Recycle Bin, conflicts, storage, launch through XXMI), `gmm-migoto`; the adapter conformance suite and the egress / file-access privacy harnesses. Exit check passed in game with Casual Velina (GameBanana 688491) |
+| 3 — App foundations | 2026-10-24 | `apps/desktop`: Tauri 2 shell over `gmm-core` with 22 commands (ids only), generated TypeScript types, the `gmmimg` image protocol, locked-down capability / CSP / navigation guard, a first shell (game rail, state pill, setup card, mod list, Launch with XXMI); frontend CI (typecheck, lint, `pnpm audit`, npm license check). Verified in a release build on the dev machine |
 
-- [x] Locate XXMI root, config keys, ZZMI folder layout, `d3dx.ini` (`include_recursive = Mods`,
-      `exclude_recursive = DISABLED*`)
-- [x] Locate ZZZ and WuWa Steam installs (appids, ZZZ's nested `games/ZenlessZoneZero Game`)
-- [x] Launch ZZZ once through XXMI: `game_folder` recorded, hook succeeded, 3DMigoto parsed a
-      hand-installed mod (`d3dx_user.ini` keys). The Steam copy then exits ("launch from Steam")
-      because XXMI's **Game Launch** setting was Direct
-- [x] Install WWMI for WuWa in XXMI (`WWMI/` folder, WWMI 1.1.0)
-- [x] XXMI exe path, version resource, install record (uninstall key), Quick Start shortcut
-      command (`--nogui --xxmi <IMP>`); exe is not code-signed
-- [x] XXMI GUI labels for the setup guide, from its locale files
-- [x] Confirm GameBanana list/page/sort params, image fields, updates endpoint, download
-      redirect chain
-- [x] A hand-installed mod shows in game (ZZZ via HoYoPlay; confirmed by the user 2026-10-23)
-- Moved to "Before Phase 2" below: `DISABLED` hides a mod, nested `Mods/GMM/<mod>/` loads,
-  `.staging` ignored, Quick Start command works, screenshots
-- Deferred to pre-release: GameBanana's rules for API clients (no public terms found; ask them)
+Cleanup pass (2026-10-24, after Phase 3): unused functions and a dependency removed; the NSFW
+filter, "which game is this mod for", launch planning and post-install conflict checks moved
+into shared `gmm-catalog` / `gmm-core` functions used by both the CLI and the app; Biome pinned
+to a release outside pnpm's minimum-age window (the auto-added exemption removed); finished
+phases condensed in this file.
 
-## Phase 0b — Setup check ✅ done 2026-10-23
+Design rounds (2026-10-24/25): see Phase 4 below.
 
-`gmm detect` and `gmm status` tell the user, per game, what's missing before mods can work and
-how to fix it. Read-only.
+## Phase 4 — Design (mostly done; finishing in the app)
 
-**Built**
-- [x] `gmm-detect`: Steam (`SteamPath` registry value → `libraryfolders.vdf` →
-      `appmanifest_<appid>.acf` → `common/<installdir>/<subpath>`), **HoYoPlay**
-      (`gamedata.dat`, `installPath` values only), Epic manifests (fixture-tested only; no
-      machine with Epic yet), manual folders (`--folder game=PATH`); every candidate validated
-      against the game's folder markers; deduped
-- [x] VDF/ACF parser (bounded depth and size, property-tested for panics)
-- [x] `gmm-xxmi`: finds the root (explicit `--xxmi`, default `%APPDATA%\XXMI Launcher`,
-      uninstall key `InstallLocation`), validates it (config file + launcher exe with `MZ`
-      header), reads the config through a struct that declares only the allowed fields
-- [x] Setup states with fix steps: `XxmiNotFound`, `ImporterMissing`, `ImporterBroken`,
-      `GamePathNotSet`, `PathMismatch`, `LaunchModeMismatch`, `Ready`
-- [x] Importer details: XXMI DLL version (`d3d11.dll` version resource), importer version (from
-      the core ini that `d3dx.ini` includes: ZZMI `main.ini`, WWMI `WuWa-Model-Importer.ini`),
-      enabled/disabled mod counts, `Mods/` size
-- [x] CLI: `gmm detect` and `gmm status [--game] [--xxmi] [--folder]`, both with `--json`
-- [x] Fixtures for every state; secret-canary tests (XXMI's `github_token`, proxy password,
-      signatures never appear in output or `Debug`)
+Deciding how the app looks and flows before building the screens, so each gets built once.
+The written spec is [08-design-system.md](08-design-system.md); the interactive mockup is a
+design canvas in your claude.ai account (23 artboards: every screen and dialog, dark and
+light, real GameBanana data with placeholder preview art).
 
-**Verified on the dev machine**
-- [x] ZZZ (HoYoPlay install on D:, Game Launch = Direct) → `Ready`, with ZZMI 1.50,
-      XXMI DLL 1.2.2.0, 1 mod
-- [x] WuWa (Steam, Game Launch = Direct, never started through XXMI) → `LaunchModeMismatch`,
-      fix: set "Game Launch" to "Steam". Superseded 2026-10-24: WuWa's Steam copy works with
-      Direct too, so it's now `Ready` either way (`direct_launch = true` in its manifest)
+**Your direction (2026-10-24/25):** left sidebar with General (Dashboard, Downloads, Settings),
+Mods (Select Game banner dropdown, Mods Library, Mods Store) and Development (Report a Bug as
+WIP, Documentation); dashboard game bubbles that enlarge to reveal Launch; downloads grouped by
+game with a self-clearing finished state; store with a trending gallery and sticky search and
+filters; library with a game selector header, switches, install dates, select mode and enable /
+disable all; a startup check screen; an install confirmation where every choice (file,
+versions) is made before downloading; per-mod settings with versions; theme after HoYoLAB; the
+GMM brand ([brand/](brand/)).
 
-## Before Phase 2 — in-game checks ✅ done 2026-10-24 (except screenshots)
+**Done**
+- [x] Brand assets in the repo (`docs/brand/`); app and exe icons from the mark; the mark in
+      the current shell
+- [x] Navigation and every screen designed, dark and light, on the canvas; layout and theme
+      signed off (2026-10-25)
+- [x] Visual system: tokens for both themes, type, radius, spacing, motion, scrollbars,
+      accessibility rules ([08](08-design-system.md#tokens))
+- [x] Three contrast and overlap passes, then a fourth with the new surfaces: 62 states in
+      both themes, checked by screenshots and an automated audit (contrast of every text
+      against its real background, overlap of every pair of text lines). Rules recorded in 08
+- [x] Second round (2026-10-25): sticky search / filter bar, startup check screen,
+      install confirmation (one version, choose a file, choose versions with a scrolling
+      list, add versions, RAR notice), mod settings with versions, "needs your choice"
+      removed from Downloads
+- [x] Data checks that shape the design: NSFW share, trending endpoint, no download counts in
+      listings, RAR share (4 of 15 sampled), versions as files vs. folders, character icons,
+      game art ([08](08-design-system.md#what-the-data-allows-found-while-designing))
+- [x] File formats documented with a RAR decision record ([09](09-archive-formats.md))
+- [x] [07](07-frontend-design.md) updated to the new navigation and flows
 
-The install pipeline relies on these. Confirmed by you in game:
+**Left** (finishing the phase in the app)
+- [ ] Decide the game banner source and the component approach (open decisions in 08)
+- [ ] Bundle Nunito (OFL-1.1: a font-only exception in the npm license check, a notice)
+- [ ] Port the tokens and base styles from the canvas into `apps/desktop/src/styles.css`
+      (both themes, scrollbars, `:where()` button base)
+- [ ] Primitives: button, icon button, switch, checkbox, radio, dropdown, chip / badge,
+      dialog, side panel, toast, progress bar
+- [ ] Living style guide: a dev-only page showing the tokens and every primitive state
+- [ ] Restyle the current shell to the sidebar layout (Dashboard with bubbles and Launch,
+      Library, the launch dialog), as the proof
 
-- [x] Rename `ZZMI\Mods\Phoenix` to `DISABLED Phoenix`: gone in game
-- [x] Move it to `ZZMI\Mods\GMM\Phoenix\`: still loads (nested folder). Left there; `gmm list`
-      shows it as `GMM/Phoenix`, not installed by GMM
-- [x] The desktop **ZZMI Quick Start** shortcut (`--nogui --xxmi ZZMI`) starts ZZZ with mods
-- [x] One WuWa mod shows in game. Observed: XXMI started the **Steam** copy of WuWa twice with
-      "Game Launch" still on **Direct**, and mods worked. So "Steam copies need Game Launch =
-      Steam" (learned from ZZZ's Steam copy, which wraps HoYoPlay) doesn't hold for WuWa, and
-      `gmm status` wrongly reports WuWa as `LaunchModeMismatch`
-- Dropped: the empty `Mods\GMM\.staging\` check. GMM stages under `DISABLED .staging`, which
-  XXMI skips by its own `exclude_recursive = DISABLED*` rule
-- [ ] Screenshots of each XXMI step for the setup guide
+Exit: the tokens, font and primitives are in the codebase, the style guide page shows them,
+and the shell uses the new navigation.
 
-## Phase 1 — Backend foundations
+## Phase 5 — Screens
 
-- [x] Cargo workspace, pinned toolchain, rustfmt/clippy config, `justfile`
-- [x] CI on Windows + Linux: fmt, clippy `-D warnings`, tests; `cargo-deny` (licenses, bans,
-      advisories, sources)
-- [x] pnpm + Tauri app shell; `pnpm audit` and npm license checks in CI (done in Phase 3,
-      2026-10-24)
-- [x] `gmm-fsguard` (ScopedPath, RelPath, roots, denylist, junction/symlink escape checks) +
-      `disallowed_methods` lints (verified to fire outside fsguard)
-- [x] `gmm-net`: host allowlist (incl. every redirect hop), rate limiting, retries/backoff,
-      size caps, resumable verified downloads (SHA-256 + MD5)
-- [x] `gmm-archive`: hardened zip + 7z extraction, policy scan, malicious archive corpus,
-      randomized corruption tests
-- [ ] RAR support (C `unrar`, in a sandboxed subprocess)
-- [ ] cargo-fuzz targets (archive extraction, `RelPath`, VDF) as a nightly CI job
-- [x] `gmm-catalog`: `CatalogSource` trait + GameBanana client (list, search, mod page, files,
-      updates, categories), in-memory cache, synthetic fixtures, live API smoke test
-- [x] SQLite-backed HTTP cache (done with `gmm-db` in Phase 2)
-- [x] `gmm-adapters`: manifest schema (unknown fields rejected), validation, registry with
-      lookups by id / GameBanana id / importer / Steam appid; CLI `gmm games`
-- [x] CLI: `gmm catalog list|search|show|categories`, `gmm fetch` (download → extract → scan)
+Every screen sits on commands that exist or are small additions. Order: what unblocks
+installs first, then the screens in the order users meet them.
 
-Exit: the CLI browses both catalogues and prints a full mod page. Archive harness green. ✅ met
-(the open items above don't block Phase 2).
+**Backend additions**
+- [ ] **RAR support** first (about a quarter of mods): `gmm-extract` helper with libarchive,
+      sandboxed, two-pass checks in the parent, R7 amended; fall back to UnRAR if libarchive
+      fails real archives ([09](09-archive-formats.md#rar-plan-decision-record))
+- [ ] Install in two steps for the confirmation dialog: `prepare_install` (fetch into the
+      cache and analyze: files, versions, blocked files, conflicts between versions) and
+      `install` (the chosen file, versions, skip-blocked, switch on or not). `gmm-core`
+      already has `fetch_archive` + `analyze` + `install_analyzed`
+- [ ] Versions as one mod: group installed folders by GameBanana mod and file, list the
+      archive's other versions, install one more from the cached archive, remove one, switch
+      which one is on (exclusive when they conflict)
+- [ ] An install queue with per-item state for the Downloads page; cancel hook in
+      `gmm-core::install`; pause / resume via `gmm-net`'s resumable downloads
+- [ ] Startup check: newest catalogue pages per game (cached), update check for installed
+      mods (`_tsDateUpdated`, new file ids; moved here from Phase 6), and the app-update
+      step once the Phase 7 updater exists
+- [ ] Trending: `CatalogSource::top_subs` over `apiv11/Game/{id}/TopSubs` (safe-for-work
+      entries first, backfilled)
+- [ ] Download counts for cards: the mod pages of visible cards in the background
+      (rate-limited, cached)
+- [ ] Store each mod's category and character at install; record "last played" on launch
+- [ ] Commands: open a GameBanana page or the XXMI releases page in the system browser (after
+      a confirmation, ids only), open a mod's folder (R7 allows folders only), clear the HTTP
+      cache (`gmm_db::clear_http_cache` exists)
+- [ ] Rewrite and sanitize description HTML (DOMPurify; images through `gmmimg`)
+- [ ] Look again at GameBanana's `File/{id}/RawFileList` (could list versions without
+      downloading)
 
-## Phase 2 — Backend features ✅ done 2026-10-24
+**Screens** (in order)
+- [ ] Startup check screen
+- [ ] App shell: sidebar (Select Game, theme switch); Downloads page on the install queue
+- [ ] Dashboard: game bubbles with Launch, setup cards for games that aren't Ready, recently
+      installed
+- [ ] Setup guide: the failing row highlighted per `SetupState`, a stepper with your
+      screenshots
+- [ ] Mods Store: featured gallery, sticky toolbar, virtualized grid, filters (category,
+      character, sort), state badges (installed, disabled, update available, conflict)
+- [ ] Install confirmation: one version, choose a file, choose versions, add versions,
+      blocked files, RAR / unsupported notices
+- [ ] Mod page: hero + slideshow + lightbox, header / stats / license, Description, Files
+      (archived files), Credits, Updates
+- [ ] Mods Library: grid, sticky toolbar, switches, filters, select mode, enable / disable
+      all, hand-installed mods, conflict notice
+- [ ] Mod settings panel: versions, details, actions, uninstall with the itemized
+      confirmation for hand-installed mods
+- [ ] Settings (with Storage: segment bar, table, multi-select disable / delete, clear caches)
+      and About (notices, disclaimer, XXMI credit)
+- [ ] Documentation page (guides rewritten for players); Report a Bug as the WIP page
 
-Already done in Phase 0b: game detection, XXMI detection, setup states, `gmm detect`,
-`gmm status`, per-state fixtures.
+**Tests**
+- [ ] Vitest component tests and fixture-based snapshots
+- [ ] XSS corpus through the description renderer (T3)
+- [ ] IPC fuzz harness: hostile arguments to every command (R5; so far checked by hand)
+- [ ] The contrast and overlap audit from Phase 4, run against the real app in CI
 
-**Start here** (suggested order):
-- [x] `gmm-db` (2026-10-23): SQLite (sqlx 0.9, bundled SQLite, no macros, no extension
-      loading) with migrations in `crates/gmm-db/migrations/`; tables `settings` (XXMI folder,
-      confirmed XXMI exe), `manual_game_folders`, `installed_mods`, `download_cache`,
-      `http_cache`. The catalogue's HTTP cache now lives there (`HttpCache` became async).
-      CLI: `gmm config show|add-folder|remove-folder|set-xxmi|clear-xxmi`; `detect`/`status`
-      use the saved folders and XXMI folder; `gmm fetch` records archives in `download_cache`.
-      Verified on the dev machine: the cache survives between runs (459 ms → 18 ms for a
-      list page)
-- [x] Install pipeline (2026-10-23): new crate `gmm-core` (`fetch_archive` → `analyze` →
-      `install_analyzed`, plus `install` and `install_gate`). `gmm install <mod-id> [--file]
-      [--game] [--variant N|name ...] [--all-variants] [--skip-blocked]` and `gmm list`;
-      `gmm fetch` now reuses the same steps and prints kind and variants. Stages under
-      `Mods/GMM/DISABLED .staging/`, writes `gmm.json` and an `installed_mods` row, never
-      overwrites. `gmm status` now counts mods inside `Mods/GMM/` one by one. The catalogue
-      model gained `game_id` (`_aGame`). 12 pipeline tests (variants, blocked files, hostile
-      names, collisions, end to end against a mock GameBanana). Verified with a real mod
-      (Belle High Waisted, 534637: 47 files, 85 MiB) installed into a throwaway XXMI folder.
-      Not yet done: installing into your real `ZZMI\Mods` and checking it in game (that's the
-      Phase 2 exit check, with `gmm launch`). Known gap: `installed_mods` doesn't record which
-      XXMI root a mod went into; `gmm list` reconciles with disk in the next item
-- [x] Enable/disable, uninstall, unmanaged listing (2026-10-23): `gmm-core::library`
-      (`library`, `set_enabled`, `uninstall` with a `Trash` trait; `RecycleBin` in the app).
-      The disk is the truth for on/off: hand renames update the DB; a vanished folder is
-      reported `missing` and uninstall then only removes the record; both names present is
-      `ambiguous` and refused. Unmanaged = folders and loose `.ini` files in `Mods/`, plus
-      unknown folders inside `Mods/GMM/`; listed only, never touched. `Guard::move_to_trash`
-      (new `trash` dependency, in fsguard). CLI: `gmm list` (per game, with disk state and
-      unmanaged mods), `gmm enable|disable|uninstall <id>...`. Verified in a throwaway XXMI
-      folder (install, disable, enable, uninstall to the real Recycle Bin) and as a read-only
-      `gmm list` of the real setup (Phoenix shown as unmanaged). An interrupted install left
-      only a staging leftover, no mod and no record. Known: SQLite may reuse the id of the
-      most recently deleted mod
-- [x] Conflicts (2026-10-23): new crate `gmm-migoto` (tolerant parser: override hashes,
-      `match_first_index`, geometry/texture replacement, namespace, key bindings; property
-      tests) and `gmm-core::conflicts` (`conflicts`, `conflicts_for`). Library mods ignored by
-      namespace via the manifest. CLI: `gmm conflicts`, `gmm enable` refuses a conflicting mod
-      unless `--anyway`, `gmm install` warns. Verified: the real Belle mod and an unmanaged copy
-      of it conflict on 20 hashes; the real setup (Phoenix alone) has none. Deferred: the
-      "same character" warning tier (needs the category stored at install) and caching the index
-- [x] Storage accounting (2026-10-23): `gmm-core::storage` (`game_storage`, `cache_storage`,
-      `clear_downloads`), `Guard::available_space` (new `fs4` dependency). CLI: `gmm storage
-      [--game] [--clear-downloads]`. Verified on the real setup: Phoenix 123.4 MiB, 369.9 GiB
-      free, cache 22.7 MiB of downloads
-- [x] `gmm launch <game> [--yes]` (2026-10-23): `gmm-xxmi::launch` (the only process launch),
-      `gmm-core::{plan_launch, confirm_exe, start}`. Requires `Ready`; asks once to confirm the
-      exact exe path (stored, asked again if it changes). Verified on the dev machine up to the
-      confirmation (WuWa refused as not Ready; ZZZ asks for confirmation). First real run
-      (2026-10-24) failed with Windows error 740: XXMI's exe requires administrator rights. Fixed
-      by starting it through the shell (`ShellExecuteExW`, UAC prompt), the one `unsafe` call
-      in GMM, guarded by a CI check
-- [x] Adapter conformance suite (2026-10-23): `crates/gmm-core/tests/conformance.rs` builds a
-      fake machine from each built-in manifest alone (game folder from the markers, XXMI with the
-      importer, a hand-installed mod, secret canaries in the config) and runs detect → `Ready` →
-      install → toggle (XXMI's mod counts follow) → conflicts → storage → uninstall. It also
-      asserts that nothing outside `Mods/` changed (size and mtime of every other file and
-      folder) and that no canary reached GMM's database, cache or the mod folder. Passes for ZZZ
-      and WuWa
-- [x] CLI: `gmm install`, `gmm list`, `gmm enable|disable`, `gmm uninstall`, `gmm conflicts`,
-      `gmm storage`, `gmm launch`
-- [x] Egress + file-access harnesses (2026-10-23): `crates/gmm-cli/tests/privacy.rs` runs the real
-      binary behind a refusing, logging proxy with a canary-filled fake profile; on Linux CI
-      every `gmm` process also runs under `strace` (no non-loopback connections, no canary
-      opened, no writes outside `GMM_HOME`/`Mods/`). `GMM_HOME` relocates GMM's folders.
-      `just audit-privacy`. Deferred: Windows syscall tracing (Process Monitor) and a
-      firewall-based bypass check
+Exit: everything the CLI does is reachable in the app for ZZZ and WuWa (RAR included), with
+the designed loading, empty and error states; install (all confirmation paths), versions,
+uninstall, storage and settings exercised in the app against the real setup.
 
-Exit: from the CLI alone, install a ZZZ mod, see it in game via `gmm launch`, toggle it, see a
-conflict reported, and see it in storage. Privacy harnesses green.
+## Phase 6 — Power features
 
-**Exit check (done with you, 2026-10-24):**
-- [x] `gmm install 688491` (Casual Velina) into your real `ZZMI\Mods\GMM\` (2026-10-24; GMM
-      id `#1`)
-- [x] `gmm launch zzz`, exe confirmed once, game starts with mods (after the UAC fix)
-- [x] `gmm disable 1` / `gmm enable 1` rename Casual Velina's folder with and without
-      `DISABLED ` (the prefix you confirmed hides a mod in game). The first try used the
-      GameBanana id (`688491`); GMM now accepts `#1` and says which GMM id a GameBanana id
-      means. `gmm disable Phoenix_duplicate` switched the hand-made copy off the same way
-- [x] WuWa's Steam copy was wrongly flagged `LaunchModeMismatch` (it runs fine with XXMI's Game
-      Launch on Direct). Fixed 2026-10-24 with a per-game manifest flag,
-      `[detect.steam] direct_launch` (WuWa `true`, ZZZ `false`); `gmm status` now says WuWa is
-      `Ready`
-- [x] `gmm conflicts` reports a conflict: `GMM/Phoenix` and a hand-made copy
-      `GMM/Phoenix_duplicate`, 8 shared hashes. `gmm enable` refusing is covered by tests
-- [x] `gmm storage` lists Casual Velina (131.0 MiB) and the hand-installed mods
-- [x] Hand-installed mods: `gmm enable|disable|uninstall` take their name or path too
-      (2026-10-24; uninstall lists them and asks first)
-- [x] Privacy harnesses green in CI (egress + file access, strace on Linux)
-
-## Phase 3 — Frontend
-
-Spec: [07-frontend-design.md](07-frontend-design.md). Every screen sits on a `gmm-core` call the
-CLI already makes, so this phase adds presentation, not features.
-
-**Start here** ✅ done 2026-10-24:
-- [x] App shell in `apps/desktop/`: Tauri 2.12 (`gmm-desktop`, a workspace member that depends
-      on `gmm-core`), Vite 8 + React 19 + TypeScript 7 + Tailwind 4, pnpm 12 via corepack (pnpm
-      workspace at the repo root, lockfile `pnpm-lock.yaml`), Biome for lint and format. The
-      main window's capability lists only GMM's 22 commands (not even `core:default`); CSP
-      from [04](04-security.md) plus `http://gmmimg.localhost` for WebView2; a navigation
-      guard keeps the webview on GMM's own pages; devtools only with `--features dev` (R6).
-      CI: a `frontend` job (`pnpm install --frozen-lockfile`, typecheck, lint, `pnpm audit`,
-      `pnpm run check-licenses`, `pnpm build`); the Rust job installs WebKitGTK on Linux and
-      checks that `tauri/devtools` and `gmm-net/test-util` stay out of the shipped graph.
-      Verified: `pnpm tauri dev` and a release build run on the dev machine and show ZZZ and
-      WuWa `Ready` with the real Mods folders
-- [x] Command layer (`apps/desktop/src-tauri/src/commands.rs`): `games`, `statuses`,
-      `catalog_list|search|mod|updates|categories`, `install` (progress over a Tauri
-      `Channel`; `choose_variant` / `blocked` as structured `CmdError`s), `library`,
-      `set_enabled` (refuses with `conflicts` unless `anyway`), `uninstall_preview` +
-      `uninstall`, `conflicts`, `storage`, `clear_download_cache`, `launch_plan` + `launch`,
-      `settings`, `pick_xxmi_folder`, `clear_xxmi_folder`, `pick_game_folder`,
-      `remove_game_folder`. Mods are named by `ModKey` (GMM id, or the exact listed path of a
-      hand-installed mod: new `gmm_core::set_unmanaged_enabled_at` / `listed_unmanaged`).
-      Folder pickers open from Rust (`tauri-plugin-dialog`, no webview permission) and are
-      validated. TS types generated with `ts-rs` into `src/bindings.ts` (a test fails when
-      stale; `just bindings` regenerates). Checked by hand in the app: catalogue, library,
-      hostile ids and keys refused. Not yet exercised from the UI: `install`, `uninstall`,
-      `storage`, `settings` (no screens yet)
-- [x] `gmmimg` protocol: `gmm_core::ImageCache` (keys = SHA-256 of `images.gamebanana.com`
-      URLs handed out by catalogue commands; fetched through `gmm-net` with its own 8/s rate
-      limit; JPEG/PNG/WebP/GIF only; `cache/images/`, 512 MiB cap, oldest pruned first).
-      Verified in a release build: catalogue images load, outside images and fetches are blocked
-
-**Screens** (in this order):
-- [ ] Design tokens, app shell, game rail, XXMI state pill, downloads tray. Done so far: dark
-      tokens in `styles.css`, the shell (`App.tsx`: game rail with a "needs setup" dot, top
-      bar, state pill, Launch with XXMI with the exe confirmation dialog). Next: the
-      Browse/Library/Storage/Settings navigation from [07](07-frontend-design.md), the
-      downloads tray on the `install` channel (cancel/pause need a cancel hook in
-      `gmm-core::install`), light theme, shadcn/ui primitives (dialog, menu, toast)
-- [ ] Setup/onboarding cards + setup guide stepper (driven by `gmm-xxmi`'s states and steps).
-      Done so far: `SetupCard` (game / XXMI / importer rows, next steps, re-check, folder
-      pickers). Next: highlight the failing row per `SetupState`, the stepper with your
-      screenshots, the XXMI releases link (system browser after a confirmation, through a
-      new command)
-- [ ] Catalogue: virtualized grid, filters (category, character, sort, NSFW), banner cards,
-      state badges
-- [ ] Mod page: hero banner + slideshow + lightbox, header/stats/license, Description (sanitized),
-      Files (file picker, archived files), Credits, Updates
-- [ ] Variant picker dialog
-- [ ] Library: list/grid, toggles, filters, unmanaged tab, actions menu. Done so far: one list
-      of managed and hand-installed mods with toggles and the "Enable anyway" conflict prompt
-- [ ] Conflict dialog + conflict filter
-- [ ] Storage screen: segment bar, table, multi-select disable/delete/clear cache
-- [ ] Settings + About (notices, disclaimer)
-- [ ] Component tests, XSS corpus, fixture-based snapshots (needs a test runner: Vitest)
-- [ ] IPC fuzz harness (hostile args to every command, from [04](04-security.md)); so far
-      checked by hand
-
-Exit: everything from Phase 2 is reachable in the UI for ZZZ and WuWa, with designed loading,
-empty and error states.
-
-## Phase 4 — Power features
-
-- [ ] Update checker (`_tsDateUpdated`, new file ids), one-click update with rollback from the
-      cache
-- [ ] Profiles (named sets of enabled mods; snapshot/restore `d3dx_user.ini`), share as a JSON
-      code
-- [ ] Keybind viewer (from `[Key*]` sections)
-- [ ] Adopt unmanaged mods (match against GB)
+- [ ] One-click mod update with rollback from the download cache (the update check itself
+      lands in Phase 5's startup check)
+- [ ] Profiles (named sets of enabled mods; snapshot / restore `d3dx_user.ini`), shareable as a
+      JSON code
+- [ ] Keybind viewer (from `[Key*]` sections, already parsed by `gmm-migoto`)
+- [ ] Adopt unmanaged mods (match against GameBanana)
 - [ ] Drag-and-drop local archive install (same scan pipeline)
-- [ ] 1-click install deep links (`gmm://`) if GameBanana allows
+- [ ] Report a Bug (describe, attach a log the user reviews; needs a destination host, R2)
+- [ ] 1-click install deep links (`gmm://`) if GameBanana allows (T6)
 
-## Phase 5 — Release
+## Phase 7 — Release
 
+- [ ] Name chosen and cleared; logo and app icon
 - [ ] Windows installer (NSIS/MSI via Tauri), code signing, signed auto-updates from GitHub
-      Releases
-- [ ] Reproducible-build check, release feature assertion, `SECURITY.md`, docs site
-- [ ] Public beta (Windows), then Linux (AppImage/Flatpak) from the same codebase
+      Releases (adds `github.com` to the allowlist, R2)
+- [ ] Hardening: `cargo-fuzz` targets as a nightly job; Windows equivalents of the strace checks
+      (Process Monitor, a firewall rule for the bypass check); reproducible-build check;
+      release feature assertion; `SECURITY.md`
+- [ ] Licensing checklist in [06](06-licensing-and-provenance.md) (third-party notices in About)
+- [ ] GameBanana contacted about API use and 1-click
+- [ ] Public beta (Windows), then Linux (AppImage / Flatpak) from the same codebase
 
-## Phase 6+ — More games
+## Phase 8+ — More games
 
 XXMI importers already exist: **Arknights: Endfield (EFMI)** first (it's in your Steam library),
 then Star Rail (SRMI), Genshin (GIMI), HI3 (HIMI). HoYoPlay detection already sees Genshin,
 Star Rail and HI3 install paths. Each game goes through the adapter checklist in
-[03](03-game-adapters.md).
+[03](03-game-adapters.md). Later detection sources: the Kuro launcher (native WuWa), and a real
+Epic install to confirm the Epic reader (fixture-tested only).
 
-Later detection sources: Kuro launcher (native WuWa) once a machine with it is available.
+## Known gaps
+
+- `installed_mods` doesn't record which XXMI root a mod went into; the library reconciles
+  with the disk instead.
+- SQLite may reuse the id of the most recently deleted mod.
+- The conflict index is rebuilt on every call (fine at today's sizes; cache it if it gets slow).
 
 ## Open questions
 

@@ -182,6 +182,20 @@ impl ModSummary {
     pub fn banner(&self) -> Option<&Image> {
         self.images.first()
     }
+
+    /// Flagged by GameBanana (visibility or content ratings): hidden until the user opts in.
+    pub fn is_sensitive(&self) -> bool {
+        self.visibility.is_sensitive() || self.has_content_ratings
+    }
+}
+
+impl Page<ModSummary> {
+    /// Drops sensitive mods (see [`ModSummary::is_sensitive`]) and returns how many.
+    pub fn hide_sensitive(&mut self) -> usize {
+        let before = self.items.len();
+        self.items.retain(|m| !m.is_sensitive());
+        before - self.items.len()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

@@ -53,10 +53,7 @@ fn lookups() {
     let r = Registry::builtin().unwrap();
     assert_eq!(r.get("ZZZ").unwrap().id(), "zzz", "case-insensitive");
     assert_eq!(r.by_gamebanana_id(20357).unwrap().id(), "wuwa");
-    assert_eq!(r.by_importer(Importer::Zzmi).unwrap().id(), "zzz");
-    assert_eq!(r.by_steam_appid(3513350).unwrap().id(), "wuwa");
     assert!(r.get("genshin").is_none());
-    assert!(r.by_importer(Importer::Gimi).is_none());
 }
 
 // ---- rejected manifests ---------------------------------------------------------------------

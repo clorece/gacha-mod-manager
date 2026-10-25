@@ -6,7 +6,7 @@
 
 use std::io::Write;
 
-use gmm_adapters::{GameManifest, Registry};
+use gmm_adapters::GameManifest;
 use gmm_archive::Severity;
 use gmm_catalog::{CatalogSource, GameBanana};
 use gmm_core::{AppDirs, FetchEvent, Workspace, analyze, fetch_archive};
@@ -70,22 +70,7 @@ pub fn progress(json: bool) -> impl FnMut(FetchEvent) {
 
 /// The game a GameBanana mod belongs to, from its mod page.
 pub async fn game_of(gb: &GameBanana, mod_id: u64) -> Result<&'static GameManifest, AnyError> {
-    let profile = gb.mod_profile(mod_id).await?;
-    let registry = Registry::builtin()?;
-    profile
-        .summary
-        .game_id
-        .and_then(|id| registry.by_gamebanana_id(id))
-        .ok_or_else(|| {
-            format!(
-                "mod {mod_id} isn't for a supported game (GameBanana game {}); see `gmm games`",
-                profile
-                    .summary
-                    .game_id
-                    .map_or("unknown".to_owned(), |id| id.to_string())
-            )
-            .into()
-        })
+    Ok(gmm_core::game_for_mod(&gb.mod_profile(mod_id).await?)?)
 }
 
 pub async fn run(

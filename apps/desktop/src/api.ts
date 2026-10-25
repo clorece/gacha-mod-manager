@@ -77,14 +77,3 @@ export const api = {
   pickGameFolder: (game: string) => invoke<string | null>("pick_game_folder", { game }),
   removeGameFolder: (game: string, folder: string) => invoke<null>("remove_game_folder", { game, folder }),
 };
-
-export function bytes(n: number): string {
-  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
-  let value = n;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  return unit === 0 ? `${n} B` : `${value.toFixed(1)} ${units[unit]}`;
-}

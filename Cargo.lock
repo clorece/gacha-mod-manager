@@ -1552,7 +1552,6 @@ dependencies = [
  "gmm-core",
  "gmm-db",
  "gmm-detect",
- "gmm-fsguard",
  "gmm-net",
  "gmm-xxmi",
  "serde",

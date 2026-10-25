@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::sync::OnceLock;
 
-use crate::manifest::{GameManifest, Importer};
+use crate::manifest::GameManifest;
 use crate::validate;
 
 /// The manifests shipped with GMM. Adding a game = adding a file here and in `games/`.
@@ -105,15 +105,5 @@ impl Registry {
 
     pub fn by_gamebanana_id(&self, id: u64) -> Option<&GameManifest> {
         self.games.iter().find(|g| g.gamebanana.game_id == id)
-    }
-
-    pub fn by_importer(&self, importer: Importer) -> Option<&GameManifest> {
-        self.games.iter().find(|g| g.xxmi.importer == importer)
-    }
-
-    pub fn by_steam_appid(&self, appid: u32) -> Option<&GameManifest> {
-        self.games
-            .iter()
-            .find(|g| g.detect.steam.as_ref().is_some_and(|s| s.appid == appid))
     }
 }

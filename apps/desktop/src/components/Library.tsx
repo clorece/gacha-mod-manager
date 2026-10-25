@@ -4,16 +4,8 @@
 // actions menu, uninstall) comes later (docs/07, "Library").
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  api,
-  asCmdError,
-  bytes,
-  type Conflict,
-  type GameInfo,
-  type LibraryView,
-  type ModKey,
-  type ModRef,
-} from "../api";
+import { api, asCmdError, type Conflict, type GameInfo, type LibraryView, type ModKey, type ModRef } from "../api";
+import { bytes } from "../format";
 
 function label(ref: ModRef): string {
   return ref.type === "managed" ? ref.folder : `${ref.path} (not installed by GMM)`;

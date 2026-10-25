@@ -8,7 +8,7 @@ use gmm_adapters::GameManifest;
 use gmm_catalog::GameBanana;
 use gmm_core::{
     CoreError, InstallEvent, InstallOptions, InstallRequest, ModsTarget, SetupHints, VariantChoice,
-    conflicts_for, install,
+    conflicts_after_install, install,
 };
 use gmm_db::Db;
 use gmm_net::Client;
@@ -101,12 +101,8 @@ pub async fn run(
     };
 
     // New mods start enabled; say right away if they clash with something already on.
-    let mut clashes = Vec::new();
-    for folder in &report.installed {
-        let found = conflicts_for(db, &target.ws, target.mods, game, folder.id).await?;
-        clashes.extend(found.conflicts);
-    }
-    clashes.dedup();
+    let clashes =
+        conflicts_after_install(db, &target.ws, target.mods, game, &report.installed).await?;
 
     if json {
         #[derive(Serialize)]

@@ -4,7 +4,7 @@
 //! run in order and the first failing one decides the state, so the user always gets the one
 //! next step that matters. Wording of the steps is GMM's own; quoted names are XXMI's labels.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use gmm_adapters::GameManifest;
 use gmm_detect::{GameInstall, InstallSource, is_game_folder, resolve_game_folder, same_path};
@@ -290,10 +290,6 @@ impl GameStatus {
         self.summary = summary;
         self.steps = steps;
         self
-    }
-
-    pub fn xxmi_game_folder_path(&self) -> Option<&Path> {
-        self.xxmi_game_folder.as_deref().map(Path::new)
     }
 }
 

@@ -21,6 +21,7 @@ use gmm_migoto::{MAX_INI_BYTES, Override, parse};
 use serde::Serialize;
 
 use crate::error::CoreError;
+use crate::install::InstalledFolder;
 use crate::library::{DiskState, library};
 use crate::names::{GMM_DIR, on_disk_name};
 use crate::workspace::Workspace;
@@ -111,6 +112,27 @@ pub async fn conflicts_for(
         });
     };
     Ok(check(ws.guard(), game, units, Some(focus)))
+}
+
+/// What freshly installed mods (which start enabled) clash with, for one warning after
+/// [`crate::install`]. Both sides stay on.
+pub async fn conflicts_after_install(
+    db: &Db,
+    ws: &Workspace,
+    mods: RootId,
+    game: &GameManifest,
+    installed: &[InstalledFolder],
+) -> Result<Vec<Conflict>, CoreError> {
+    let mut found = Vec::new();
+    for folder in installed {
+        found.extend(
+            conflicts_for(db, ws, mods, game, folder.id)
+                .await?
+                .conflicts,
+        );
+    }
+    found.dedup();
+    Ok(found)
 }
 
 /// A mod to check even though it is switched off (it's about to be switched on).

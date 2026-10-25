@@ -44,6 +44,11 @@ pub enum CoreError {
         expected: u64,
         found: u64,
     },
+    #[error(
+        "mod {mod_id} isn't for a game GMM supports (GameBanana game {})",
+        .game_id.map_or("unknown".to_owned(), |id| id.to_string())
+    )]
+    UnsupportedGame { mod_id: u64, game_id: Option<u64> },
     #[error("{game} isn't set up for mods yet: {reason}")]
     NotReady { game: String, reason: String },
 

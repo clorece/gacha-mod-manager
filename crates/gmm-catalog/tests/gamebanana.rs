@@ -115,6 +115,11 @@ async fn list_mods_sends_filters_and_maps_records() {
     assert_eq!(b.date_updated, Some(1790600000));
     assert!(b.visibility.is_sensitive());
     assert!(b.has_content_ratings);
+
+    let mut visible = page.clone();
+    assert_eq!(visible.hide_sensitive(), 1);
+    assert_eq!(visible.items.len(), 1);
+    assert_eq!(visible.items[0].id, 900001);
 }
 
 #[tokio::test]

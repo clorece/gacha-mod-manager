@@ -10,11 +10,7 @@ pub fn mod_page(page: &Page<ModSummary>, hidden: usize) -> String {
     let mut out = String::new();
     for m in &page.items {
         let character = m.category.as_ref().map(|c| c.name.as_str()).unwrap_or("-");
-        let flag = if m.visibility.is_sensitive() || m.has_content_ratings {
-            " [NSFW?]"
-        } else {
-            ""
-        };
+        let flag = if m.is_sensitive() { " [NSFW?]" } else { "" };
         let _ = writeln!(
             out,
             "{:>8}  {}{}\n          by {} · {} · ♥ {} · 👁 {} · updated {}",
@@ -67,7 +63,7 @@ pub fn profile(p: &ModProfile) -> String {
         s.stats.downloads.unwrap_or(0),
         s.stats.views,
     );
-    if s.visibility.is_sensitive() || s.has_content_ratings {
+    if s.is_sensitive() {
         let _ = writeln!(out, "content warning: may be NSFW");
     }
     if !p.is_installable() {

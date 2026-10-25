@@ -31,7 +31,8 @@ mod workspace;
 
 pub use analyze::{Analysis, Variant, analyze};
 pub use conflicts::{
-    Conflict, ConflictReport, ModRef, conflicts, conflicts_for, conflicts_for_unmanaged,
+    Conflict, ConflictReport, ModRef, conflicts, conflicts_after_install, conflicts_for,
+    conflicts_for_unmanaged,
 };
 pub use error::CoreError;
 pub use fetch::{FetchEvent, FetchedArchive, MAX_DOWNLOAD_BYTES, choose_file, fetch_archive};
@@ -49,7 +50,7 @@ pub use library::{
 pub use names::{
     DISABLED_PREFIX, GMM_DIR, SIDECAR_FILE, STAGING_DIR, mod_folder_name, on_disk_name,
 };
-pub use setup::{Machine, ModsTarget, SetupHints, saved_setup};
+pub use setup::{Machine, ModsTarget, SetupHints, game_for_mod, saved_setup};
 pub use storage::{
     CacheStorage, ClearedCache, GameStorage, ModUsage, Size, cache_storage, clear_downloads,
     game_storage, unmanaged_size,

@@ -444,13 +444,7 @@ fn games(json: bool) -> Result<(), AnyError> {
 }
 
 fn hide_sensitive(page: &mut gmm_catalog::Page<gmm_catalog::ModSummary>, show: bool) -> usize {
-    if show {
-        return 0;
-    }
-    let before = page.items.len();
-    page.items
-        .retain(|m| !m.visibility.is_sensitive() && !m.has_content_ratings);
-    before - page.items.len()
+    if show { 0 } else { page.hide_sensitive() }
 }
 
 async fn catalog(

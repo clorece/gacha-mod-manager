@@ -106,7 +106,15 @@ LGPL or AGPL dependency fails the build. Watch out for:
   ignored in `deny.toml` with that reason. npm (44 packages, all on the allowlist): `react`,
   `react-dom`, `@tauri-apps/api` (runtime); `vite`, `@vitejs/plugin-react`, `tailwindcss`,
   `@tailwindcss/vite`, `typescript`, `@biomejs/biome`, `@tauri-apps/cli`, `@types/react*`
-  (build/dev only).
+  (build/dev only). Every npm package must be older than pnpm's minimum release age (one day);
+  no exemptions are configured.
+- **Brand assets** (`docs/brand/`, the app icons, `apps/desktop/src/assets/gmm-logo.svg`): the
+  GMM mark and lockups, provided by the project owner (made with Claude Design, 2026-10-24),
+  original to this project. The planned UI font, **Nunito**, is under the SIL Open Font License
+  1.1 (OFL-1.1): free to bundle and ship with software, not sold on its own. Bundling it adds a
+  font-only OFL-1.1 exception to the npm license check and an entry in the third-party
+  notices. Game key art and logos are not used (see "Names and trademarks"); GameBanana's logo
+  is never used, only its name as text.
 - **Facts about other software** come from observing it on the dev machine (file layouts,
   config keys, locale strings), recorded in our own words in `docs/03-game-adapters.md`. The
   HoYoPlay `gamedata.dat` handling, for example, is based only on what the file visibly

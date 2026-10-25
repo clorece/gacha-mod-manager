@@ -20,7 +20,6 @@ gmm-catalog.workspace = true
 gmm-core.workspace = true
 gmm-db.workspace = true
 gmm-detect.workspace = true
-gmm-fsguard.workspace = true
 gmm-net.workspace = true
 gmm-xxmi.workspace = true
 serde.workspace = true

@@ -50,10 +50,6 @@ impl Analysis {
     pub fn cleanup(&self, ws: &Workspace) {
         let _ = ws.guard().remove_dir_all(&self.extract.dest);
     }
-
-    pub fn has_variants(&self) -> bool {
-        self.variants.len() > 1
-    }
 }
 
 /// Extracts `archive` into a fresh folder in the cache, scans it and classifies it.

@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, asCmdError, type GameInfo, type GameStatus } from "./api";
+import logo from "./assets/gmm-logo.svg";
 import { LaunchButton } from "./components/LaunchButton";
 import { Library } from "./components/Library";
 import { SetupCard } from "./components/SetupCard";
@@ -37,6 +38,7 @@ export default function App() {
   return (
     <div className="flex h-full">
       <nav aria-label="Games" className="flex w-20 flex-col items-center gap-2 border-line border-r bg-panel py-4">
+        <img src={logo} alt="Gacha Mod Manager" className="mb-2 h-12 w-12" />
         {games.map((g) => {
           const s = statuses.find((x) => x.game_id === g.id);
           const active = g.id === selected;

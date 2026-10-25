@@ -39,6 +39,16 @@ impl CmdError {
             message: message.into(),
         }
     }
+
+    pub fn message(&self) -> &str {
+        match self {
+            Self::ChooseVariant { message, .. }
+            | Self::Blocked { message, .. }
+            | Self::Conflicts { message, .. }
+            | Self::NotReady { message }
+            | Self::Other { message } => message,
+        }
+    }
 }
 
 impl From<CoreError> for CmdError {

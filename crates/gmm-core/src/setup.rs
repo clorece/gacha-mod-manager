@@ -7,6 +7,7 @@
 use std::path::PathBuf;
 
 use gmm_adapters::{GameManifest, Registry};
+use gmm_catalog::ModProfile;
 use gmm_db::Db;
 use gmm_detect::{DetectReport, SystemEnvironment, detect};
 use gmm_fsguard::RootId;
@@ -41,6 +42,18 @@ pub async fn saved_setup(
         .collect();
     folders.extend(hints.folders);
     Ok((xxmi, folders))
+}
+
+/// The supported game a GameBanana mod belongs to (from its mod page).
+pub fn game_for_mod(profile: &ModProfile) -> Result<&'static GameManifest, CoreError> {
+    let registry = Registry::builtin().map_err(|e| CoreError::Io(e.to_string()))?;
+    let game_id = profile.summary.game_id;
+    game_id
+        .and_then(|id| registry.by_gamebanana_id(id))
+        .ok_or(CoreError::UnsupportedGame {
+            mod_id: profile.summary.id,
+            game_id,
+        })
 }
 
 /// What detection found on this machine.

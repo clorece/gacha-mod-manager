@@ -1,6 +1,6 @@
 [package]
 name = "gmm-core"
-description = "GMM's features on top of the building blocks: install, library, (later) toggle, conflicts, storage"
+description = "GMM's features on top of the building blocks: install, library, conflicts, storage, launch, images"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

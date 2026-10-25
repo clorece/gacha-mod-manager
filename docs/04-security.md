@@ -13,7 +13,7 @@ does is the failure we design out.
 | T3 | **Malicious catalogue content** | XSS in a mod description that then calls IPC | Sanitization, strict CSP, IPC takes ids not paths |
 | T4 | **Download tampering / redirect abuse** | Redirect to another host, swapped file | Host allowlist after every redirect, size caps, GB AV status + MD5, local SHA-256 |
 | T5 | **Executing the wrong program** | A planted "XXMI Launcher.exe" in a user-writable folder | Launch only the exe inside a confirmed XXMI root; first launch needs user confirmation; show the path |
-| T6 | **Deep-link abuse** (Phase 4) | `gmm://install?url=https://evil/` | Deep links carry GB ids only, plus a confirmation dialog |
+| T6 | **Deep-link abuse** (Phase 6) | `gmm://install?url=https://evil/` | Deep links carry GB ids only, plus a confirmation dialog |
 | T7 | **Supply chain** | Malicious crate/npm package | Lockfiles, `cargo-deny`, minimal deps, license + advisory checks |
 | T8 | **Update channel compromise** | Fake GMM update | Signed Tauri updates, keys offline, GitHub Releases only |
 | T9 | **Data loss** | Deleting the wrong mods | Deletes go to the Recycle Bin; unmanaged mods are never auto-deleted |
@@ -29,7 +29,7 @@ does is the failure we design out.
   HTTPS on port 443 to a compiled-in host: `gamebanana.com`, `files.gamebanana.com`,
   `images.gamebanana.com`, or a numbered download mirror `filecache<digits>.gamebanana.com`.
   IP literals and URLs with credentials are refused. `github.com` and
-  `objects.githubusercontent.com` get added only when GMM's own updater is built (Phase 5).
+  `objects.githubusercontent.com` get added only when GMM's own updater is built (Phase 7).
   A test-only feature that allows plain HTTP to `127.0.0.1` (for mock servers) is checked in CI
   never to reach a shipped binary. The webview makes **no** network
   requests: CSP `connect-src ipc: http://ipc.localhost`, and images arrive via the `gmmimg`
@@ -130,14 +130,17 @@ does is the failure we design out.
     references outside the mod folder (`..\`), unusually large files.
   - Scan report stored with the mod and shown on its library entry.
 - RAR (C `unrar`) extraction runs in a subprocess with a restricted token / job object on Windows
-  (seccomp on Linux). That's Phase 2 hardening; RAR is off until then.
+  (seccomp on Linux). RAR support is planned for Phase 5 (it's common on GameBanana); until
+  then RAR archives are refused. The helper would be a second kind of process GMM starts
+  (its own extractor, never anything from an archive), so R7 is amended in the same change.
+  Design and the libarchive / UnRAR choice: [09](09-archive-formats.md#rar-plan-decision-record).
 
 ## Catalogue / UI hardening
 
 - `_sText` and `_sLicense` HTML will be sanitized with DOMPurify (strict allowlist: no
   `style`, no iframes, no forms, no event handlers) when the mod page is built. Links will
   open in the system browser after a confirmation. Biome's `noDangerouslySetInnerHtml` is an
-  error until then.
+  error until then (Phase 5).
 - **Capability** (`apps/desktop/src-tauri/capabilities/main.json`): the main window gets
   exactly GMM's own commands (`allow-<command>`, generated from the list in `build.rs`), and
   nothing else: not `core:default`, no event, window, `fs`, `shell`, `http` or `dialog`
@@ -175,13 +178,13 @@ does is the failure we design out.
 | 0b | Detection on a fake machine (✅ done): Steam libraries, HoYoPlay data with a default path for an uninstalled game, Epic manifest, hostile `installdir` (`..\..\Windows`), planted `loginusers.vdf` canary | R3/R4, correct detection |
 | 2 | **Egress harness** (✅ done, `crates/gmm-cli/tests/privacy.rs`): the real `gmm` binary runs every network command behind an in-test proxy that logs and refuses each request. Every `CONNECT` target must pass `Allowlist::production()` on port 443, at least one must be seen, and local commands (detect, status, config, list, conflicts, storage, launch) must make none. On Linux CI each `gmm` process also runs under `strace`, and any IPv4/IPv6 connection that isn't loopback (traffic bypassing the proxy) fails the run. ⏳ a Windows equivalent of the bypass check (firewall rule) | R2 |
 | 2 | **File-access harness** (✅ done, same test): a fake profile with canary files (Steam `loginusers.vdf`, `config.vdf`, `userdata/`, a game `Player.log`, a browser `logins.json`, `~/.ssh/id_rsa`) and secrets in XXMI's config; GMM's folders redirected with `GMM_HOME`. Asserts nothing in the profile outside `Mods/` changed and no canary content reached GMM's files. Under `strace` (Linux CI) it also fails if any canary is opened or stat-ed, or any write lands outside `GMM_HOME` and `Mods/`. ⏳ Process Monitor on Windows | R3/R4 |
-| 2→3 | IPC fuzz: hostile args to every Tauri command. ⏳ Not automated yet; checked by hand in the running app (2026-10-24): an unknown game id (`../../etc`), an unmanaged key `../XXMI Launcher Config.json`, an image key GMM never issued, and plugin commands are all refused | R5 |
+| 5 | IPC fuzz: hostile args to every Tauri command. ⏳ Not automated yet; checked by hand in the running app (2026-10-24): an unknown game id (`../../etc`), an unmanaged key `../XXMI Launcher Config.json`, an image key GMM never issued, and plugin commands are all refused | R5 |
 | 3 | Image cache tests (✅ done, `gmm-core/src/images.rs`): only `images.gamebanana.com` HTTPS URLs get keys; bad keys, SVG/HTML bodies and HTTP errors are refused and nothing is written; cache survives restarts; oldest images pruned at the cap | R2, R5 |
 | 3 | `bindings_are_current` (✅ done, `gmm-desktop`): the TypeScript types match the Rust types | Bridge types can't drift |
 | 2 | Adapter conformance suite on fixtures (✅ done: per-state fixtures in 0b; `gmm-core/tests/conformance.rs` runs detect → install → toggle → conflicts → storage → uninstall per game, asserts no file outside `Mods/` changed and no XXMI config canary reached GMM's database, cache or mod folders) | Correct detection, no writes outside `Mods/`, R4 for the database |
-| 3 | XSS corpus through the description renderer | T3 |
-| 4 | Hostile deep-link URLs | T6 |
-| 5 | Release checks: feature-flag assertion (R6), update signature verification, installer contents review | T7/T8 |
+| 5 | XSS corpus through the description renderer | T3 |
+| 6 | Hostile deep-link URLs | T6 |
+| 7 | Release checks: feature-flag assertion (R6), update signature verification, installer contents review | T7/T8 |
 
 `just audit-privacy` runs the egress and file-access harnesses locally against a release build
 (with strace on Linux when `GMM_PRIVACY_STRACE=1` is set),

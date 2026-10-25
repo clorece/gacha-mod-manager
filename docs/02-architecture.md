@@ -15,7 +15,7 @@
 | Tooling | pnpm (via corepack), Biome (lint + format), cargo workspace, `just` task runner | |
 
 The **`gmm` CLI** is built from the same core crates. Every backend feature ships in the CLI first
-(Phases 1–2). The UI (Phase 3) only presents what the CLI can already do.
+(Phases 1–2). The app (Phases 3–5) only presents what the CLI can already do.
 
 ## What GMM does and doesn't do
 
@@ -150,7 +150,7 @@ has `include_recursive = Mods`, so nested folders load:
   `$\mods\phoenix\resources\phoenix.ini\headband = 0`. Renaming or moving a mod folder,
   including adding the `DISABLED` prefix, orphans those keys, and 3DMigoto drops orphaned keys
   the next time it saves. So GMM picks a mod's folder name once at install and never renames
-  it except to toggle it. Profiles snapshot `d3dx_user.ini` (Phase 4) so toggle choices
+  it except to toggle it. Profiles snapshot `d3dx_user.ini` (Phase 6) so toggle choices
   survive a disable/enable cycle.
 
 ## Conflict detection
@@ -279,6 +279,9 @@ command per CLI action, all in `src/commands.rs`: `games`, `statuses`, `catalog_
 - **Frontend**: `App.tsx` (game rail, top bar with the XXMI state pill and Launch with XXMI),
   `components/SetupCard.tsx` (state, steps, folder pickers), `components/Library.tsx` (mods
   with toggles and the conflict prompt), `components/LaunchButton.tsx` (exe confirmation).
+- Logic both front ends need lives below them, not in either: `Page::hide_sensitive`
+  (`gmm-catalog`, the NSFW filter), `game_for_mod`, `Machine::launch_plan` and
+  `conflicts_after_install` (`gmm-core`).
 - The app uses `AppDirs::system()` like the CLI (so `GMM_HOME` works for both), one shared
   `Db`, one API `gmm_net::Client` and the image cache's own client.
 

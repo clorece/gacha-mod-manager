@@ -1,37 +1,32 @@
 # 07 — Frontend design
 
-The UI is built in Phase 3, after the backend works from the CLI. Every screen reads from typed
-Tauri commands (TS types generated from the Rust types with `ts-rs` into
+The app is built in Phases 3–5 (foundations, design, screens), after the backend works from
+the CLI. Every screen reads from typed Tauri commands (TS types generated from the Rust types with `ts-rs` into
 `apps/desktop/src/bindings.ts`). The UI never builds a path or a URL to the outside world.
+
+Navigation, layout, tokens and the look of each screen are in
+[08-design-system.md](08-design-system.md) (Phase 4). This doc keeps the screen contents and
+the data each one shows.
 
 ## App shell
 
-```
-┌───────────┬──────────────────────────────────────────────────────────────┐
-│ [ZZZ]     │  Top bar: game name · XXMI state pill · search · [Launch with XXMI] │
-│ [WuWa]    ├──────────────────────────────────────────────────────────────┤
-│ ───────   │                                                              │
-│ Browse    │                         page content                         │
-│ Library   │                                                              │
-│ Storage   │                                                              │
-│ ───────   │                                                              │
-│ Settings  │                                       downloads tray ▲ (2)   │
-└───────────┴──────────────────────────────────────────────────────────────┘
-```
+A left sidebar with three groups (General: Dashboard, Downloads, Settings; Mods: Select
+Game, Mods Library, Mods Store; Development: Report a Bug, Documentation) and the page on the
+right. Details in [08](08-design-system.md#navigation).
 
-- **Game rail** (left): one icon per supported game. Games that aren't detected appear dimmed,
-  with a "Set up" badge.
-- **XXMI state pill** in the top bar: green *Ready*, amber *Needs setup*, red *XXMI not found*.
-  Clicking it opens the setup guide.
-- **Launch with XXMI** is enabled only in `Ready`. A tooltip carries the "mods only load through
-  XXMI" notice.
-- **Downloads tray**: progress, pause/resume, cancel, errors with a retry button.
-- Theme: dark by default, light available. Tailwind tokens + shadcn/ui. Keyboard navigable.
-  Visible focus rings. All images have alt text (the mod name).
+- **Launch** lives on the Dashboard's game bubbles, enabled only in `Ready`, with the "mods
+  only load through XXMI" line beside it. First launch confirms the exe path (R7).
+- **Downloads** is a page (grouped by game, with a finished state that clears itself), not a
+  tray; the sidebar badge counts active installs. Choices never wait there: they're made in
+  the install confirmation first.
+- **Startup check**: a screen while GMM starts (app update, new mods per game, updates for
+  installed mods), skippable. See [08](08-design-system.md#startup-check).
+- Keyboard navigable, visible focus rings, all images with alt text (the mod name).
 
 ## Setup & onboarding
 
-Shown on first run and whenever a game isn't `Ready`. One card per game, filled from
+Shown on the Dashboard in place of a game's Launch button whenever it isn't `Ready`, and on
+first run. One card per game, filled from
 `gmm_xxmi::GameStatus` (the same data `gmm status --json` prints today):
 
 ```
@@ -53,7 +48,9 @@ Each `SetupState` maps to one highlighted row (XXMI, importer, game folder, laun
 [03](03-game-adapters.md), our own screenshots, and the XXMI releases link (opened in the
 system browser after a confirmation).
 
-## Catalogue (Browse)
+## Mods Store (catalogue)
+
+Layout, featured gallery and filters: [08](08-design-system.md#mods-store). Contents:
 
 ```
 [Search…………]  Category ▾  Character ▾  Sort: Recently updated ▾  ☐ Show NSFW  ☐ Hide installed
@@ -118,32 +115,35 @@ cache. With one image, there are no controls. With none, a placeholder.
 | Obsolete / withheld | `_bIsObsolete`, `_bIsWithheld`, `_bIsTrashed` → banner, install disabled |
 | Updates tab | `Mod/{id}/Updates` (verified): title, version, date, changelog entries (`text`, `cat`), file ids |
 
-**Choosing what to install:**
-1. **File** (GameBanana level): the Files tab lists each file with version, size, date and scan
-   status. The newest non-archived file is pre-selected in the **Install ▾** split button. Files
-   with an AV result other than `clean` can't be installed.
-2. **Variant** (archive level): after download, if the archive holds several full mods, a picker
-   shows each variant's folder name and its preview image if the archive has one. Multi-select is
-   allowed, and the default is the first variant.
-3. Already installed → the button becomes **Installed ✓ / Update / Reinstall / Uninstall**.
+**Choosing what to install** happens in the install confirmation, which every Download and
+Install button opens ([08](08-design-system.md#install-confirmation)); nothing downloads before
+it's confirmed:
+1. **File** (GameBanana level): when the mod has several files, a radio list with each file's
+   description, size and date; the newest clean file is pre-selected. Files with an AV result
+   other than `clean` can't be chosen. The Files tab on the mod page shows the same list,
+   archived files included.
+2. **Versions** (archive level): when the archive holds several full mods, a scrolling
+   checklist of them (folder name, files, size), after GMM has fetched the archive into its
+   cache to look inside. Multi-select is allowed; the first one picked is switched on, and
+   versions that replace the same things can't be on together.
+3. Already installed → the button opens the mod's settings (or "Add versions" for a mod with
+   several), with Update / Reinstall / Uninstall there.
 
-## Library (downloaded mods)
+## Mods Library (installed mods)
 
-```
-[ Enabled 12 | Disabled 4 | Conflicts 1 | Updates 2 | Unmanaged 3 ]   Group by: Character ▾
-┌──────┬───────────────────────────┬──────────┬────────┬──────────┬───────┐
-│ [on] │ ▣ Ellen - Maid Outfit      │ Ellen    │ v1.2   │ 142 MB   │  ⋯    │
-│ [off]│ ▣ Miyabi - Casual          │ Miyabi   │ v2.0   │  88 MB   │  ⋯    │
-│ [on]⚠│ ▣ Ellen - Swimsuit         │ Ellen    │ v1.0   │ 120 MB   │  ⋯    │
-└──────┴───────────────────────────┴──────────┴────────┴──────────┴───────┘
-```
+Layout: [08](08-design-system.md#mods-library). Contents and actions:
 
-- List view (default) and grid view, using the same banner as the catalogue.
-- Toggle = enable/disable (the `DISABLED` rename). The ⋯ menu has: open mod page, open folder in
-  Explorer, reinstall, change variant, uninstall (Recycle Bin).
-- **Unmanaged** tab: folders in `Mods/` that GMM didn't install. Actions: adopt (search GB for a
-  match), open folder. No delete without confirmation.
-- A reminder banner while the game isn't `Ready`: "These mods are installed but XXMI isn't set up
+- Every installed mod for the selected game (or all games): GMM's mods and hand-installed
+  ones ("Added by hand"), each with an on/off switch (the `DISABLED` rename).
+- Bulk: Enable all, Disable all, and Select mode for enabling or disabling a chosen set.
+- **Mod settings** (the settings button on each card, [08](08-design-system.md#mod-settings)):
+  on/off, versions (switch which one is on, install more from the cached archive, remove
+  one), details (version, file, size, folder), actions (open folder, view on GameBanana,
+  check for updates, reinstall), per-mod options as they arrive (key bindings, Phase 6),
+  uninstall (Recycle Bin; hand-installed mods only after the itemized confirmation, R8).
+  Adopt a hand-installed mod (match it on GameBanana) comes in Phase 6.
+- The search and filter row stays at the top while the grid scrolls (also in the store).
+- A reminder while the game isn't `Ready`: "These mods are installed but XXMI isn't set up
   for this game yet."
 
 ## Conflict dialog
@@ -164,7 +164,8 @@ a **Conflicts** filter, plus a per-mod "conflicts with" panel.
 
 ## Storage
 
-Like Steam's storage manager, but per game and per mod instead of per drive:
+No page of its own: Settings › Storage shows the cache sizes with Clear buttons and opens
+this breakdown. Like Steam's storage manager, but per game and per mod instead of per drive:
 
 ```
 Zenless Zone Zero ▾                        Drive C: 112 GB free of 1 TB
@@ -186,8 +187,9 @@ Zenless Zone Zero ▾                        Drive C: 112 GB free of 1 TB
 
 ## Settings
 
-Detected folders (games, XXMI root) with a re-scan button, plus manual overrides. Download cache
-size cap. NSFW visibility. Theme. Language (i18n-ready from the start). An About page with the
+Sections per [08](08-design-system.md#settings): Appearance, Mods Store (sensitive mods), XXMI
+Launcher, Games, Storage, About. Later: a download cache size cap, language (i18n-ready from
+the start). An About page with the
 third-party notices and the "not affiliated" disclaimer.
 
 ## Frontend quality bar

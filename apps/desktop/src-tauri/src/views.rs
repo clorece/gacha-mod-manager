@@ -9,7 +9,8 @@ use std::path::PathBuf;
 
 use gmm_catalog::{Category, Image, ImageVariant, Member, ModProfile, ModSummary, Page};
 use gmm_core::{
-    CacheStorage, Conflict, DiskState, GameStorage, ImageCache, InstallReport, UnmanagedMod,
+    CacheStorage, Conflict, DiskState, FetchEvent, GameStorage, ImageCache, InstallEvent,
+    InstallReport, UnmanagedMod, VariantChoice,
 };
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -105,6 +106,16 @@ pub enum VariantPick {
     All,
 }
 
+impl From<VariantPick> for VariantChoice {
+    fn from(pick: VariantPick) -> Self {
+        match pick {
+            VariantPick::Only => Self::Only,
+            VariantPick::Named { names } => Self::Named(names),
+            VariantPick::All => Self::All,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, TS)]
 pub struct InstallArgs {
     pub mod_id: u64,
@@ -126,6 +137,21 @@ pub enum InstallProgress {
     Progress { downloaded: u64, total: Option<u64> },
     Extracting,
     Installing { folder: String },
+}
+
+impl From<InstallEvent> for InstallProgress {
+    fn from(event: InstallEvent) -> Self {
+        match event {
+            InstallEvent::Fetch(FetchEvent::UsingCache) => Self::UsingCache,
+            InstallEvent::Fetch(FetchEvent::Downloading { size }) => Self::Downloading { size },
+            InstallEvent::Fetch(FetchEvent::Progress(p)) => Self::Progress {
+                downloaded: p.downloaded,
+                total: p.total,
+            },
+            InstallEvent::Extracting => Self::Extracting,
+            InstallEvent::Installing { folder } => Self::Installing { folder },
+        }
+    }
 }
 
 #[derive(Debug, Serialize, TS)]
