@@ -68,8 +68,9 @@ desktop.ini
 $RECYCLE.BIN/
 *.lnk
 
-# Claude Code: personal settings and notes (launch.json is shared)
-.claude/settings.local.json
+# AI assistant settings and notes stay local
+.claude/
+CLAUDE.md
 CLAUDE.local.md
 
 # Internal research notes (keep out of the public repo)

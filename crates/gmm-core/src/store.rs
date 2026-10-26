@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The Mods Store's featured gallery (docs/08, "Mods Store" and "What the data allows").
+//! The Mods Store's featured gallery.
 //!
 //! Featured mods are the game's top submissions (GameBanana's `TopSubs`: the top few per
 //! period) in GameBanana's order, minus sensitive ones unless the user opted in. Most top

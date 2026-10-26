@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The app update check (docs/05, Phase 7; security rule R2): GMM reads its own releases list
+//! The app update check (security rule R2): GMM reads its own releases list
 //! on GitHub and says whether a newer version exists. It never downloads or runs anything:
 //! the user gets the release page in their browser (after a confirmation) and installs the
 //! new MSI themselves. Pre-releases count while GMM itself is a pre-release (the betas), so
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::CoreError;
 
-/// This build's version (`0.1.0-beta`): the workspace version every crate shares.
+/// This build's version (`0.0.1-beta`): the workspace version every crate shares.
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Where releases are listed for people (the page the update notice opens).
@@ -59,7 +59,10 @@ struct RawRelease {
 }
 
 /// Asks GitHub for GMM's releases and returns the newest one newer than `current`, if any.
-pub async fn check_app_update(net: &Client, current: &str) -> Result<Option<AppRelease>, CoreError> {
+pub async fn check_app_update(
+    net: &Client,
+    current: &str,
+) -> Result<Option<AppRelease>, CoreError> {
     let url = Url::parse(&format!(
         "https://{GITHUB_RELEASES_HOST}{GITHUB_RELEASES_PATH}?per_page={PER_PAGE}"
     ))
@@ -132,7 +135,10 @@ mod tests {
 
         let stable = list(&[("v0.1.0", false, false), ("v0.1.1-beta", false, true)]);
         assert_eq!(
-            newest_release(&stable, "0.1.0-beta").unwrap().unwrap().version,
+            newest_release(&stable, "0.1.0-beta")
+                .unwrap()
+                .unwrap()
+                .version,
             "0.1.1-beta"
         );
     }

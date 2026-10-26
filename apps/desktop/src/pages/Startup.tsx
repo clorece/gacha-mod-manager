@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The startup check (docs/08, "Startup check"): a full-window screen while GMM pulls the
+// The startup check: a full-window screen while GMM pulls the
 // newest catalogue pages and checks the installed mods for updates (`startup_check`). The
 // app works offline, so a failing step is shown and the app opens anyway; Skip for now
 // opens it at once while the check finishes in the background. When a newer GMM is on GitHub

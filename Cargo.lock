@@ -1507,7 +1507,7 @@ checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
 
 [[package]]
 name = "gmm-adapters"
-version = "0.1.0-beta"
+version = "0.0.1-beta"
 dependencies = [
  "gmm-fsguard",
  "serde",
@@ -1517,7 +1517,7 @@ dependencies = [
 
 [[package]]
 name = "gmm-archive"
-version = "0.1.0-beta"
+version = "0.0.1-beta"
 dependencies = [
  "gmm-fsguard",
  "proptest",
@@ -1530,7 +1530,7 @@ dependencies = [
 
 [[package]]
 name = "gmm-catalog"
-version = "0.1.0-beta"
+version = "0.0.1-beta"
 dependencies = [
  "gmm-net",
  "serde",
@@ -1544,7 +1544,7 @@ dependencies = [
 
 [[package]]
 name = "gmm-cli"
-version = "0.1.0-beta"
+version = "0.0.1-beta"
 dependencies = [
  "clap",
  "gmm-adapters",
@@ -1563,7 +1563,7 @@ dependencies = [
 
 [[package]]
 name = "gmm-core"
-version = "0.1.0-beta"
+version = "0.0.1-beta"
 dependencies = [
  "dirs",
  "gmm-adapters",
@@ -1590,7 +1590,7 @@ dependencies = [
 
 [[package]]
 name = "gmm-db"
-version = "0.1.0-beta"
+version = "0.0.1-beta"
 dependencies = [
  "gmm-catalog",
  "gmm-fsguard",
@@ -1602,7 +1602,7 @@ dependencies = [
 
 [[package]]
 name = "gmm-desktop"
-version = "0.1.0-beta"
+version = "0.0.1-beta"
 dependencies = [
  "gmm-adapters",
  "gmm-catalog",
@@ -1625,7 +1625,7 @@ dependencies = [
 
 [[package]]
 name = "gmm-detect"
-version = "0.1.0-beta"
+version = "0.0.1-beta"
 dependencies = [
  "dirs",
  "gmm-adapters",
@@ -1640,7 +1640,7 @@ dependencies = [
 
 [[package]]
 name = "gmm-extract"
-version = "0.1.0-beta"
+version = "0.0.1-beta"
 dependencies = [
  "cc",
  "gmm-archive",
@@ -1652,7 +1652,7 @@ dependencies = [
 
 [[package]]
 name = "gmm-fsguard"
-version = "0.1.0-beta"
+version = "0.0.1-beta"
 dependencies = [
  "fs4",
  "proptest",
@@ -1662,7 +1662,7 @@ dependencies = [
 
 [[package]]
 name = "gmm-migoto"
-version = "0.1.0-beta"
+version = "0.0.1-beta"
 dependencies = [
  "proptest",
  "serde",
@@ -1670,7 +1670,7 @@ dependencies = [
 
 [[package]]
 name = "gmm-net"
-version = "0.1.0-beta"
+version = "0.0.1-beta"
 dependencies = [
  "gmm-fsguard",
  "gmm-net",
@@ -1688,7 +1688,7 @@ dependencies = [
 
 [[package]]
 name = "gmm-xxmi"
-version = "0.1.0-beta"
+version = "0.0.1-beta"
 dependencies = [
  "gmm-adapters",
  "gmm-detect",

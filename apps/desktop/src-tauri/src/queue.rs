@@ -234,7 +234,7 @@ async fn install(state: &AppState, job: &NextJob) -> Result<Outcome, CoreError> 
         .await?;
         if !options.start_disabled {
             // Every picked version stays on unless it replaces the same things as one that
-            // is on (docs/08, "Install confirmation").
+            // is on.
             let ids: Vec<i64> = report.installed.iter().map(|f| f.id).collect();
             if ids.len() > 1 {
                 gmm_core::settle_versions(&state.db, &target.ws, target.mods, game, &ids).await?;

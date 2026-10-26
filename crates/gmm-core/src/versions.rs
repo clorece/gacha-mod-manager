@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Versions as one mod (docs/08, "Mod settings"): the folders GMM installed from the same
+//! Versions as one mod: the folders GMM installed from the same
 //! GameBanana file are versions of one mod. Any number of them can be on together (a mod
 //! split into pieces, say); switching one on switches off only the others that replace the
 //! same things.

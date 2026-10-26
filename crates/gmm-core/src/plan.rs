@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The background check before a queued install goes ahead (docs/08, "Downloads"), built
+//! The background check before a queued install goes ahead, built
 //! from a [`Prepared`] mod: every version in the archive with its blocked files and warnings,
 //! which versions are already installed ("Add versions"), which ones replace the same things,
 //! and what the user has to look at first ([`review`]). The local install shows the same

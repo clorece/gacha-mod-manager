@@ -5,7 +5,7 @@
 //! It holds what GMM can't recompute from disk: the mods it installed, the archives it keeps
 //! in its download cache, the user's settings (manual game folders, the XXMI folder and exe
 //! they confirmed), and cached GameBanana responses. Setup states are never stored; they are
-//! worked out fresh each time (docs/02-architecture.md, "Data model").
+//! worked out fresh each time (docs/architecture.md, "Data model").
 //!
 //! The schema lives in `migrations/` and is applied on open. The database file is located
 //! through [`gmm_fsguard`] and must sit in a read-write root; SQLite then opens it (and its

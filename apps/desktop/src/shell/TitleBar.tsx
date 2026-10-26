@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The window's title bar (docs/08, "Navigation"). The window has no system frame, so this
+// The window's title bar. The window has no system frame, so this
 // strip continues the sidebar and the page up to the top edge in the theme's colours, with
 // no title, and draws the caption buttons. A press on the strip moves the window; a double
 // click maximizes or restores it. Everything goes through GMM's own window commands

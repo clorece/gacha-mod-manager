@@ -3,7 +3,7 @@
 //! GMM's features, built from the lower crates. The CLI and the app's commands are thin
 //! layers over this crate.
 //!
-//! Installing a mod (docs/02-architecture.md, "Install flow"):
+//! Installing a mod (docs/architecture.md, "Install flow"):
 //!
 //! 1. [`fetch_archive`]: pick a file GameBanana scanned as clean, download it into the cache
 //!    (or reuse the cached copy), record it in the database.
@@ -21,8 +21,8 @@
 //! list.
 
 mod adopt;
-mod app_update;
 mod analyze;
+mod app_update;
 mod conflicts;
 mod errlog;
 mod error;
@@ -49,10 +49,10 @@ mod versions;
 mod workspace;
 
 pub use adopt::{AdoptCandidate, Adopted, MatchReason, adopt, adopt_candidates};
+pub use analyze::{Analysis, Variant, VersionConflict, analyze};
 pub use app_update::{
     APP_VERSION, AppRelease, RELEASES_PAGE, check_app_update, newest_release, release_page,
 };
-pub use analyze::{Analysis, Variant, VersionConflict, analyze};
 pub use conflicts::{
     Conflict, ConflictReport, ModRef, conflicts, conflicts_after_install, conflicts_for,
     conflicts_for_unmanaged,

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The IPC fuzz harness (docs/04-security.md, R5): hostile arguments to every command, sent
+//! The IPC fuzz harness (docs/security.md, R5): hostile arguments to every command, sent
 //! through Tauri's real IPC path (the mock runtime, the app's own context and capability) to
 //! the real command list, against a fake XXMI setup in a temporary folder.
 //!

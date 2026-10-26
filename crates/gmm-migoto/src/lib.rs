@@ -2,7 +2,7 @@
 
 //! A tolerant reader for 3DMigoto mod `.ini` files, as XXMI's importers load them.
 //!
-//! GMM only needs a few facts from a mod's ini files (docs/02-architecture.md, "Conflict
+//! GMM only needs a few facts from a mod's ini files (docs/architecture.md, "Conflict
 //! detection"):
 //!
 //! - which resources it overrides: `[TextureOverride*]` / `[ShaderOverride*]` sections with

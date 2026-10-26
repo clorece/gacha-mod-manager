@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Buttons: text buttons in five styles and round icon buttons (docs/08, "Tokens"). Every
+// Buttons: text buttons in five styles and round icon buttons. Every
 // style sets its own colors; the base `:where(button)` rule only sets the font.
 
 import type { ButtonHTMLAttributes } from "react";

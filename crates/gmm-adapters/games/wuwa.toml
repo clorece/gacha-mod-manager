@@ -1,5 +1,5 @@
-# Wuthering Waves. Facts and their sources: docs/03-game-adapters.md.
-# Compiled into GMM; never loaded from disk at runtime (docs/04-security.md, R7).
+# Wuthering Waves. Facts and their sources: docs/game-adapters.md.
+# Compiled into GMM; never loaded from disk at runtime (docs/security.md, R7).
 
 [game]
 id = "wuwa"

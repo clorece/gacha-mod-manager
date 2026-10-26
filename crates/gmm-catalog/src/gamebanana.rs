@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! GameBanana `apiv11` client. Endpoints and fields were confirmed against the live API on
-//! 2026-10-22 (docs/02-architecture.md, "Catalog flow").
+//! 2026-10-22 (docs/architecture.md, "Catalog flow").
 //!
 //! GameBanana's JSON is loosely typed: numbers sometimes arrive as strings, and an empty
 //! object is often serialized as `[]`. The raw types below therefore deserialize every field

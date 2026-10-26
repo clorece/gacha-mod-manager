@@ -6,7 +6,7 @@
 //! never write) and sends every entry and its data to stdout as frames
 //! ([`gmm_archive::rar_protocol`]). It creates no files, and GMM checks everything it says.
 //!
-//! Reviewed `unsafe` (docs/04-security.md, R7): calls into the vendored UnRAR (`ffi`), the
+//! Reviewed `unsafe` (docs/security.md, R7): calls into the vendored UnRAR (`ffi`), the
 //! data callback, and the Win32 / libc calls in `lockdown` and `stdin_path`.
 #![allow(unsafe_code)]
 

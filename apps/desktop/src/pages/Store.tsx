@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Mods Store (docs/08, "Mods Store"; docs/07): the featured gallery, a sticky toolbar
+// Mods Store: the featured gallery, a sticky toolbar
 // (search, Category, Characters, Sort, Hide installed, Show sensitive) and a virtualized grid
 // of GameBanana mods that pages on as it scrolls. Download counts aren't in listings, so
 // they fill in for the cards on screen (`catalog_stats`). A click on a card opens GMM's mod

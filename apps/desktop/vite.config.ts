@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import pkg from "./package.json" with { type: "json" };
 
-// The webview only ever loads these bundled files (docs/04-security.md, CSP); the font is
+// The webview only ever loads these bundled files (docs/security.md, CSP); the font is
 // bundled too (@fontsource-variable/nunito).
 export default defineConfig({
   plugins: [react(), tailwindcss()],

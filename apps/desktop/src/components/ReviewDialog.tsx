@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The review of an install that needs action (docs/08, "Downloads"). The background check
+// The review of an install that needs action. The background check
 // stopped it and says why: the file holds several versions to choose from, it has files GMM
 // never installs, odd files worth a look, or it's an outdated file. The user goes ahead
 // (`queue_proceed`, with the versions they picked) or cancels the download.

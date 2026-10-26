@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The app shell (docs/08, "Navigation"): the title bar on every screen, then the startup
+// The app shell: the title bar on every screen, then the startup
 // check first, the preferences screen on the first run, then the sidebar and the current
 // page, the install queue, the install confirmation and the local install (a file dropped
 // on the window). The mod page opens over the page it came from, which stays mounted

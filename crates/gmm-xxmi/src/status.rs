@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The per-game setup state machine (docs/03-game-adapters.md, "Per-importer state"). Checks
+//! The per-game setup state machine (docs/game-adapters.md, "Per-importer state"). Checks
 //! run in order and the first failing one decides the state, so the user always gets the one
 //! next step that matters. Wording of the steps is GMM's own; quoted names are XXMI's labels.
 

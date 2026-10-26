@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The setup guide (docs/07, "Setup & onboarding"): four steps in XXMI Launcher, text only,
+// The setup guide: four steps in XXMI Launcher, text only,
 // opened from a game's setup card. It starts at the step the game's setup state points to,
 // and "Check again" re-runs detection and moves on when a step got done. Quoted names are
 // XXMI's own labels. XXMI itself asks for the game settings mods need (for example HD

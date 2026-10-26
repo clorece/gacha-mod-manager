@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT OR Apache-2.0 */
-/* GMM's visual system, ported from the signed-off design canvas (docs/08-design-system.md).
+/* GMM's visual system, ported from the signed-off design canvas.
    Tokens live on <html> as .t-dark / .t-light; every rule below reads them. The order is:
    font, tokens, base, primitives (src/ui), shell, pages. */
 

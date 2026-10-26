@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The window frame (docs/08, "Navigation"). The main window has no system title bar: the
+//! The window frame. The main window has no system title bar: the
 //! webview draws its own in the theme's colours, and its caption buttons and drag area call
 //! these. Each acts only on the window that called it and takes no arguments, so the
 //! capability still grants GMM's own commands and nothing from Tauri's window plugin.

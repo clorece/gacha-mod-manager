@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The startup check's GameBanana steps (docs/08, "Startup check"): pull the newest
+//! The startup check's GameBanana steps: pull the newest
 //! catalogue page per game so the store opens fresh, and compare each GMM-installed mod with
 //! its GameBanana page to find updates (a newer clean file than the one installed).
 

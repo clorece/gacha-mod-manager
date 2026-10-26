@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Downloads (docs/08, "Downloads"): the install queue, grouped by game, newest first. Each
+// Downloads: the install queue, grouped by game, newest first. Each
 // row downloads, checks and installs in the background and shows where it is. When the check
 // finds something the row waits as "Needs action" until the user reviews it (ReviewDialog):
 // install anyway, with the versions they pick, or cancel. Installed rows clear themselves

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The contrast and overlap audit (docs/05-roadmap.md, Phase 5 tests; first run by hand on the
-// design canvas in Phase 4). It serves the frontend with Vite, opens it in Chromium through
-// Playwright with GMM's commands answered by the fake bridge (src/test/fakeBridge.ts, the same
-// fixtures as the Vitest tests), walks the app's screens in both themes and checks:
+// The contrast and overlap audit. It serves the frontend with Vite, opens it in Chromium
+// through Playwright with GMM's commands answered by the fake bridge (src/test/fakeBridge.ts,
+// the same fixtures as the Vitest tests), walks the app's screens in both themes and checks:
 //
 // - contrast: every piece of text against the background it sits on, composited through
 //   semi-transparent layers: 4.5:1, or 3:1 for large text (WCAG 2.2 AA). Text on artwork

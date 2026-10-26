@@ -17,7 +17,7 @@ static UNIQUE: AtomicU64 = AtomicU64::new(0);
 /// interrupted run and get removed.
 pub(crate) const STALE_TEMP: Duration = Duration::from_secs(60 * 60);
 
-/// GMM's own folders (docs/02-architecture.md, "App directories").
+/// GMM's own folders (docs/architecture.md, "App directories").
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppDirs {
     /// Config and database: `%APPDATA%\GMM`.

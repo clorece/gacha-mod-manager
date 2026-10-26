@@ -3,11 +3,11 @@
 //! The mod catalogue.
 //!
 //! [`CatalogSource`] is what the rest of GMM talks to; [`GameBanana`] implements it over the
-//! public `apiv11` (see "Catalog flow" in `docs/02-architecture.md`). The model types here are
+//! public `apiv11` (see "Catalog flow" in `docs/architecture.md`). The model types here are
 //! GMM's own, so the UI never depends on GameBanana's field names.
 //!
 //! Text fields that hold HTML (`description_html`, `license_html`, update text) come straight
-//! from GameBanana and must be sanitized before display (docs/04-security.md, T3).
+//! from GameBanana and must be sanitized before display (docs/security.md, T3).
 
 mod cache;
 mod error;

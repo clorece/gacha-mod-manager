@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! GMM's catalogue model. Timestamps are Unix seconds. Field meanings are mapped from
-//! GameBanana in `gamebanana.rs`; see also the field table in docs/07-frontend-design.md.
+//! GameBanana in `gamebanana.rs`.
 
 use serde::{Deserialize, Serialize};
 
@@ -270,7 +270,7 @@ pub struct ModFile {
 }
 
 impl ModFile {
-    /// Only files GameBanana scanned as clean may be installed (docs/04-security.md, T4).
+    /// Only files GameBanana scanned as clean may be installed (docs/security.md, T4).
     pub fn is_clean(&self) -> bool {
         self.av_result.as_deref() == Some("clean")
     }

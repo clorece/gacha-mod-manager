@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! GMM's local error log, for bug reports (Phase 6, Report a Bug; docs/04-security.md, R1).
+//! GMM's local error log, for bug reports (Phase 6, Report a Bug; docs/security.md, R1).
 //!
 //! Errors only, one per line, in `<data>/logs/errors.log`; past [`MAX_LOG_BYTES`] the file
 //! becomes `errors.1.log` (replacing the older one), so the log never holds more than about

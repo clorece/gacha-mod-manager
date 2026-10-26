@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! `gmm`: the command-line front end. Every backend feature lands here before it gets a
-//! screen (docs/05-roadmap.md).
+//! screen.
 
 mod config;
 mod fetch;

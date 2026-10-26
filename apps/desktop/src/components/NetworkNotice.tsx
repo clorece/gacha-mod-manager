@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The notice for when GameBanana is limiting GMM (docs/10-gamebanana-api.md): it asked GMM
+// The notice for when GameBanana is limiting GMM (docs/gamebanana-api.md): it asked GMM
 // to slow down, or answers couldn't be had and saved ones are showing. `network_status` is a
 // local question (no request to GameBanana), asked every few seconds.
 

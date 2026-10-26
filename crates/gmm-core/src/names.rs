@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Names inside `<XXMI>/<IMP>/Mods/` (docs/02-architecture.md, "Install & toggle model").
+//! Names inside `<XXMI>/<IMP>/Mods/` (docs/architecture.md, "Install & toggle model").
 
 use gmm_fsguard::RelPath;
 

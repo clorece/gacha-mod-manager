@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Adapter conformance suite (docs/03-game-adapters.md, "Adding a game"): every built-in game
+//! Adapter conformance suite (docs/game-adapters.md, "Adding a game"): every built-in game
 //! goes through detect → setup state → install → toggle → conflicts → storage → uninstall
 //! on a fake machine built from its manifest alone. Afterwards nothing outside the game's
 //! `Mods/` folder (and GMM's own folders) may have changed, and none of the secrets in

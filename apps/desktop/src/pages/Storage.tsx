@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The storage breakdown (docs/07, "Storage"), opened from Settings › Storage: per game, a bar
+// The storage breakdown, opened from Settings › Storage: per game, a bar
 // of the biggest mods (the top eight, the rest folded into "Other") with a legend, and a
 // sortable table with multi-select to switch mods off or delete them (confirmed, R8). "All
-// games" shows one bar per game: GMM's mods, mods added by hand, other files. Decided for
-// Phase 5: no "Last used" column and no drive line (docs/05-roadmap.md).
+// games" shows one bar per game: GMM's mods, mods added by hand, other files. No "Last used"
+// column and no drive line yet.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, asCmdError, type ModKey, type StorageView, type UninstallItem } from "../api";

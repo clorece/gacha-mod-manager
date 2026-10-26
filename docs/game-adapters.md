@@ -1,13 +1,13 @@
-# 03 — Game adapters, detection & XXMI setup states
+# Game adapters, detection & XXMI setup states
 
 Every supported game is loaded by an **XXMI importer**. An adapter ties together: the GameBanana
 catalogue, how to find the game on disk, which importer folder its mods go in, and how to read a
 mod archive.
 
 > **Provenance:** facts marked "XXMI source" were learned by reading XXMI Launcher (GPL-3.0).
-> Facts marked "observed" come from the dev machine (`research/phase0-observations.md`). These
-> tables restate interoperability facts in our own words. Implement from them, not from XXMI's
-> code (see [06](06-licensing-and-provenance.md)).
+> Facts marked "observed" come from the maintainer's machine (Windows 11, both games
+> installed). These tables restate interoperability facts in our own words. Implement from
+> them, not from XXMI's code (see [licensing](licensing.md)).
 
 ## Adapter contract
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Settings (docs/08, "Settings"; docs/07): Appearance and the Mods Store's sensitive-mods
+// Settings: Appearance and the Mods Store's sensitive-mods
 // switches on the stored preferences, the XXMI Launcher folder (found or chosen), each game
 // and how it was found (plus folders added by hand), Storage (the caches with Clear, and the
 // full breakdown) and About (version, license, disclaimer, credits, third-party notices).

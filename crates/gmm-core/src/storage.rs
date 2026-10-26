@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Storage accounting (docs/02-architecture.md, "Storage accounting"): how much space each
+//! Storage accounting (docs/architecture.md, "Storage accounting"): how much space each
 //! mod, each game's `Mods/` folder and GMM's cache take, and how much is left on the drive.
 //! Sizes are measured on disk each time; a managed mod's recorded size is refreshed when it
 //! changed.

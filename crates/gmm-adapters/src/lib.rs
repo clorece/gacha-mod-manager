@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Per-game rules ("adapters"), see `docs/03-game-adapters.md`.
+//! Per-game rules ("adapters"), see `docs/game-adapters.md`.
 //!
 //! Each supported game is a TOML manifest in `games/`, compiled into the binary with
 //! `include_str!` and validated when the [`Registry`] is built. Manifests are data only: they

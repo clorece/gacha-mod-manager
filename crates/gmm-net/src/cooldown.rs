@@ -2,7 +2,7 @@
 
 //! GameBanana's "slow down" signals, shared by every client of one app: the API, the
 //! background reads, images and downloads all go to GameBanana's hosts from the user's one IP
-//! address, so a limit hit by any of them pauses all of them (docs/10-gamebanana-api.md).
+//! address, so a limit hit by any of them pauses all of them (docs/gamebanana-api.md).
 //!
 //! A strike is an HTTP 429, a 503 that says when to come back (`Retry-After`), or a
 //! Cloudflare challenge (a 403 or 503 with `cf-mitigated: challenge`, the browser check GMM

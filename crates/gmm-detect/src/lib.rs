@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Finds installed games (docs/03-game-adapters.md, "Game detection").
+//! Finds installed games (docs/game-adapters.md, "Game detection").
 //!
-//! Every source only reads the exact files allowlisted in docs/04-security.md (R3), through
+//! Every source only reads the exact files allowlisted in docs/security.md (R3), through
 //! [`gmm_fsguard`] with read-only roots, and every candidate folder must pass the game's folder
 //! markers before it counts. That marker check is what makes it safe to scan loosely structured
 //! sources like HoYoPlay's data file: a path only counts if the game is really there.

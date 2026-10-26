@@ -111,7 +111,7 @@ export default function StyleGuide({
       <div className="page-head">
         <div>
           <h1>Style guide</h1>
-          <p>Tokens and primitives from docs/08, in the current theme. Dev builds only.</p>
+          <p>Tokens and primitives, in the current theme. Dev builds only.</p>
         </div>
         <Segmented
           label="Theme"

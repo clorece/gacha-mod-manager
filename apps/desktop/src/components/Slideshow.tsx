@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The mod page's slideshow (docs/07, "Mod page"), built by hand: the current preview large,
+// The mod page's slideshow, built by hand: the current preview large,
 // arrow buttons and ←/→ keys, a thumbnail strip, and a click opening a full-window lightbox
 // on a native <dialog> (focus trap, Escape). One image: no controls. None: a placeholder.
 // Every image is a `gmmimg` URL from Rust.

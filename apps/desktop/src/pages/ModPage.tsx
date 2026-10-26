@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// GMM's own mod page (docs/07, "Mod page"): a full page with Back, opened from a Store card,
+// GMM's own mod page: a full page with Back, opened from a Store card,
 // the featured gallery or the Library's mod settings. The slideshow, the header (author,
 // category and character, version, dates, counters), the license checklist, and tabs for
 // the description, the files (archived ones folded away), the update notes and the credits.

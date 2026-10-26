@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! "Launch with XXMI" (docs/02-architecture.md, "Launch flow"; security rule R7).
+//! "Launch with XXMI" (docs/architecture.md, "Launch flow"; security rule R7).
 //!
 //! XXMI's launcher exe isn't code-signed (observed), so before GMM runs it for the first time
 //! the user confirms the exact path, and GMM remembers it. If the path later changes (XXMI

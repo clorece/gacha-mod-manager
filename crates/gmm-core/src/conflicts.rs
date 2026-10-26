@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Conflict detection (docs/02-architecture.md, "Conflict detection").
+//! Conflict detection (docs/architecture.md, "Conflict detection").
 //!
 //! Two enabled mods **conflict** when both replace the same resource: an override section
 //! with the same `hash` (and the same `match_first_index`, when both set one) that replaces

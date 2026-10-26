@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! Preview images for the app: the `gmmimg://` protocol serves them from here
-//! (docs/04-security.md, R2 and R5).
+//! (docs/security.md, R2 and R5).
 //!
 //! The webview never touches the network and never names a URL. When the app hands catalogue
 //! data to the webview, it [`register`](ImageCache::register)s each GameBanana image URL and

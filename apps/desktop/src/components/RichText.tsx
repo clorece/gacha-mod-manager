@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// GameBanana HTML (mod descriptions, licenses, update notes) shown safely (docs/04-security.md,
+// GameBanana HTML (mod descriptions, licenses, update notes) shown safely (docs/security.md,
 // T3). Rust already replaced every address: images are `gmmimg` URLs, links are
 // `#gmm-link:<key>` (src-tauri/src/html.rs). Here DOMPurify sanitizes with a strict
 // allowlist (no styles, forms, frames, scripts or event handlers), anything that still names

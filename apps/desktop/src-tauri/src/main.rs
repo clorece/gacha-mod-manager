@@ -70,7 +70,7 @@ impl AppState {
     async fn open_with(dirs: AppDirs, net: NetConfig) -> Result<Self, Box<dyn std::error::Error>> {
         let db = open_db(&dirs).await?;
         // Every client shares one connection pool and one "slow down" state: they all reach
-        // GameBanana from the same IP address (docs/10-gamebanana-api.md).
+        // GameBanana from the same IP address (docs/gamebanana-api.md).
         // The app update check reads GMM's releases list on GitHub through a client of its own:
         // its own allowlist (that list only), connections and slow-down state, so GitHub can
         // never hold up GameBanana traffic (R2).

@@ -1,7 +1,7 @@
 name: Release
 
-# Builds the Windows installer (MSI) when a version tag is pushed (`v0.1.0-beta`), and as a
-# dry run from the Actions tab. Docs: docs/05-roadmap.md, Phase 7.
+# Builds the Windows installer (MSI) when a version tag is pushed (`v0.0.1-beta`), and as a
+# dry run from the Actions tab.
 #
 # Signing switches on once the repository variable SIGNPATH_ORGANIZATION_ID and the secret
 # SIGNPATH_API_TOKEN exist (SignPath Foundation's free open-source signing): the programs

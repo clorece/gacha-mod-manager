@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The startup check (docs/08, "Startup check"): the GMM app step (whether a newer GMM is on
+//! The startup check: the GMM app step (whether a newer GMM is on
 //! GitHub, `app_update.rs`), the newest catalogue page per game, and an update check of every
 //! GMM-installed mod. Each step is reported on the channel as it starts and ends; a failing
 //! step (offline, say) doesn't stop the others, and the app works on with cached data.

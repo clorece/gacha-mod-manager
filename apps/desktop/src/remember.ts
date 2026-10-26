@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // Page state that outlives the page. Pages unmount when the user goes elsewhere; the Mods
 // Store keeps its search, filters and loaded results here, so coming back finds it as it
-// was (docs/08, "Mods Store"). Kept in memory only, for as long as the window is open.
+// was. Kept in memory only, for as long as the window is open.
 
 import { type Dispatch, type SetStateAction, useCallback, useState } from "react";
 

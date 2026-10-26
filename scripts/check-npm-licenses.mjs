@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // Fails when an npm package in the desktop app's dependency tree has a license outside the
-// policy in deny.toml (docs/06-licensing-and-provenance.md). Run from apps/desktop:
+// policy in deny.toml (docs/licensing.md). Run from apps/desktop:
 // `pnpm run check-licenses`.
 
 import { execFileSync } from "node:child_process";
@@ -25,7 +25,7 @@ const ALLOWED = new Set([
 // Per-package exceptions, as [name, license], each with a reason.
 const EXCEPTIONS = new Map([
   // Font files only (no code): the UI font, Nunito. OFL-1.1 allows bundling it with software;
-  // it can't be sold on its own. Listed in THIRD-PARTY-NOTICES.md (docs/06).
+  // it can't be sold on its own. Listed in THIRD-PARTY-NOTICES.md (docs/licensing.md).
   ["@fontsource-variable/nunito", "OFL-1.1"],
 ]);
 

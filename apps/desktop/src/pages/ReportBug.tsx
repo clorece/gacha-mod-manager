@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Report a Bug (Phase 6, docs/07 "Report a Bug"): the user writes what went wrong, sees
+// Report a Bug: the user writes what went wrong, sees
 // exactly what the GitHub issue will say (Rust writes it: their text, versions and setup
 // states, never a path), and opens it in the browser after a native confirmation. GMM sends
 // nothing itself. Below, the local error log (errors only, home folder shown as ~), to read

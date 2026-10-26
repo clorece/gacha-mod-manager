@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// GMM's version as people read it ("0.1.0 beta"; the build's version is 0.1.0-beta) and the
+// GMM's version as people read it ("0.0.1 beta"; the build's version is 0.0.1-beta) and the
 // update notice's action. GMM never installs updates itself: it opens the release page on
 // GitHub (after a native confirmation), where the new installer is.
 
 import { api, asCmdError } from "./api";
 
-/** "0.1.0-beta" → "0.1.0 beta". */
+/** "0.0.1-beta" → "0.0.1 beta". */
 export function versionLabel(version: string): string {
   return version.replace("-", " ");
 }

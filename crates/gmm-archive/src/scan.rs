@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Policy scan of an extracted mod (see "Policy scan" in `docs/04-security.md`).
+//! Policy scan of an extracted mod (see "Policy scan" in `docs/security.md`).
 //!
 //! The scan never deletes or runs anything. It reports; the install pipeline decides.
 

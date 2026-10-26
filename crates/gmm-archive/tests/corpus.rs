@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Malicious archive corpus (docs/04-security.md, Phase 1 harness). Every case must be
+//! Malicious archive corpus (docs/security.md, Phase 1 harness). Every case must be
 //! rejected with the expected error, leave no destination behind, and write nothing outside
 //! the root (checked inside `Env::extract`).
 

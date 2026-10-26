@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! RAR through the real helper: benign archives extract exactly, and the malicious corpus
-//! (docs/04-security.md, archive hardening) is rejected with nothing left behind and nothing
+//! (docs/security.md, archive hardening) is rejected with nothing left behind and nothing
 //! written outside the root (checked in `Env::extract`).
 
 #![allow(clippy::disallowed_methods, clippy::unwrap_used)]

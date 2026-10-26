@@ -6,7 +6,7 @@
 //! registered roots (app folders, XXMI `Mods/` folders, game folders) and whether each one is
 //! read-only or read-write. A [`ScopedPath`] can only be built from a registered root plus a
 //! validated relative path ([`RelPath`]), so code elsewhere in GMM cannot name an arbitrary
-//! location on disk. See security rules R3/R4 in `docs/04-security.md`.
+//! location on disk. See security rules R3/R4 in `docs/security.md`.
 
 // This crate is the one place allowed to call `std::fs` directly (see clippy.toml).
 #![allow(clippy::disallowed_methods)]

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The fixed left sidebar (docs/08, "Navigation"): brand, General, Mods (with Select Game),
+// The fixed left sidebar: brand, General, Mods (with Select Game),
 // Development, and the theme switch with the version at the bottom.
 
 import type { ReactNode } from "react";

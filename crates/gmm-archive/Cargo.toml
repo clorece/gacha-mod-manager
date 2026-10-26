@@ -16,7 +16,7 @@ sevenz-rust2 = { workspace = true, features = ["deflate", "ppmd"] }
 thiserror.workspace = true
 zip.workspace = true
 
-# The RAR helper's job object (helper.rs, docs/04-security.md R7).
+# The RAR helper's job object (helper.rs, docs/security.md R7).
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
   "Win32_Foundation",

@@ -1,4 +1,4 @@
-# 06 — Licensing & provenance
+# Licensing & provenance
 
 Goal: ship GMM as an original work under a license **we** choose, with a record that shows it was
 written from scratch. Not legal advice. If the project grows or takes money, get a short review
@@ -27,12 +27,12 @@ from a lawyer familiar with open-source licensing.
 ## Clean-room rules for development
 
 1. **No GPL source open while writing GMM code.** Don't read DMM or XXMI source while
-   implementing the matching GMM component. Don't paste it into prompts for Claude either.
-   Research ended with these design docs. From now on, implement from **our** specs
-   ([02](02-architecture.md), [03](03-game-adapters.md)), which record facts in our own words.
+   implementing the matching GMM component. Don't paste it into AI tools either.
+   Implement from **our** docs
+   ([architecture](architecture.md), [game adapters](game-adapters.md)), which record facts in our own words.
 2. **Need more facts? Get them from behaviour, not code.** Observe the game and the XXMI launcher
    from outside: diff files before and after a launch, inspect the SQLite DB, read the INI
-   files. Write the findings into `03-game-adapters.md` first, then implement from that.
+   files. Write the findings into `game-adapters.md` first, then implement from that.
 3. **Game settings stay with XXMI.** GMM doesn't patch game files (such as ZZZ's
    `GENERAL_DATA.bin`, whose encoding we only know from XXMI's code). That removes the highest
    clean-room risk entirely.
@@ -78,16 +78,20 @@ Our dependencies must fit this license. `cargo-deny` and an npm license checker
 (`scripts/check-npm-licenses.mjs`, `pnpm run check-licenses` in `apps/desktop`, in CI) enforce
 an allowlist (MIT, Apache-2.0, BSD-2/3-Clause, ISC, Zlib, MPL-2.0, Unicode-3.0, CC0-1.0; the npm
 check also allows 0BSD, BlueOak-1.0.0 and MIT-0, common permissive npm licenses; MIT-0, MIT
-without the attribution clause, arrived with jsdom in the Phase 5 tests). Any GPL,
+without the attribution clause, arrives with jsdom in the tests). Any GPL,
 LGPL or AGPL dependency fails the build. Watch out for:
-- **UnRAR** (vendored in `crates/gmm-extract`, Phase 5): RARLAB's freeware *UnRAR license*
+- **UnRAR** (vendored in `crates/gmm-extract`): RARLAB's freeware *UnRAR license*
   lets any software use the source to handle RAR archives, free of charge, but bans using it
   to build a RAR-compatible archiver or re-create the RAR compression algorithm. GMM only
   extracts. It isn't OSI-approved, so it's handled as GMM's one non-OSI component: the
   helper crate's license field says `(MIT OR Apache-2.0) AND LicenseRef-UnRAR`, `deny.toml`
   has a per-crate exception for it, the full license text is in `THIRD-PARTY-NOTICES.md`,
   and the code lives only in the separate `gmm-extract` executable, not in GMM's main
-  binaries. Source and version: `crates/gmm-extract/vendor/README.md`.
+  binaries. Source and version: `crates/gmm-extract/vendor/README.md`. Why UnRAR and not
+  libarchive (BSD-2-Clause, tried first, 2026-10-24): libarchive 3.8.10 failed one of five
+  real RAR mods from GameBanana with "Block checksum error" (the download's MD5 matched);
+  UnRAR 7.23 extracted all five. The `unrar` crates on crates.io weren't used: they carry an
+  older UnRAR and declare its code as MIT / Apache-2.0.
 - **GPL crates or npm packages:** blocked by the allowlist. Find a permissive alternative.
 - **MPL-2.0 dependencies** are allowed: they stay MPL, and we must not modify their files without
   publishing those changes.
@@ -105,10 +109,9 @@ LGPL or AGPL dependency fails the build. Watch out for:
   lockdown), `sqlx` 0.9 (MIT OR Apache-2.0; SQLite only, no macros), which pulls
   in `libsqlite3-sys` (MIT) with SQLite's own C source **bundled**. SQLite itself is in the
   public domain; list it in `THIRD-PARTY-NOTICES` anyway. Building it needs a C compiler
-  (the MSVC Build Tools the Rust Windows toolchain already uses). (`trash` was removed on
-  2026-10-25: deletes are permanent now, R8.) `fs4` 1
+  (the MSVC Build Tools the Rust Windows toolchain already uses). `fs4` 1
   (MIT OR Apache-2.0; free disk space only, `sync` feature). Dev-only: `proptest`, `tempfile`, `wiremock`.
-- **Desktop app** (Phase 3, all pass `cargo deny`): `tauri` 2.12 (Apache-2.0 OR MIT; default
+- **Desktop app** (all pass `cargo deny`): `tauri` 2.12 (Apache-2.0 OR MIT; default
   features minus `dynamic-acl` and `dbus`), `tauri-build` 2.7, `tauri-plugin-dialog` 2.8
   (Apache-2.0 OR MIT; Rust-side folder pickers only), `ts-rs` 12 (MIT; behind each crate's `ts`
   feature, generates the TypeScript types). On Linux Tauri brings gtk-rs 0.18; its build-time
@@ -116,17 +119,17 @@ LGPL or AGPL dependency fails the build. Watch out for:
   ignored in `deny.toml` with that reason. The desktop crate also uses `sha2` and `hex`
   (workspace dependencies already listed) for description link keys. npm (117 packages with the test tools):
   `react`, `react-dom`, `@tauri-apps/api`, `@tanstack/react-virtual` 3.14.22 (MIT, with
-  `@tanstack/virtual-core`; the Mods Store's virtualized grid, Phase 5), `dompurify` 3.4.17 (MPL-2.0 OR Apache-2.0,
-  taken as Apache-2.0; sanitizes GameBanana HTML, Phase 5) (runtime); `@fontsource-variable/nunito` 5.3 (the UI font, OFL-1.1, font
+  `@tanstack/virtual-core`; the Mods Store's virtualized grid), `dompurify` 3.4.17 (MPL-2.0 OR Apache-2.0,
+  taken as Apache-2.0; sanitizes GameBanana HTML) (runtime); `@fontsource-variable/nunito` 5.3 (the UI font, OFL-1.1, font
   files only: the one exception in `scripts/check-npm-licenses.mjs`, see below); `vite`, `@vitejs/plugin-react`, `tailwindcss`,
   `@tailwindcss/vite`, `typescript`, `@biomejs/biome`, `@tauri-apps/cli`, `@types/react*`
   (build/dev only); `vitest` 5.0.5, `jsdom` 30.1.3, `@testing-library/react` 16.3.3 and
-  `@testing-library/dom` 10.4.2 (MIT) and `playwright` 1.64.1 (Apache-2.0) for the Phase 5
+  `@testing-library/dom` 10.4.2 (MIT) and `playwright` 1.64.1 (Apache-2.0) for the
   tests and the contrast audit (test only, never bundled). Every npm package must be older than pnpm's minimum release age (one day);
   no exemptions are configured.
 - **Brand assets** (`docs/brand/`, the app icons, `apps/desktop/src/assets/gmm-logo.svg`): the
   GMM mark and lockups, provided by the project owner (made with Claude Design, 2026-10-24),
-  original to this project. The UI font, **Nunito**, is bundled (Phase 4, through
+  original to this project. The UI font, **Nunito**, is bundled (through
   `@fontsource-variable/nunito`) under the SIL Open Font License 1.1 (OFL-1.1): free to bundle
   and ship with software, not sold on its own, and its notice and license text must travel with
   it. The npm license check allows OFL-1.1 for that one package only, and
@@ -140,10 +143,10 @@ LGPL or AGPL dependency fails the build. Watch out for:
   (checked 2026-10-25), so it is used descriptively, to identify each game, with a notice
   in `THIRD-PARTY-NOTICES.md` and the README that the art isn't covered by GMM's license and
   will be removed or replaced at the owners' request. Game logos are not used. A game
-  without art gets the styled banner (its colors and name). Revisit before the public beta
-  ("Before the first public release", below).
+  without art gets the styled banner (its colors and name). Revisited at every release
+  ("Release checklist", below).
 - **Facts about other software** come from observing it on the dev machine (file layouts,
-  config keys, locale strings), recorded in our own words in `docs/03-game-adapters.md`. The
+  config keys, locale strings), recorded in our own words in `docs/game-adapters.md`. The
   HoYoPlay `gamedata.dat` handling, for example, is based only on what the file visibly
   contains (`"installPath"` strings), not on any other tool's code.
 
@@ -155,36 +158,31 @@ LGPL or AGPL dependency fails the build. Watch out for:
   affiliated with or endorsed by HoYoverse, Kuro Games or GameBanana. All trademarks belong to
   their owners."
 - Before publishing, search GitHub, the Windows Store, Flathub and the USPTO/EUIPO trademark
-  databases for the chosen name. "Gacha Mod Manager" is only a working name.
+  databases for the chosen name. The name "Gacha Mod Manager" was kept (2026-10-25).
 
-## Provenance record (start on the first commit)
+## Provenance record
 
-- Initialize git in the real project folder. History from day one is the best evidence of
-  independent authorship.
+- Git history from the first commit is the evidence of independent authorship.
 - `LICENSE-MIT` + `LICENSE-APACHE`, plus SPDX headers in source files (`// SPDX-License-Identifier: MIT OR Apache-2.0`).
-- **DCO sign-off** (`git commit -s`) for all contributors, and a PR template checkbox: "I did not
-  copy or port code from other projects; any third-party code is listed in
-  THIRD-PARTY-NOTICES."
-- Generate `THIRD-PARTY-NOTICES` from the dependency tree (`cargo about`, plus an npm license
-  report) in CI.
-- AI-assisted code: commits made with Claude carry a `Co-Authored-By` line. Reviews check that
+- **DCO sign-off** (`git commit -s`) for all contributors (see `CONTRIBUTING.md`).
+- AI-assisted code: commits made with an AI assistant carry a `Co-Authored-By` line. Reviews check that
   generated code doesn't resemble another project's code, especially for components
   where prior art exists (archive extraction, GameBanana client).
-- Research notes about other projects (`docs/research/`) stay **out of the public repo** or are
-  clearly marked as prior-art notes. They aren't needed to understand GMM.
+- Research notes about other projects stay **out of the public repo** (`docs/research/` is
+  git-ignored). They aren't needed to understand GMM.
 
-## Before the first public release
+## Release checklist
 
-- [x] License chosen: MIT OR Apache-2.0
+Go through this before publishing each release.
+
 - [ ] `LICENSE-MIT`, `LICENSE-APACHE`, crate/package metadata and SPDX headers in place
-- [ ] `cargo deny check licenses` and the npm license check pass (both in CI since Phase 3)
+- [ ] `cargo deny check licenses` and the npm license check pass (both run in CI)
 - [ ] `THIRD-PARTY-NOTICES` generated and shown in Settings → About
 - [ ] No assets, strings or code from other projects (spot-check by searching distinctive strings)
 - [ ] Name cleared; disclaimer in README and About
 - [ ] Setup guide and About credit XXMI and link to its official repo/releases
 - [ ] README Credits section current (GameBanana, mod creators, XXMI, 3Dmigoto, UnRAR, Nunito,
       game banner art, libraries) with the contact line for credit changes or removal. No GameBanana outreach
-      (decided 2026-10-25, [10](10-gamebanana-api.md)); comply with any request they make
+      (decided 2026-10-25, [GameBanana API](gamebanana-api.md)); comply with any request they make
 - [ ] Game banner art: still wanted, notice current, no request from HoYoverse or Kuro Games to
       remove it (exception above)
-- [ ] `docs/research/` removed from the public repo or marked as prior art

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// GMM's UI primitives (docs/08-design-system.md). The dev-only style guide page shows each
+// GMM's UI primitives. The dev-only style guide page shows each
 // one in every state.
 
 export { Button, type ButtonVariant, IconButton } from "./buttons";

@@ -1,8 +1,8 @@
-# 10 — GameBanana API: terms, limits, and how GMM stays polite
+# GameBanana API: terms, limits, and how GMM stays polite
 
 How GMM uses GameBanana, what GameBanana allows, what can go wrong for a user in daily use,
 and what GMM does about it. Checked 2026-10-25. Endpoints and field shapes are in
-[02](02-architecture.md#catalog-flow-gamebanana-apiv11).
+[architecture](architecture.md#catalog-flow-gamebanana-apiv11).
 
 ## Do we need permission?
 
@@ -32,7 +32,7 @@ What *does* need GameBanana:
   manager integrations in `_aModManagerIntegrations`; it is empty for every ZZZ and WuWa mod
   checked (729726, 553203, 688491, 731970). A staff post from 2018 describes them integrating
   mod managers that start from a custom URL scheme. So GMM can only get those buttons if
-  GameBanana adds it; deep links (deferred from Phase 6 to "Later" on 2026-10-26) wait on that.
+  GameBanana adds it; GMM has no deep links until then.
 - **Using their name** in the lockup ("Powered by GameBanana") is descriptive; it stays
   unless they ask otherwise.
 

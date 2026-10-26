@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The install queue behind the Downloads page (docs/08, "Downloads"): installs run one at a
+//! The install queue behind the Downloads page: installs run one at a
 //! time in the order they were confirmed, each with a state the page shows, and each can be
 //! paused, resumed or cancelled through its [`StopSignal`]. An install whose background
 //! check found something ([`crate::review`]) waits in [`JobState::NeedsAction`] until the

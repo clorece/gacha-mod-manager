@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // Typed wrappers for GMM's Tauri commands (apps/desktop/src-tauri/src/commands.rs). The
-// webview only ever passes ids; it never names a path or a URL (docs/04-security.md, R5).
+// webview only ever passes ids; it never names a path or a URL (docs/security.md, R5).
 // The types come from bindings.ts, which is generated from the Rust types.
 
 import { Channel, invoke } from "@tauri-apps/api/core";

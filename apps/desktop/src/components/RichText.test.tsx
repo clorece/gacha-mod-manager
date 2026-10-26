@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The XSS corpus (docs/04-security.md, T3) through the webview's half of the description
+// The XSS corpus (docs/security.md, T3) through the webview's half of the description
 // renderer. Rust has already rewritten addresses (html.rs, with its own tests); this checks
 // that whatever reaches `sanitize`, hostile or not, comes out as inert markup: only allowed
 // tags and attributes, images only as gmmimg keys, links only as link keys.

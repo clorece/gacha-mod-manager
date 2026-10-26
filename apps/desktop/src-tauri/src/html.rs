@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The address rewrite for GameBanana's description HTML (docs/04-security.md, T3).
+//! The address rewrite for GameBanana's description HTML (docs/security.md, T3).
 //!
 //! This is not the sanitizer: the webview runs the result through DOMPurify (strict
 //! allowlist), and the CSP stops anything that slips through from loading. What happens here

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! XXMI, read-only (docs/03-game-adapters.md, "XXMI detection & setup states").
+//! XXMI, read-only (docs/game-adapters.md, "XXMI detection & setup states").
 //!
 //! - [`find_xxmi`] locates and validates the XXMI Launcher folder.
 //! - [`XxmiConfig`] reads its config file through a struct that declares only the fields GMM

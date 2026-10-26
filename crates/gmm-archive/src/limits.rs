@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-/// Extraction limits. Defaults follow `docs/04-security.md`.
+/// Extraction limits. Defaults follow `docs/security.md`.
 #[derive(Debug, Clone)]
 pub struct Limits {
     /// Total decompressed bytes across all entries.

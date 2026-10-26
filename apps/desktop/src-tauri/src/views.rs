@@ -12,8 +12,8 @@ use gmm_catalog::{
     Category, Image, ImageVariant, Member, ModProfile, ModStats, ModSummary, ModUpdate, Page,
 };
 use gmm_core::{
-    AppRelease, CacheStorage, Conflict, DiskState, FetchEvent, GameStorage, ImageCache, InstallEvent,
-    InstallReport, ModUpdateInfo, UnmanagedMod, VariantChoice,
+    AppRelease, CacheStorage, Conflict, DiskState, FetchEvent, GameStorage, ImageCache,
+    InstallEvent, InstallReport, ModUpdateInfo, UnmanagedMod, VariantChoice,
 };
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;

@@ -8,7 +8,7 @@
 //! CPU-time caps, no UI access, killed when GMM drops it), and only then runs; it lowers its
 //! own rights before reading (gmm-extract's `lockdown.rs`).
 
-// The helper is GMM's own program, started with fixed arguments (docs/04-security.md, R7).
+// The helper is GMM's own program, started with fixed arguments (docs/security.md, R7).
 #![allow(clippy::disallowed_methods)]
 
 use std::fs::File;
@@ -141,7 +141,7 @@ impl Drop for Running {
 #[cfg(windows)]
 mod sandbox {
     //! The helper's job object. Reviewed `unsafe`: Win32 calls on handles this module owns
-    //! (docs/04-security.md, R7).
+    //! (docs/security.md, R7).
     #![allow(unsafe_code)]
 
     use std::io;

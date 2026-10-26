@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // The install queue as the shell sees it: the whole list from `queue_watch`, kept current.
 // Installs that finish are reported once (to refresh that game's library) and dismissed
-// from the list a few seconds later (docs/08, "Downloads"). The list lives in a context of
+// from the list a few seconds later. The list lives in a context of
 // its own: progress arrives several times a second while something downloads, and only what
 // shows it (the sidebar's count, the Downloads page) should draw again, not the page the
 // user is browsing.

@@ -2,7 +2,7 @@
 // Dark / light / match Windows. The choice is one of the user's preferences (prefs.tsx,
 // stored in GMM's database); localStorage keeps a copy only so the first paint, before the
 // database answers, already has the right theme. The theme class on <html> carries every
-// token (docs/08); dark is the default.
+// token; dark is the default.
 
 import { useEffect, useState } from "react";
 import type { ThemeChoice } from "./api";

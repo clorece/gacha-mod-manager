@@ -7,7 +7,7 @@
 //! `<IMP>/d3dx_user.ini`, under `[Constants]`, keyed by the path of the mod's `.ini`
 //! (`$\mods\gmm\ellen [gb-1]\mod.ini\swapvar = 2`) or by the namespace it declares
 //! (`$\<namespace>\swapvar`). Switching a mod off renames its folder, the keys stop matching,
-//! and 3DMigoto drops them the next time it saves (docs/02, "Folder names must stay
+//! and 3DMigoto drops them the next time it saves (docs/architecture.md, "Folder names must stay
 //! stable"). So GMM copies a mod's lines into its database just before switching it off, and
 //! writes the missing ones back just after switching it on. Every switch goes through
 //! [`crate::set_enabled`] or [`crate::set_unmanaged_enabled_at`], so profiles, version

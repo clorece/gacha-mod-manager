@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "The main window may call GMM's own commands and nothing else: no core:default, no plugin permissions (docs/04-security.md, R5). Keep in step with build.rs.",
+  "description": "The main window may call GMM's own commands and nothing else: no core:default, no plugin permissions (docs/security.md, R5). Keep in step with build.rs.",
   "windows": ["main"],
   "permissions": [
     "allow-games",

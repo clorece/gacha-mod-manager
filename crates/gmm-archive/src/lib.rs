@@ -1,6 +1,6 @@
 ﻿// SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Hardened extraction of mod archives (security threat T2 in `docs/04-security.md`).
+//! Hardened extraction of mod archives (security threat T2 in `docs/security.md`).
 //!
 //! [`extract`] unpacks a `.zip`, `.7z` or `.rar` into a fresh directory through [`gmm_fsguard`]. Every
 //! entry is checked before anything is written: unsafe names, links, special files, case

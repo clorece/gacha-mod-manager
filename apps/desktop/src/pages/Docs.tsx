@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Documentation (docs/08, "Documentation"; docs/07): a grid of guide cards, each opening the
+// Documentation: a grid of guide cards, each opening the
 // guide in the app. The guides are the Markdown files in docs/guides/, bundled at build time
 // (`?raw`), so editing one updates the next build and installed copies fetch nothing.
 

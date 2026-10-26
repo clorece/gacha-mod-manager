@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Dashboard (docs/08): a bubble per game that enlarges to reveal Launch and the game's
+// Dashboard: a bubble per game that enlarges to reveal Launch and the game's
 // profiles (Phase 6), then recently installed mods and each game's setup. A game that isn't
 // Ready gets its setup card here instead of a Launch button.
 

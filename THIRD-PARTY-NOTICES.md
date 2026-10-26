@@ -2,7 +2,7 @@
 
 Assets and source code bundled into GMM that come from other projects. The notices for the
 other dependencies (Rust crates and npm packages) are generated into this file at release
-(docs/06-licensing-and-provenance.md, release checklist); until then they are listed by
+(docs/licensing.md, release checklist); until then they are listed by
 `cargo deny` and `pnpm run check-licenses`.
 
 ## Game banner art

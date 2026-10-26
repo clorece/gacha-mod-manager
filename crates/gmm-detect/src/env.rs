@@ -2,7 +2,7 @@
 
 //! Where things live on this machine. Behind a trait so tests can point every source at a
 //! temporary folder. This is the only module that reads the Windows registry, and it reads only
-//! the values listed in docs/04-security.md (R3).
+//! the values listed in docs/security.md (R3).
 
 // The registry key type is banned elsewhere (clippy.toml); this module is the exception.
 #![allow(clippy::disallowed_types)]

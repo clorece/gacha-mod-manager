@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Privacy harnesses (docs/04-security.md, R2–R4), run against the real `gmm` binary:
+//! Privacy harnesses (docs/security.md, R2–R4), run against the real `gmm` binary:
 //!
 //! - **Egress:** every command runs behind a logging proxy that refuses all requests. Every
 //!   host GMM tried to reach must be on the compiled-in allowlist, and commands that work

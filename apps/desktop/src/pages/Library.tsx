@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Mods Library (docs/08): game banner cards, Update all, a sticky toolbar (search, Category,
+// Mods Library: game banner cards, Update all, a sticky toolbar (search, Category,
 // Characters, Show sensitive; Profiles, Enable all, Disable all, Select) and a card per mod
 // with its stored preview, an On/Off switch and a settings button. GMM's mods and
 // hand-installed ones show together; the versions of one GameBanana file share a card.

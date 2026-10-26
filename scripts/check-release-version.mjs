@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The release's versions must agree before an installer is built (docs/05, Phase 7):
-//   - the Rust workspace version (Cargo.toml), e.g. 0.1.0-beta: what GMM reports and
+// The release's versions must agree before an installer is built:
+//   - the Rust workspace version (Cargo.toml), e.g. 0.0.1-beta: what GMM reports and
 //     compares in its update check;
 //   - the desktop frontend's (apps/desktop/package.json): the same;
-//   - the installer's (apps/desktop/src-tauri/tauri.conf.json), e.g. 0.1.0: MSI versions
+//   - the installer's (apps/desktop/src-tauri/tauri.conf.json), e.g. 0.0.1: MSI versions
 //     are numbers only, so it is the workspace version without its pre-release part;
 //   - the git tag, when one is given: `v` + the workspace version.
 // Usage: node scripts/check-release-version.mjs [tag]. Prints the workspace version.

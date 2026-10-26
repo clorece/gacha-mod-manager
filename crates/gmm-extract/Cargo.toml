@@ -6,7 +6,7 @@ edition.workspace = true
 rust-version.workspace = true
 # Our code is MIT OR Apache-2.0; the vendored UnRAR source (vendor/unrar) is under the UnRAR
 # license (free to use for extracting RAR, not for making a RAR compressor). See
-# docs/06-licensing-and-provenance.md and the exception in deny.toml.
+# docs/licensing.md and the exception in deny.toml.
 license = "(MIT OR Apache-2.0) AND LicenseRef-UnRAR"
 repository.workspace = true
 publish = false

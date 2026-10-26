@@ -5,7 +5,7 @@ use url::{Host, Url};
 use crate::error::NetError;
 
 /// Hosts GMM may contact, compiled in. Adding one needs a `security-review` PR
-/// (docs/04-security.md).
+/// (docs/security.md).
 const EXACT_HOSTS: &[&str] = &[
     "gamebanana.com",
     // `gamebanana.com/dl/<id>` redirects here, then to a numbered `filecacheN` mirror.
@@ -200,11 +200,20 @@ mod tests {
         assert!(gh(
             "https://api.github.com/repos/clorece/gacha-mod-manager/releases?per_page=20"
         ));
-        assert!(!gh("https://api.github.com/repos/clorece/gacha-mod-manager/releases/1"));
-        assert!(!gh("https://api.github.com/repos/other/gacha-mod-manager/releases"));
+        assert!(!gh(
+            "https://api.github.com/repos/clorece/gacha-mod-manager/releases/1"
+        ));
+        assert!(!gh(
+            "https://api.github.com/repos/other/gacha-mod-manager/releases"
+        ));
         assert!(!gh("https://github.com/clorece/gacha-mod-manager/releases"));
-        assert!(!gh("http://api.github.com/repos/clorece/gacha-mod-manager/releases"));
-        assert!(!gh("https://gamebanana.com/apiv11/Mod/1/ProfilePage"), "no GameBanana");
+        assert!(!gh(
+            "http://api.github.com/repos/clorece/gacha-mod-manager/releases"
+        ));
+        assert!(
+            !gh("https://gamebanana.com/apiv11/Mod/1/ProfilePage"),
+            "no GameBanana"
+        );
         assert!(
             !ok("https://api.github.com/repos/clorece/gacha-mod-manager/releases"),
             "the GameBanana clients can't reach GitHub"

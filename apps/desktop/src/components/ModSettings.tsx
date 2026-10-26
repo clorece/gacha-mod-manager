@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Mod settings: the side panel from a library card (docs/08, "Mod settings"): the preview and
+// Mod settings, the side panel from a library card: the preview and
 // source, the switch, versions (switch which one is on, remove one, add more from the cached
 // archive), updates and roll back, key bindings, actions (open folder, GameBanana, adopt),
 // the details and Uninstall with its itemized confirmation.

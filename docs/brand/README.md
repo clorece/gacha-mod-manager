@@ -19,4 +19,4 @@ In the app, build the lockup live (text + SVG) so it stays crisp:
 - Hover: `scale(1.07) rotate(-5deg)` with a springy curve, off under reduced motion.
 
 "GameBanana" is plain text; never use GameBanana's own logo without their permission. The full
-token list and how the app uses it are in [../08-design-system.md](../08-design-system.md).
+token list for both themes is in `apps/desktop/src/styles.css`.

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// One game's setup state with the steps to fix it, from gmm-xxmi (docs/07, "Setup &
-// onboarding"). Shown on the Dashboard instead of Launch for a game that isn't Ready, with
+// One game's setup state with the steps to fix it, from gmm-xxmi.
+// Shown on the Dashboard instead of Launch for a game that isn't Ready, with
 // the step-by-step setup guide one click away.
 
 import { useState } from "react";

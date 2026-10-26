@@ -5,43 +5,196 @@
 
 # Gacha Mod Manager
 
-A desktop app for finding, downloading and organizing GameBanana mods for gacha games, using
-[XXMI](https://github.com/SpectrumQT/XXMI-Launcher) as the mod loader.
+A desktop app for finding, downloading and organizing [GameBanana](https://gamebanana.com)
+mods for gacha games, using [XXMI](https://github.com/SpectrumQT/XXMI-Launcher) as the mod
+loader. Supported games: **Zenless Zone Zero** and **Wuthering Waves**.
 
-**Status:** early development. The backend is complete and works from the `gmm` command
-line: browse GameBanana, check your setup (`gmm status`), install mods into XXMI's Mods folder
-with a safety scan (`gmm install`), switch them on and off (keeping their saved in-game
-toggles), uninstall them for good, spot conflicts, show disk use, and start a game with mods
-through XXMI (`gmm launch`). Zip, 7z and RAR mods are supported. The app window has the
-designed sidebar shell with the startup check, a first-run preferences screen, the Dashboard
-(game banners, Launch, last played, a setup guide), the Mods Store (trending gallery, search
-and filters, a scrolling grid) with a mod page for every mod, the Mods Library (previews,
-filters, versions, select mode, profiles) with per-mod settings, Downloads (the install
-queue, where each install is downloaded and checked in the background and waits for you if it
-needs a choice), the install confirmation (variants and conflicts before anything downloads),
-Settings (with a storage breakdown) and player guides on
-the Documentation page. Power features are done: update and roll back, profiles (also on
-the Dashboard), key
-bindings, adopting hand-installed mods, installing from a local archive, and Report a Bug
-(a pre-filled GitHub issue you check and submit yourself, plus a local error log with your
-home folder hidden; GMM sends nothing). The screens
-have component tests, an XSS corpus, an IPC fuzz harness and a contrast audit in CI.
-Progress and plans: [docs/README.md](docs/README.md).
+**Status:** 0.0.1 beta, the first public test release. Windows installer (unsigned for now);
+Linux builds from source and is experimental.
 
-First games: Zenless Zone Zero and Wuthering Waves.
+- **Mods Store**: browse and search GameBanana by category and character, with a full mod
+  page (previews, description, files, updates, credits, license).
+- **Safe installs**: every download is checked before anything reaches XXMI's Mods folder.
+  Zip, 7z and RAR are supported.
+- **Mods Library**: switch mods on and off (your in-game toggles are kept), versions, updates
+  and roll back, key bindings, profiles, conflicts, adopting mods you installed by hand,
+  installing from a local archive.
+- **Dashboard**: launch a game with mods through XXMI, with setup checks that tell you what to
+  fix.
+- **No account, no telemetry.** GMM talks to GameBanana (and to GitHub's releases list, to
+  check for a newer GMM) and nothing else.
 
-## Download
+## How it works
 
-Windows installers (`.msi`) and their SHA-256 checksums are on the
-[Releases page](https://github.com/clorece/gacha-mod-manager/releases). The first beta,
-0.1.0-beta, is in preparation.
+GMM downloads and manages mods. It doesn't load them: **XXMI does**, and only when the game is
+started through XXMI. GMM puts mods in XXMI's `Mods` folder for each game (its own go into
+`Mods/GMM/`), switches them on and off, and starts XXMI for you. It never changes game files
+and never bundles or modifies XXMI.
 
-Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
-[SignPath Foundation](https://signpath.org).
+## Requirements
 
-## Try it (developers)
+- **Windows 10 or 11, 64-bit.** Linux: see [Linux (experimental)](#linux-experimental).
+- **[XXMI Launcher](https://github.com/SpectrumQT/XXMI-Launcher/releases)**, installed and set
+  up for each game you want to mod (the importer for that game installed, the game folder
+  set). GMM checks this and walks you through anything missing.
+- **Zenless Zone Zero** and/or **Wuthering Waves**, installed through Steam, HoYoPlay, Epic
+  Games, or anywhere else (you can add a folder by hand).
+- An internet connection, for GameBanana.
 
-Needs Rust (see `rust-toolchain.toml`) on Windows.
+## Install
+
+### Windows
+
+1. **Download** `GMM-<version>-x64.msi` and `SHA256SUMS.txt` from the
+   [Releases page](https://github.com/clorece/gacha-mod-manager/releases).
+2. **Check the download** (recommended, since the installer isn't signed yet). In PowerShell,
+   in the folder you downloaded to:
+
+   ```powershell
+   Get-FileHash .\GMM-0.0.1-beta-x64.msi -Algorithm SHA256
+   ```
+
+   The hash it prints must match the one in `SHA256SUMS.txt`. If it doesn't, delete the file
+   and don't run it.
+3. **Run the installer.** Because it's unsigned, Windows will likely stop it first; see
+   [Unsigned installer warnings](#unsigned-installer-warnings) below. The installer asks for
+   administrator permission and installs Microsoft Edge WebView2 if it's missing (Windows 11
+   already has it).
+4. **Start Gacha Mod Manager** from the Start menu and follow [First run](#first-run).
+
+To **uninstall**, use Settings → Apps → Installed apps → Gacha Mod Manager. Your mods stay in
+XXMI's Mods folders; GMM's own data stays in `%APPDATA%\GMM` and `%LOCALAPPDATA%\GMM`, which
+you can delete by hand.
+
+#### Unsigned installer warnings
+
+Code signing is being set up: free code signing provided by
+[SignPath.io](https://about.signpath.io), certificate by
+[SignPath Foundation](https://signpath.org). Until a signed release is out, Windows treats
+GMM like any program from an unknown publisher. There are two different
+protections you may meet:
+
+**SmartScreen: "Windows protected your PC"**
+
+This is the common one. Click **More info**, check that the file name is the one you
+downloaded, then click **Run anyway**. You can also avoid the prompt before you run the file:
+right-click the `.msi` → **Properties** → tick **Unblock** at the bottom of the General tab →
+**OK**.
+
+**Smart App Control: "Part of this app has been blocked"**
+
+Smart App Control is stricter: it blocks unsigned programs outright, with no "Run anyway"
+button and no way to allow a single app. It's only on for some PCs (mostly fresh installs of
+Windows 11). It blocks GMM's programs every time they start, not just the installer, so using
+an unsigned GMM means switching it off:
+
+1. Open **Windows Security** → **App & browser control** → **Smart App Control settings**.
+2. If it says **On** (or **Evaluation** and GMM is being blocked), choose **Off**.
+
+Smart App Control is a real protection, so decide whether that trade-off is right for you.
+On Windows 11 with the April 2026 update (KB5083769) or later you can turn it back on from the
+same page. On **older builds, turning it off is permanent** until Windows is reset or
+reinstalled. If you'd rather not turn it off, wait for a signed release.
+
+### Linux (experimental)
+
+There's no Linux package yet, so you build GMM from source. It builds and its tests pass on
+Ubuntu in CI, but it hasn't been tried against a real Linux gaming setup. Expect rough edges,
+and please [report](https://github.com/clorece/gacha-mod-manager/issues) what you find.
+
+What to expect, since the games and XXMI are Windows programs running through Proton or Wine:
+
+- **XXMI isn't found automatically.** Point GMM at the XXMI Launcher folder inside your Wine
+  or Proton prefix (Settings → XXMI folder). It's usually
+  `<prefix>/drive_c/users/<user>/AppData/Roaming/XXMI Launcher`.
+- **Games:** Steam libraries under `~/.steam/steam` are detected. HoYoPlay and Epic installs
+  aren't; add the game folder by hand (Settings → Games).
+- **The setup check will likely say "game folder in XXMI is wrong"**, because XXMI stores the
+  folder as a Windows path (`Z:\...`) that GMM can't match. Mods still install into the right
+  Mods folder.
+- **Launch** starts `XXMI Launcher.exe` directly, which only works if your system runs `.exe`
+  files through Wine. Otherwise start XXMI the way you normally do; mods installed with GMM
+  load all the same.
+
+To build and run it:
+
+1. Install the system libraries Tauri needs, plus a C/C++ compiler (for SQLite and the RAR
+   reader).
+
+   Debian / Ubuntu (tested in CI):
+
+   ```bash
+   sudo apt install build-essential curl file libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libxdo-dev libssl-dev
+   ```
+
+   Fedora (from Tauri's prerequisites, untested here):
+
+   ```bash
+   sudo dnf install gcc-c++ curl file webkit2gtk4.1-devel gtk3-devel librsvg2-devel libxdo-devel openssl-devel
+   ```
+
+   Arch (from Tauri's prerequisites, untested here):
+
+   ```bash
+   sudo pacman -S --needed base-devel curl file webkit2gtk-4.1 gtk3 librsvg xdotool openssl
+   ```
+
+2. Install **Rust** with [rustup](https://rustup.rs) (the repo pins the version, and rustup
+   fetches it on first build) and **Node.js 24** (from [nodejs.org](https://nodejs.org) or
+   your version manager).
+3. Build it:
+
+   ```bash
+   git clone https://github.com/clorece/gacha-mod-manager.git
+   ```
+
+   ```bash
+   cd gacha-mod-manager/apps/desktop && corepack pnpm install && corepack pnpm tauri build
+   ```
+
+4. Run it. The app and its RAR reader (`gmm-extract`) must stay side by side:
+
+   ```bash
+   ../../target/release/gmm-desktop
+   ```
+
+## First run
+
+1. **Preferences:** pick a theme and whether to show sensitive (NSFW) mods. You can change both
+   later in Settings.
+2. **Startup check:** GMM looks for your games and XXMI and checks for newer mods.
+3. **Dashboard:** each game shows **Ready** or what's missing. A setup card walks you through
+   fixing it in XXMI (installing the importer, setting the game folder), then **Check again**.
+4. **Mods Store:** find a mod, press **Download**, pick the files you want and confirm. The
+   install runs on the **Downloads** page.
+5. **Play:** open the game's banner on the Dashboard and press **Launch**. Mods only load when
+   the game starts through XXMI.
+
+The app's **Documentation** page has short guides on all of this, including fixing setup
+problems and conflicts. The same guides are in [docs/guides](docs/guides/).
+
+## Build from source
+
+You need the same tools on every platform: **Rust** through [rustup](https://rustup.rs) (the
+version is pinned in `rust-toolchain.toml`), **Node.js 24** (pnpm comes through corepack) and a
+C/C++ compiler. On Windows that's the
+[Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with
+"Desktop development with C++", which Rust's Windows toolchain needs anyway. On Linux, see the
+packages above.
+
+Run the app in development mode:
+
+```bash
+cd apps/desktop && corepack pnpm install && corepack pnpm tauri dev
+```
+
+Build a release binary (`target/release/gmm-desktop`, with `gmm-extract` beside it):
+
+```bash
+cd apps/desktop && corepack pnpm tauri build
+```
+
+Everything the app does also works from the `gmm` command line:
 
 ```bash
 cargo run -p gmm-cli -- status
@@ -51,25 +204,26 @@ cargo run -p gmm-cli -- status
 cargo run -p gmm-cli -- catalog list --game zzz --sort downloads
 ```
 
-RAR mods go through a separate helper program; build it once next to `gmm` (the app's
-`tauri dev` and `tauri build` do this themselves):
+`cargo run -p gmm-cli -- --help` lists every command. RAR mods need the helper built once
+next to `gmm` (`tauri dev` and `tauri build` do this themselves):
 
 ```bash
 cargo build -p gmm-extract
 ```
 
-The app window needs Node 24 too (pnpm comes through corepack):
+To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```bash
-cd apps/desktop && corepack pnpm install && corepack pnpm tauri dev
-```
+## Docs
 
-## Mods load through XXMI
-
-This app downloads and manages mods. It doesn't load them. Mods only take effect when the game is
-started through XXMI. Install XXMI from its
-[official releases](https://github.com/SpectrumQT/XXMI-Launcher/releases) and set it up for your
-game. The app detects your setup and walks you through any missing steps.
+| Doc | What it covers |
+|---|---|
+| [docs/guides/](docs/guides/) | Player guides, also shown on the app's Documentation page |
+| [docs/architecture.md](docs/architecture.md) | Crates, data model, install and launch flows, app folders |
+| [docs/game-adapters.md](docs/game-adapters.md) | Game and XXMI detection, setup states, adding a game |
+| [docs/security.md](docs/security.md) | Threat model, the rules the code follows, test harnesses |
+| [docs/licensing.md](docs/licensing.md) | Licenses, dependencies, clean-room rules, release checklist |
+| [docs/gamebanana-api.md](docs/gamebanana-api.md) | GameBanana's terms and limits, and how GMM stays within them |
+| [docs/brand/](docs/brand/) | The GMM mark and lockups |
 
 ## Credits
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// GMM's icon set: 24-unit grid, round caps, drawn to one style (docs/08, "Icons"). Each icon
+// GMM's icon set: 24-unit grid, round caps, drawn to one style. Each icon
 // is a list of SVG children; the stroke width and size vary by place.
 
 import type { ReactNode } from "react";

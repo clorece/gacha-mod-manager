@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The install confirmation (docs/08, "Install confirmation"). Nothing is downloaded while
+// The install confirmation. Nothing is downloaded while
 // it's open: it reads the mod page (usually already cached) and asks, in up to three steps,
 // which of GameBanana's files to install (several can be picked, and each one picked is
 // switched on), what to do about mods already on for the same character, and to confirm.
