@@ -188,7 +188,9 @@ before it's confirmed. To show versions it fetches the file into the download ca
 
 ## Mods Library (installed mods)
 
-Layout: [08](08-design-system.md#mods-library). Contents and actions:
+Layout: [08](08-design-system.md#mods-library). Built 2026-10-25 (`pages/Library.tsx`, with
+the Mod settings panel); the Conflicts filter and the per-mod "conflicts with" panel below
+are not built (cards carry a Conflict badge instead). Contents and actions:
 
 - Every installed mod for the selected game (or all games): GMM's mods and hand-installed
   ones ("Added by hand"), each with an on/off switch (the `DISABLED` rename).
@@ -254,12 +256,14 @@ Zenless Zone Zero ▾                        Drive C: 112 GB free of 1 TB
   **Clear cache** removes only the cached archives.
 - Decided 2026-10-25 for Phase 5: the full breakdown (bar, table, multi-select disable and
   delete) **without** the "Last used" column (GMM doesn't record it) and without the drive
-  line; both can come later.
+  line; both can come later. Built 2026-10-25 (`pages/Storage.tsx`): the bar shows the
+  eight biggest mods plus "Other" (by mod, not by character); the per-mod "Clear cache"
+  button isn't built (the download cache is cleared as a whole in Settings).
 
 ## Settings
 
 Sections per [08](08-design-system.md#settings): Appearance, Mods Store (sensitive mods), XXMI
-Launcher, Games, Storage, About. Later: a download cache size cap, language (i18n-ready from
+Launcher, Games, Storage, About. Built 2026-10-25 (`pages/Settings.tsx`). Later: a download cache size cap, language (i18n-ready from
 the start). An About page with the
 third-party notices and the "not affiliated" disclaimer. Appearance and the sensitive-mods
 switches read and write the stored preferences (built 2026-10-25: `preferences` /
@@ -270,7 +274,8 @@ switches read and write the stored preferences (built 2026-10-25: `preferences` 
 Decided 2026-10-25: the guides are Markdown files in the repo (readable on GitHub too),
 turned into the app's pages at build time, so editing a guide updates the app in its next
 build (installed copies don't fetch anything). Drafted short and friendly, linking to the
-repo docs for detail; the project owner edits them.
+repo docs for detail; the project owner edits them. Built 2026-10-25: six guides in
+[guides/](guides/), shown by `pages/Docs.tsx`.
 
 ## Report a Bug
 

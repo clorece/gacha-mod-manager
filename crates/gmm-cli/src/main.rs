@@ -233,6 +233,9 @@ enum Command {
         /// Delete every cached download for good (installed mods stay).
         #[arg(long)]
         clear_downloads: bool,
+        /// Delete every cached preview image for good (they download again when shown).
+        #[arg(long)]
+        clear_images: bool,
         #[command(flatten)]
         setup: SetupArgs,
     },
@@ -501,12 +504,14 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
         Command::Storage {
             game,
             clear_downloads,
+            clear_images,
             setup,
         } => {
             library::storage(
                 db,
                 game,
                 clear_downloads,
+                clear_images,
                 setup.xxmi,
                 setup.folders,
                 cli.json,

@@ -181,7 +181,7 @@ async fn swap_in(
     let fetched = &prepared.fetched;
     let meta = ModMeta {
         gb_mod_id: Some(prepared.mod_id),
-        categories: prepared.categories.clone(),
+        listing: prepared.listing.clone(),
         ..ModMeta::from_gamebanana(
             &prepared.mod_name,
             prepared.mod_version.as_deref(),
@@ -287,6 +287,7 @@ async fn swap_in(
             archive_sha256: assembled.row.archive_sha256.clone(),
             size_bytes: assembled.row.size_bytes,
             scan_report_json: assembled.row.scan_report_json.clone(),
+            listing: assembled.row.listing.clone(),
         };
         if let Err(e) = db.change_installed_mod_file(row.id, &change).await {
             let _ = guard.rename(&target, &new_dir);

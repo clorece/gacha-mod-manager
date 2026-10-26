@@ -1,37 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Pages whose screens are built in Phase 5 (docs/05-roadmap.md). Each says what it will hold,
-// so the sidebar is complete now; Report a Bug is the designed work-in-progress page.
+// Report a Bug: the designed work-in-progress page (docs/08). The real one (a pre-filled
+// GitHub issue and a local error log) is Phase 6.
 
 import logo from "../assets/gmm-logo.svg";
 import { Button } from "../ui";
-
-const upcoming = {
-  settings: {
-    title: "Settings",
-    line: "Appearance, the Mods Store, the XXMI folder, your games and storage. Stored on this computer only.",
-  },
-  docs: {
-    title: "Documentation",
-    line: "How GMM works, and what to do when something doesn't.",
-  },
-} as const;
-
-export function ComingSoon({ page }: { page: keyof typeof upcoming }) {
-  const { title, line } = upcoming[page];
-  return (
-    <>
-      <div className="page-head">
-        <div>
-          <h1>{title}</h1>
-          <p>{line}</p>
-        </div>
-      </div>
-      <div className="card empty">
-        This screen is being built next. Everything here works from the gmm command line today.
-      </div>
-    </>
-  );
-}
 
 export function ReportBug() {
   return (

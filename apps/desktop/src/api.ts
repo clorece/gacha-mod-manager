@@ -39,6 +39,7 @@ import type {
   ProfileInfo,
   RollbackFile,
   Settings,
+  Size,
   StartupReport,
   StartupStep,
   StorageView,
@@ -156,6 +157,8 @@ export const api = {
   storage: () => invoke<StorageView>("storage"),
   clearDownloadCache: () => invoke<ClearedCache>("clear_download_cache"),
   clearHttpCache: () => invoke<number>("clear_http_cache"),
+  /** Deletes every cached preview image; they download again when shown. */
+  clearImageCache: () => invoke<Size>("clear_image_cache"),
   /** Whether GameBanana asked GMM to slow down, and whether saved data is showing. Local only. */
   networkStatus: () => invoke<NetworkStatus>("network_status"),
 

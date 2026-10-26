@@ -18,12 +18,12 @@
 
 use gmm_adapters::GameManifest;
 use gmm_catalog::{CatalogSource, ModSummary, SearchQuery};
-use gmm_db::{Db, ModCategories, NewInstalledMod};
+use gmm_db::{Db, NewInstalledMod};
 use gmm_fsguard::RootId;
 use serde::{Deserialize, Serialize};
 
 use crate::error::CoreError;
-use crate::install::{SIDECAR_FORMAT, Sidecar};
+use crate::install::{SIDECAR_FORMAT, Sidecar, listing_of};
 use crate::library::{library, listed_unmanaged};
 use crate::names::{GMM_DIR, SIDECAR_FILE, on_disk_name};
 use crate::storage::unmanaged_size;
@@ -303,16 +303,7 @@ pub async fn adopt<C: CatalogSource>(
         archive_sha256: None,
         size_bytes: size.bytes,
         scan_report_json: None,
-        categories: ModCategories {
-            root_category_id: profile.summary.root_category.as_ref().and_then(|c| c.id),
-            root_category: profile
-                .summary
-                .root_category
-                .as_ref()
-                .map(|c| c.name.clone()),
-            category_id: profile.summary.category.as_ref().and_then(|c| c.id),
-            category: profile.summary.category.as_ref().map(|c| c.name.clone()),
-        },
+        listing: listing_of(&profile.summary),
     };
     let recorded = async {
         let json = serde_json::to_vec_pretty(&sidecar)?;

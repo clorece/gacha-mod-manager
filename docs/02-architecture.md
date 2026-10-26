@@ -316,7 +316,7 @@ command per CLI action, in `src/commands.rs`: `games`, `statuses`, `catalog_list
 `set_preferences`, `pick_xxmi_folder`,
 `clear_xxmi_folder`, `pick_game_folder`, `remove_game_folder`; plus, for the Phase 5
 screens, `prepare_install`, `switch_version`, `catalog_featured`, `catalog_stats` and
-`clear_http_cache` there, the queue in `src/queue.rs` (`queue_install`, `queue_jobs`,
+`clear_http_cache`, `clear_image_cache` there, the queue in `src/queue.rs` (`queue_install`, `queue_jobs`,
 `queue_watch`, `queue_pause`, `queue_resume`, `queue_cancel`, `queue_dismiss`,
 `queue_clear_finished`), `startup_check` in `src/startup.rs`, and the openers in
 `src/open.rs` (`open_mod_page`, `open_xxmi_releases`, `open_link`, `open_mod_folder`),
@@ -400,15 +400,19 @@ and `network_status`. Phase 6 adds `queue_change_file` (queue), `rollback_files`
     of its installs finishes and dismisses installed rows after 5 s.
   - `pages/`: `Startup` (the startup check), `Dashboard` (bubbles, Launch, recently
     installed, setup), `Downloads` (the queue by game, with Pause / Resume / Cancel),
-    `Library` (game cards, search, enable / disable all, mod cards, conflict prompt),
-    `Placeholders` (the remaining Phase 5 pages and Report a Bug), `StyleGuide` (dev builds
-    only, dropped from release builds by `import.meta.env.DEV`; also opens the real install
-    confirmation by mod id until the Store exists).
+    `Library` (game cards, Update all, filters, version groups as one card, select mode,
+    conflict prompt), `Store` and `ModPage`, `Settings` (preferences, XXMI, games, caches,
+    About) with `Storage` (the breakdown), `Docs` (the guides from `docs/guides/`, bundled
+    as `?raw` imports), `Placeholders` (Report a Bug), `StyleGuide` (dev builds only,
+    dropped from release builds by `import.meta.env.DEV`).
+  - `markdown.tsx`: a small Markdown renderer for files bundled at build time (guides,
+    README sections, THIRD-PARTY-NOTICES.md) that builds React elements, never HTML.
   - `components/`: `InstallDialog` (the install confirmation from `InstallPlan`),
     `LocalInstallDialog` (the same for a local archive), `RichText` (GameBanana HTML through
     DOMPurify), `NetworkNotice`, `Launch` (exe confirmation dialog), `SetupCard`,
-    `ModSettings` (side panel: switch, Updates / Roll back, Key bindings, Actions, details,
-    Uninstall with the itemized confirmation; the Phase 6 sections are in `ModExtras`),
+    `ModSettings` (side panel: preview, switch, Versions, Updates / Roll back, Key bindings,
+    Actions, details, Uninstall with the itemized confirmation; the Phase 6 sections are in
+    `ModExtras`), `UninstallDialog` (several games at once), `Preview`,
     `AdoptDialog`, `ProfilesPanel`.
 - Logic both front ends need lives below them, not in either: `Page::hide_sensitive`
   (`gmm-catalog`, the NSFW filter), `game_for_mod`, `Machine::launch_plan` and
@@ -474,7 +478,7 @@ matching Game Launch setting (`LaunchModeMismatch`).
 `crates/gmm-db/migrations/` and is applied when the database opens; an older GMM refuses a
 database that a newer one has migrated. sqlx 0.9 with SQLite bundled, WAL journal, foreign
 keys on, every query a static SQL string with bound parameters (sqlx rejects anything else).
-Times are Unix seconds. Built so far (migrations 0001 to 0004):
+Times are Unix seconds. Built so far (migrations 0001 to 0005):
 
 ```
 settings(key PK, value)                  -- xxmi.root (a folder the user picked),
@@ -487,6 +491,8 @@ installed_mods(id PK, game_id, folder_name, name, gb_mod_id NULL, gb_file_id NUL
                size_bytes, installed_at, scan_report_json NULL,
                root_category_id NULL, root_category NULL,   -- 0002: GameBanana's categories
                category_id NULL, category NULL,             -- at install (category = character)
+               sensitive NULL, preview_url NULL,            -- 0005: GameBanana's flag and first
+                                                            -- preview image (refreshed by updates)
                UNIQUE(game_id, folder_name))
 download_cache(sha256 PK, gb_mod_id NULL, gb_file_id NULL, path_rel UNIQUE, size_bytes,
                added_at, last_used_at)

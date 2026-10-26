@@ -56,9 +56,15 @@ export function useAppData(): AppData {
   return { games, statuses, libraries, loading, error, refresh, refreshLibrary };
 }
 
-/** Mods in a game's library (GMM's and hand-installed) and how many are on. */
+/** Mods in a game's library (GMM's and hand-installed) and how many are on. The versions of
+ *  one GameBanana file count as one mod, on when any of them is (like the Library's cards). */
 export function modCounts(view: LibraryView | undefined): { total: number; on: number } {
   if (!view) return { total: 0, on: 0 };
-  const all = [...view.managed.map((m) => m.enabled), ...view.unmanaged.map((u) => u.enabled)];
+  const groups = new Map<string, boolean>();
+  for (const m of view.managed) {
+    const k = m.group ?? `id:${m.id}`;
+    groups.set(k, (groups.get(k) ?? false) || m.enabled);
+  }
+  const all = [...groups.values(), ...view.unmanaged.map((u) => u.enabled)];
   return { total: all.length, on: all.filter(Boolean).length };
 }

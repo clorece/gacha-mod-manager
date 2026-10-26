@@ -44,7 +44,15 @@ root_category: string | null, root_category_id: number | null,
 /**
  * The subcategory at install: for skins, the character.
  */
-category: string | null, category_id: number | null, };
+category: string | null, category_id: number | null, 
+/**
+ * GameBanana flagged it at install (false when unknown: earlier installs).
+ */
+sensitive: boolean, 
+/**
+ * The stored preview image as a `gmmimg` address, when there is one.
+ */
+preview: string | null, };
 
 export type LibraryView = { game: string, 
 /**
@@ -419,6 +427,10 @@ downloads: Size,
  * Leftover extraction folders (normally empty).
  */
 extract: Size, 
+/**
+ * Preview images in `images/` (capped, oldest go first).
+ */
+images: Size, 
 /**
  * GameBanana responses kept in the database.
  */

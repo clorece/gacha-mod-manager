@@ -21,6 +21,7 @@ use gmm_net::{Client, Url};
 use sha2::{Digest, Sha256};
 
 use crate::error::CoreError;
+use crate::storage::Size;
 
 /// GameBanana serves every preview image, avatar and category icon from this host
 /// (observed in API responses: `/img/ss/`, `/img/av/`, `/img/ico/`).
@@ -138,6 +139,14 @@ impl ImageCache {
         })
     }
 
+    /// Deletes every cached image for good (Settings › Storage › Clear). Keys handed out in
+    /// this run stay valid: their images are fetched again when next shown.
+    pub fn clear(&self) -> Size {
+        let cleared = delete_images(&self.guard, &self.dir);
+        self.total.store(0, Ordering::Relaxed);
+        cleared
+    }
+
     /// Removes the oldest images until the cache is well under its cap. Keeps `keep` (the
     /// image just written). Best effort.
     fn prune(&self, keep: &ScopedPath) {
@@ -171,6 +180,33 @@ impl ImageCache {
         }
         self.total.store(total, Ordering::Relaxed);
     }
+}
+
+/// Deletes every cached image in `<cache>/images/` for good, for the CLI (`gmm storage
+/// --clear-images`); the app clears through its running [`ImageCache::clear`].
+pub fn clear_image_cache(cache_dir: &Path) -> Result<Size, CoreError> {
+    let mut guard = Guard::new();
+    let cache = guard.ensure_root("cache", cache_dir, Access::ReadWrite)?;
+    let dir = guard.path(cache, "images")?;
+    Ok(delete_images(&guard, &dir))
+}
+
+/// Best effort: a file that can't be removed (in use) stays and isn't counted.
+fn delete_images(guard: &Guard, dir: &ScopedPath) -> Size {
+    let mut cleared = Size::default();
+    let Ok(entries) = guard.read_dir(dir) else {
+        return cleared;
+    };
+    for e in entries {
+        if e.is_dir || e.is_symlink || !is_key(&e.name) {
+            continue;
+        }
+        if guard.remove_file(&e.path).is_ok() {
+            cleared.files += 1;
+            cleared.bytes += e.len;
+        }
+    }
+    cleared
 }
 
 fn image_url_allowed(url: &Url) -> bool {
@@ -301,6 +337,27 @@ mod tests {
         drop(server);
         let again = ImageCache::open(dir.path(), client()).unwrap();
         assert_eq!(again.get(&key).await.unwrap(), first);
+    }
+
+    #[tokio::test]
+    async fn clearing_deletes_the_files_and_keeps_the_keys() {
+        let server = server().await;
+        let dir = tempfile::tempdir().unwrap();
+        let cache = ImageCache::open(dir.path(), client()).unwrap();
+        let key = cache
+            .register(&format!("{}/img/ss/a.png", server.uri()))
+            .unwrap();
+        cache.get(&key).await.unwrap();
+        // Something that isn't an image key stays.
+        std::fs::write(dir.path().join("images").join("notes.txt"), b"x").unwrap();
+
+        let cleared = cache.clear();
+        assert_eq!((cleared.files, cleared.bytes), (1, PNG.len() as u64));
+        assert!(!dir.path().join("images").join(&key).exists());
+        assert!(dir.path().join("images").join("notes.txt").exists());
+        // Shown again, it's fetched again.
+        assert_eq!(cache.get(&key).await.unwrap().bytes, PNG);
+        assert_eq!(clear_image_cache(dir.path()).unwrap().files, 1);
     }
 
     #[tokio::test]

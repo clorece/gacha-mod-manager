@@ -15,11 +15,12 @@ toggles), uninstall them for good, spot conflicts, show disk use, and start a ga
 through XXMI (`gmm launch`). Zip, 7z and RAR mods are supported. The app window has the
 designed sidebar shell with the startup check, a first-run preferences screen, the Dashboard
 (game banners, Launch, last played, a setup guide), the Mods Store (trending gallery, search
-and filters, a scrolling grid) with a mod page for every mod, the Mods Library (with
-profiles), Downloads (the install queue) and the install confirmation. Power features have
-started: update and roll back, profiles, key bindings, adopting hand-installed mods, and
-installing from a local archive. Settings, Documentation and the rest of the Library come
-next.
+and filters, a scrolling grid) with a mod page for every mod, the Mods Library (previews,
+filters, versions, select mode, profiles) with per-mod settings, Downloads (the install
+queue), the install confirmation, Settings (with a storage breakdown) and player guides on
+the Documentation page. Power features have started: update and roll back, profiles, key
+bindings, adopting hand-installed mods, and installing from a local archive. Tests for the
+screens come next.
 Progress and plans: [docs/README.md](docs/README.md).
 
 First games: Zenless Zone Zero and Wuthering Waves.

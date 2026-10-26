@@ -6,8 +6,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use gmm_adapters::GameManifest;
 use gmm_archive::{Finding, Severity};
-use gmm_catalog::{CatalogSource, ModFile, ModFiles};
-use gmm_db::{Db, ModCategories, NewInstalledMod};
+use gmm_catalog::{CatalogSource, ModFile, ModFiles, ModSummary};
+use gmm_db::{Db, ModListing, NewInstalledMod};
 use gmm_fsguard::{Guard, RelPath, RootId, ScopedPath};
 use gmm_net::Client;
 use gmm_xxmi::{GameStatus, SetupState};
@@ -59,6 +59,30 @@ pub enum InstallEvent {
     Installing { folder: String },
 }
 
+/// Library cards are at most this wide (CSS pixels), so a copy twice as wide stays sharp.
+const PREVIEW_WIDTH: u32 = 2 * 260;
+
+/// What the library keeps from a mod's GameBanana listing: categories, whether it's
+/// sensitive, and its first preview image (the smallest copy wide enough for a card).
+pub fn listing_of(summary: &ModSummary) -> ModListing {
+    let preview = summary.images.first().map(|image| {
+        image
+            .variants
+            .iter()
+            .find(|v| v.size.width >= PREVIEW_WIDTH)
+            .map_or(&image.url, |v| &v.url)
+            .clone()
+    });
+    ModListing {
+        root_category_id: summary.root_category.as_ref().and_then(|c| c.id),
+        root_category: summary.root_category.as_ref().map(|c| c.name.clone()),
+        category_id: summary.category.as_ref().and_then(|c| c.id),
+        category: summary.category.as_ref().map(|c| c.name.clone()),
+        sensitive: Some(summary.is_sensitive()),
+        preview_url: preview,
+    }
+}
+
 /// What the mod is, for its `gmm.json` and database row.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ModMeta {
@@ -69,8 +93,8 @@ pub struct ModMeta {
     pub file_date: Option<i64>,
     pub version: Option<String>,
     pub archive_sha256: String,
-    /// GameBanana's categories, stored for the library cards and filters.
-    pub categories: ModCategories,
+    /// GameBanana's categories, sensitive flag and preview, stored for the library cards.
+    pub listing: ModListing,
 }
 
 impl ModMeta {
@@ -91,7 +115,7 @@ impl ModMeta {
                 .clone()
                 .or_else(|| mod_version.map(str::to_owned)),
             archive_sha256: sha256.to_owned(),
-            categories: ModCategories::default(),
+            listing: ModListing::default(),
         }
     }
 }
@@ -179,7 +203,7 @@ pub struct Prepared {
     pub mod_id: u64,
     pub mod_name: String,
     pub mod_version: Option<String>,
-    pub categories: ModCategories,
+    pub listing: ModListing,
     /// The mod's files on GameBanana, for choosing another one.
     pub files: ModFiles,
     pub fetched: FetchedArchive,
@@ -249,13 +273,8 @@ pub async fn prepare<C: CatalogSource>(
     }
     Ok(Prepared {
         mod_id,
+        listing: listing_of(&profile.summary),
         mod_name: profile.summary.name,
-        categories: ModCategories {
-            root_category_id: profile.summary.root_category.as_ref().and_then(|c| c.id),
-            root_category: profile.summary.root_category.map(|c| c.name),
-            category_id: profile.summary.category.as_ref().and_then(|c| c.id),
-            category: profile.summary.category.map(|c| c.name),
-        },
         mod_version: profile.summary.version,
         files: profile.files,
         fetched,
@@ -276,7 +295,7 @@ pub async fn install_prepared(
     let fetched = &prepared.fetched;
     let meta = ModMeta {
         gb_mod_id: Some(prepared.mod_id),
-        categories: prepared.categories.clone(),
+        listing: prepared.listing.clone(),
         ..ModMeta::from_gamebanana(
             &prepared.mod_name,
             prepared.mod_version.as_deref(),
@@ -545,7 +564,7 @@ pub(crate) fn assemble_variant(
             archive_sha256: Some(meta.archive_sha256.clone()),
             size_bytes: bytes,
             scan_report_json: Some(serde_json::to_string(&report)?),
-            categories: meta.categories.clone(),
+            listing: meta.listing.clone(),
         },
         folder: InstalledFolder {
             id: 0,

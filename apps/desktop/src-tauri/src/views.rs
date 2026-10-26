@@ -101,6 +101,10 @@ pub struct ModRow {
     /// The subcategory at install: for skins, the character.
     pub category: Option<String>,
     pub category_id: Option<u64>,
+    /// GameBanana flagged it at install (false when unknown: earlier installs).
+    pub sensitive: bool,
+    /// The stored preview image as a `gmmimg` address, when there is one.
+    pub preview: Option<String>,
 }
 
 /// An earlier file of an installed mod, kept in the download cache.
@@ -422,6 +426,11 @@ fn rewrite_member(images: &ImageCache, member: &mut Member) {
         .take()
         .and_then(|u| images.register(&u))
         .map(|k| image_src(&k));
+}
+
+/// The `gmmimg` address for a stored GameBanana image URL (`None` off GameBanana's hosts).
+pub fn image_for(images: &ImageCache, url: &str) -> Option<String> {
+    images.register(url).map(|k| image_src(&k))
 }
 
 pub fn rewrite_summary(images: &ImageCache, summary: &mut ModSummary) {

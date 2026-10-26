@@ -15,15 +15,13 @@ themes (screenshots plus an automated contrast and overlap check over 62 states)
 button base are in `apps/desktop/src/styles.css`; Nunito is bundled; the primitives are in
 `apps/desktop/src/ui` and shown in every state on the dev-only **Style guide** page (sidebar,
 Development, dev builds only). Built screens: the sidebar with Select Game, the Dashboard
-(bubbles, Launch, recently installed, setup), the Mods Library (game cards, search, enable /
-disable all, switches, conflict notice; category, character and select mode wait for stored
-categories) and a first Mod settings panel (switch, details, Uninstall). The rest follow in
-Phase 5. Since 2026-10-25 the game banners carry real key art, the Dashboard bubbles show
+(bubbles, Launch, recently installed, setup), the Mods Library and Mod settings (complete since the third checkpoint, 2026-10-25),
+Settings with the Storage breakdown, and Documentation. Every screen is built. Since 2026-10-25 the game banners carry real key art, the Dashboard bubbles show
 "Played … ago" (or "Not played from GMM yet"), and two screens not on the canvas are built
 from its tokens: the first-run preferences card and the setup guide. The Mods Store
 (gallery, sticky toolbar, grid with real previews) follows the canvas; the mod page isn't on
-the canvas and is built from 07's sketch and these tokens (below). Library cards still use
-placeholder art until their previews are stored (next checkpoint).
+the canvas and is built from 07's sketch and these tokens (below). Library cards show the preview stored at install (a quiet
+image placeholder for hand-installed and older mods).
 
 ## Direction
 
@@ -122,6 +120,10 @@ offers the same choice as large banner cards, so the two always agree.
   (opens Mod settings), name, "Installed 24 Oct 2026" or "Added by hand", size, On/Off label
   and a switch. A mod with versions shows "2 of 8 versions" on its preview; its switch turns
   the mod's current version on or off.
+  As built (2026-10-25): the chip reads "<version that's on> · N versions" (installed ones;
+  the archive's total is only known after looking inside), and a mod GameBanana flags shows
+  a Sensitive badge and blurs like the Store's; the toolbar also has Profiles and a count
+  with "N hidden as sensitive".
 - **Conflicts**: switching a mod on that clashes with one that's on shows an amber notice
   ("Phoenix_duplicate conflicts with Phoenix… only one shows") with Keep it off / Enable
   anyway. Enable all applies the same rule.
@@ -239,6 +241,17 @@ previews), XXMI Launcher (folder, found automatically or chosen), Games (how eac
 add a folder), Storage (download cache, image cache, each with Clear), About (version,
 license, disclaimer, licenses).
 
+Built 2026-10-25 (not on the canvas in detail, from its tokens): cards in one column up to
+920 px, each a stack of rows (label and muted line on the left, the control on the right);
+Storage lists three caches (downloaded archives, preview images, GameBanana answers) and
+"Show breakdown"; About shows the README's Disclaimer and Credits and opens the
+third-party notices in a dialog. The **Storage breakdown** is its own page with a pill Back
+link: a segmented game choice (All games, each game), a 18 px bar of 2 px-gapped segments
+(the eight biggest mods plus a grey "Other", a legend with sizes under it, native tooltips),
+then the selection bar and a sortable table. The bar colors are `--viz-1..8`, the dataviz
+reference categorical palette per theme (validated against `--card`: dark passes every
+check; light has three slots under 3:1, so the legend and table always show).
+
 ### Report a Bug (in development)
 The page exists in the sidebar with a `WIP` tag. It shows the mark, an "In development"
 chip, one paragraph on what it will do (describe the problem, optionally attach an error or
@@ -248,6 +261,9 @@ first beta.
 ### Documentation
 A grid of guide cards: Getting started, How mods load, Fixing setup problems, Installing
 safely, Conflicts, Privacy. Content comes from these docs, rewritten for players.
+Built 2026-10-25: cards with a round tinted icon, the guide's title and its first line;
+a guide opens as a card up to 820 px (icon and 26 px title, then the Markdown) with
+"← Documentation" above and "Next: …" below. The text lives in `docs/guides/`.
 
 ## Tokens
 

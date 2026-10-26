@@ -199,6 +199,7 @@ fn main() {
             commands::storage,
             commands::clear_download_cache,
             commands::clear_http_cache,
+            commands::clear_image_cache,
             commands::network_status,
             commands::launch_plan,
             commands::launch,

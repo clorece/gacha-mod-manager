@@ -228,6 +228,16 @@ does is the failure we design out.
   `open_link`, which shows the real address before opening it (R7). `RichText` is the one
   place allowed past Biome's `noDangerouslySetInnerHtml` (with a reason). The CSP stays the
   last line. Still to come: the Vitest XSS corpus through `sanitize` (Phase 5 tests).
+- **Bundled Markdown** (2026-10-25): the Documentation guides (`docs/guides/`), the
+  README's Credits and Disclaimer and THIRD-PARTY-NOTICES.md are compiled into the app
+  (`?raw`) and rendered by `src/markdown.tsx`, which builds React elements only (no HTML is
+  ever parsed or injected). Links to another guide open it in the app; every other address
+  is shown as plain text (its `title`), never opened or loaded.
+- **Stored previews** (2026-10-25): `installed_mods.preview_url` keeps a GameBanana image
+  address from the mod page; `library` registers it with the image cache and hands the
+  webview only the `gmmimg` key (R5), and the cache still refuses anything off GameBanana's
+  image hosts. Settings' image Clear (`clear_image_cache`) deletes only files named like
+  cache keys inside `cache/images/`.
 - **Capability** (`apps/desktop/src-tauri/capabilities/main.json`): the main window gets
   exactly GMM's own commands (`allow-<command>`, generated from the list in `build.rs`), and
   nothing else: not `core:default`, no event, window, `fs`, `shell`, `http` or `dialog`

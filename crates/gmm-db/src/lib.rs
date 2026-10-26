@@ -32,7 +32,7 @@ use sqlx::sqlite::{
 
 pub use downloads::{CachedDownload, NewCachedDownload};
 pub use error::DbError;
-pub use mods::{FileChange, InstalledMod, ModCategories, NewInstalledMod};
+pub use mods::{FileChange, InstalledMod, ModListing, NewInstalledMod};
 pub use profiles::ProfileRow;
 pub use settings::{ManualGameFolder, Preferences, Theme};
 pub use toggles::SavedToggles;
@@ -63,6 +63,7 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
         "saved_toggles",
         include_str!("../migrations/0004_saved_toggles.sql"),
     ),
+    (5, "listing", include_str!("../migrations/0005_listing.sql")),
 ];
 
 /// A handle to the database. Cheap to clone; clones share one connection pool.

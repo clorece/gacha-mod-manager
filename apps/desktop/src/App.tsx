@@ -3,8 +3,7 @@
 // the first run, then the sidebar and the current page, the install queue, the install
 // confirmation and the local install (a file dropped on the window). The mod page opens
 // over the page it came from, which stays mounted (hidden), so Back returns to the Store
-// with its filters and scroll position. Settings and Documentation arrive later in Phase 5
-// (docs/05-roadmap.md).
+// with its filters and scroll position.
 
 import { lazy, type ReactNode, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, type ModKey, type ModUpdateInfo } from "./api";
@@ -15,10 +14,12 @@ import { NetworkNotice } from "./components/NetworkNotice";
 import { modCounts, useAppData } from "./data";
 import { ALL, type Scope } from "./games";
 import { Dashboard } from "./pages/Dashboard";
+import { Docs } from "./pages/Docs";
 import { Downloads } from "./pages/Downloads";
 import { Library } from "./pages/Library";
 import { ModPage } from "./pages/ModPage";
-import { ComingSoon, ReportBug } from "./pages/Placeholders";
+import { ReportBug } from "./pages/Placeholders";
+import { Settings } from "./pages/Settings";
 import { Startup } from "./pages/Startup";
 import { Store } from "./pages/Store";
 import { Welcome } from "./pages/Welcome";
@@ -154,15 +155,23 @@ export default function App() {
           scope={scope}
           onScope={setScope}
           updates={updates}
+          owned={owned}
           onQueued={() => go("downloads")}
           focus={libraryFocus}
           onFocusDone={() => setLibraryFocus(null)}
           onOpenMod={openMod}
+          onAddVersions={(modId, fileId) => setInstalling({ modId, fileId })}
         />
       );
       break;
     case "store":
       content = <Store data={data} scope={scope} owned={owned} onOpenMod={openMod} onDownload={download} />;
+      break;
+    case "settings":
+      content = <Settings data={data} />;
+      break;
+    case "docs":
+      content = <Docs />;
       break;
     case "bug":
       content = <ReportBug />;
@@ -174,8 +183,6 @@ export default function App() {
         </Suspense>
       );
       break;
-    default:
-      content = <ComingSoon page={page} />;
   }
 
   return (

@@ -35,6 +35,7 @@ const COMMANDS: &[&str] = &[
     "storage",
     "clear_download_cache",
     "clear_http_cache",
+    "clear_image_cache",
     "network_status",
     "launch_plan",
     "launch",

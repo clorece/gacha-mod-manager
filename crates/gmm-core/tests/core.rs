@@ -136,7 +136,7 @@ fn meta(name: &str, id: u64) -> ModMeta {
         file_date: Some(1_790_000_000),
         version: Some("1.0".to_owned()),
         archive_sha256: "ab".repeat(32),
-        categories: gmm_db::ModCategories::default(),
+        listing: gmm_db::ModListing::default(),
     }
 }
 
@@ -427,6 +427,11 @@ async fn mock_gamebanana(game_id: u64, av: &str, archive: &[u8]) -> (MockServer,
         "_sVersion": "2.0",
         "_aCategory": { "_sName": "Ellen", "_sProfileUrl": "https://gamebanana.com/mods/cats/43004" },
         "_aSuperCategory": { "_sName": "Character Skins", "_sProfileUrl": "https://gamebanana.com/mods/cats/30305" },
+        "_aPreviewMedia": { "_aImages": [{
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods", "_sFile": "a.jpg",
+            "_sFile220": "220-90_a.jpg", "_wFile220": 220, "_hFile220": 124,
+            "_sFile530": "530-90_a.jpg", "_wFile530": 530, "_hFile530": 298,
+        }] },
     });
     let files = serde_json::json!({
         "_aFiles": [{
@@ -531,14 +536,16 @@ async fn end_to_end_install_and_cache_reuse() {
         Some(report.archive_sha256.as_str())
     );
     assert_eq!(
-        row.categories,
-        gmm_db::ModCategories {
+        row.listing,
+        gmm_db::ModListing {
             root_category_id: Some(30_305),
             root_category: Some("Character Skins".to_owned()),
             category_id: Some(43_004),
             category: Some("Ellen".to_owned()),
+            sensitive: Some(false),
+            preview_url: Some("https://images.gamebanana.com/img/ss/mods/530-90_a.jpg".to_owned()),
         },
-        "categories from the mod page"
+        "the listing from the mod page"
     );
 
     // The archive is cached and recorded; fetching again doesn't download.

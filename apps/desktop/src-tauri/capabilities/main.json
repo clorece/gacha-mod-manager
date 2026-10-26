@@ -35,6 +35,7 @@
     "allow-storage",
     "allow-clear-download-cache",
     "allow-clear-http-cache",
+    "allow-clear-image-cache",
     "allow-network-status",
     "allow-launch-plan",
     "allow-launch",

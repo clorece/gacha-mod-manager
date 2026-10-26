@@ -1561,9 +1561,14 @@ dialog.drawer[open] {
 .badges-r {
   flex: none;
 }
-.mod > .art .art-chip {
+.mod > .art .art-chip,
+.mod > .preview .art-chip {
   left: 10px;
   bottom: 10px;
+  max-width: calc(100% - 20px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .mod-body {
   flex: 1;
@@ -2929,6 +2934,426 @@ dialog.drawer[open] {
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+}
+
+/* ---- Library, third checkpoint (08, "Mods Library") ---- */
+
+.lib-card {
+  position: relative;
+}
+.lib-card.is-selected {
+  outline: 3px solid var(--accent);
+  outline-offset: -1px;
+}
+/* The select-mode checkbox sits above the card's click layer, on the artwork. */
+.lib-check {
+  position: relative;
+  z-index: 2;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--scrim-art);
+}
+.lib-card .badges {
+  z-index: 2;
+}
+.selbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-nav);
+  background: var(--card);
+}
+
+/* ---- Mod settings: preview and versions ---- */
+
+.ms-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ms-preview {
+  aspect-ratio: 16 / 9;
+  border-radius: 16px;
+}
+.ver-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.ver-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+.ver-row + .ver-row {
+  border-top: 1px solid var(--line);
+}
+.ver-row b {
+  overflow-wrap: anywhere;
+}
+
+/* ---- Settings (08, "Settings") ---- */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 920px;
+}
+.settings .panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.set-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.set-row .grow {
+  min-width: 220px;
+}
+.set-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.set-game {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.set-game:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+.set-sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 14px;
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.settings .mono {
+  overflow-wrap: anywhere;
+}
+
+/* ---- Storage breakdown (07, "Storage") ---- */
+
+/* Categorical slots in fixed order (the dataviz reference palette, validated on each theme's
+   card color: dark all >= 3:1; light needs the legend and table, which are always shown). */
+.t-dark {
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+  --viz-5: #d55181;
+  --viz-6: #008300;
+  --viz-7: #9085e9;
+  --viz-8: #e66767;
+}
+.t-light {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-5: #e87ba4;
+  --viz-6: #008300;
+  --viz-7: #6250d6;
+  --viz-8: #e34948;
+}
+.storage-games {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.storage-games .panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sbar-track {
+  display: flex;
+  gap: 2px;
+  height: 18px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--raised);
+}
+.sbar-seg {
+  flex-basis: 0;
+  min-width: 3px;
+  transition: opacity 0.15s;
+}
+.sbar-track:hover .sbar-seg:not(:hover) {
+  opacity: 0.55;
+}
+.sbar-tip {
+  min-height: 18px;
+  color: var(--text2);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.sbar-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 6px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.sbar-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.sbar-legend b {
+  margin-left: auto;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.sbar-key {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+}
+.sbar-1 {
+  background: var(--viz-1);
+}
+.sbar-2 {
+  background: var(--viz-2);
+}
+.sbar-3 {
+  background: var(--viz-3);
+}
+.sbar-4 {
+  background: var(--viz-4);
+}
+.sbar-5 {
+  background: var(--viz-5);
+}
+.sbar-6 {
+  background: var(--viz-6);
+}
+.sbar-7 {
+  background: var(--viz-7);
+}
+.sbar-8 {
+  background: var(--viz-8);
+}
+.sbar-other {
+  background: var(--switch-off);
+}
+.storage-bar {
+  margin-top: 18px;
+}
+.table-card {
+  overflow-x: auto;
+}
+.storage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.storage-table th {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.storage-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.storage-table tr:last-child td {
+  border-bottom: 0;
+}
+.storage-table tr.is-selected td {
+  background: var(--hover);
+}
+.storage-table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+.storage-table .col-check {
+  width: 44px;
+}
+.th-sort {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.th-sort:hover {
+  color: var(--text);
+}
+
+/* ---- Documentation (08, "Documentation") ---- */
+
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 18px;
+}
+.guide-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 20px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+.guide-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+.guide-card:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.guide-card b {
+  font-size: 16px;
+  font-weight: 900;
+}
+.guide-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--pill);
+  color: var(--accent);
+}
+.guide-page {
+  max-width: 820px;
+}
+.guide-article {
+  padding: 28px 32px;
+}
+.guide-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.guide-title h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 900;
+}
+.guide-next {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* Markdown from repo files (markdown.tsx): the guides and About. */
+.md {
+  color: var(--text2);
+  line-height: 1.6;
+}
+.md h2 {
+  margin: 22px 0 6px;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 900;
+}
+.md h3,
+.md h4 {
+  margin: 16px 0 4px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 900;
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md p {
+  margin: 0 0 10px;
+}
+.md ul,
+.md ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md li + li {
+  margin-top: 4px;
+}
+.md b {
+  color: var(--text);
+  font-weight: 800;
+}
+.md code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--raised);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.9em;
+}
+.md pre {
+  max-height: 320px;
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  overflow: auto;
+  border-radius: 12px;
+  background: var(--raised);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.md-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.md-ref {
+  color: var(--text);
+  font-weight: 700;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -29,7 +29,7 @@ use crate::views::{
     CardStats, CatalogPage, CatalogQuery, FolderRow, GameCategory, GameInfo, GameStorageView,
     InstallArgs, InstallProgress, InstallResult, LaunchInfo, Launched, LibraryView, ModKey, ModRow,
     NetworkStatus, Preferences, ProgressThrottle, RollbackFile, Settings, StorageView, Toggled,
-    UninstallItem, Uninstalled, rewrite_categories, rewrite_profile, rewrite_summary,
+    UninstallItem, Uninstalled, image_for, rewrite_categories, rewrite_profile, rewrite_summary,
     rewrite_updates,
 };
 
@@ -409,10 +409,17 @@ pub async fn library(state: State<'_, AppState>, game: String) -> CmdResult<Libr
             version: m.row.version,
             size_bytes: m.row.size_bytes,
             installed_at: m.row.installed_at,
-            root_category: m.row.categories.root_category,
-            root_category_id: m.row.categories.root_category_id,
-            category: m.row.categories.category,
-            category_id: m.row.categories.category_id,
+            root_category: m.row.listing.root_category,
+            root_category_id: m.row.listing.root_category_id,
+            category: m.row.listing.category,
+            category_id: m.row.listing.category_id,
+            sensitive: m.row.listing.sensitive.unwrap_or(false),
+            preview: m
+                .row
+                .listing
+                .preview_url
+                .as_deref()
+                .and_then(|u| image_for(&state.images, u)),
         })
         .collect();
     view.unmanaged = lib.unmanaged;
@@ -663,6 +670,12 @@ pub fn network_status(state: State<'_, AppState>) -> NetworkStatus {
 #[tauri::command]
 pub async fn clear_http_cache(state: State<'_, AppState>) -> CmdResult<u64> {
     Ok(state.db.clear_http_cache().await?)
+}
+
+/// Deletes every cached preview image for good; they're fetched again when next shown.
+#[tauri::command]
+pub fn clear_image_cache(state: State<'_, AppState>) -> gmm_core::Size {
+    state.images.clear()
 }
 
 async fn plan(state: &AppState, game: &GameManifest) -> CmdResult<gmm_core::LaunchPlan> {

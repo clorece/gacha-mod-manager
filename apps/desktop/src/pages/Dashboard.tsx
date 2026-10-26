@@ -6,13 +6,14 @@
 import { useState } from "react";
 import type { GameInfo, GameStatus } from "../api";
 import { useLaunch } from "../components/Launch";
+import { Preview } from "../components/Preview";
 import { SetupCard } from "../components/SetupCard";
 import { type AppData, modCounts } from "../data";
 import { ago, bytes, day, plural } from "../format";
 import { bannerClass, launchRoute, setupLabel, sourceLabel } from "../games";
 import { Button, Chip, Icon, Notice } from "../ui";
 
-/** Placeholder art for a mod until previews are wired: one of six stripes, by id. */
+/** Placeholder art for a mod without a preview (Downloads rows): one of six stripes, by id. */
 export function artClass(id: number): string {
   return `art a${(id % 6) + 1}`;
 }
@@ -81,7 +82,13 @@ export function Dashboard({ data }: { data: AppData }) {
           {recent.length === 0 && <p className="sub">Nothing installed through GMM yet.</p>}
           {recent.map((m) => (
             <div className="row" key={m.id}>
-              <div className={`thumb ${artClass(m.id)}`} />
+              <Preview
+                className="thumb"
+                image={m.preview ? { url: m.preview, variants: [] } : undefined}
+                width={52}
+                sensitive={m.sensitive}
+                alt={m.name}
+              />
               <div className="grow">
                 <div className="title-sm">{m.name}</div>
                 <div className="sub">

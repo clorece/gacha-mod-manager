@@ -69,6 +69,8 @@ pub struct CacheStorage {
     pub downloads: Size,
     /// Leftover extraction folders (normally empty).
     pub extract: Size,
+    /// Preview images in `images/` (capped, oldest go first).
+    pub images: Size,
     /// GameBanana responses kept in the database.
     pub http_entries: u64,
     pub http_bytes: u64,
@@ -167,6 +169,7 @@ pub async fn cache_storage(db: &Db, ws: &Workspace) -> Result<CacheStorage, Core
     Ok(CacheStorage {
         downloads: tree_size(guard, &guard.path(cache, "downloads")?),
         extract: tree_size(guard, &guard.path(cache, "extract")?),
+        images: tree_size(guard, &guard.path(cache, "images")?),
         http_entries,
         http_bytes,
         free_bytes: guard.available_space(&guard.path(cache, "")?).ok(),

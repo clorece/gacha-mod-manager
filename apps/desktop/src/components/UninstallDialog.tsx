@@ -10,38 +10,42 @@ import { bytes, plural } from "../format";
 import { Button, Dialog, Notice, useToast } from "../ui";
 
 export function UninstallDialog({
-  game,
-  items,
+  batches,
   onClose,
   onDone,
 }: {
-  game: string;
-  /** From `uninstall_preview`: exactly what goes. */
-  items: UninstallItem[];
+  /** From `uninstall_preview`, per game: exactly what goes. */
+  batches: { game: string; items: UninstallItem[] }[];
   onClose: () => void;
   onDone: (done: Uninstalled[]) => Promise<void> | void;
 }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const items = batches.flatMap((b) => b.items);
   const hand = items.filter((p) => p.hand_installed);
   const total = items.reduce((sum, p) => sum + p.bytes, 0);
+  // Several folders of one mod are its versions.
+  const what =
+    items.length === 1
+      ? items[0].name
+      : new Set(items.map((p) => p.name)).size === 1
+        ? `${items[0].name} (${items.length} versions)`
+        : plural(items.length, "mod");
 
   const confirm = async () => {
     setBusy(true);
     try {
-      const done = await api.uninstall(
-        game,
-        items.map((p) => p.key),
-      );
+      const done: Uninstalled[] = [];
+      for (const b of batches) {
+        done.push(
+          ...(await api.uninstall(
+            b.game,
+            b.items.map((p) => p.key),
+          )),
+        );
+      }
       const deleted = done.filter((d) => d.removed).length;
-      toast(
-        "ok",
-        items.length === 1
-          ? deleted > 0
-            ? `${items[0].name} deleted.`
-            : `${items[0].name} removed from GMM's list.`
-          : `${plural(items.length, "mod")} deleted.`,
-      );
+      toast("ok", items.length === 1 && deleted === 0 ? `${what} removed from GMM's list.` : `${what} deleted.`);
       await onDone(done);
     } catch (e) {
       toast("bad", asCmdError(e).message);
@@ -53,7 +57,7 @@ export function UninstallDialog({
   return (
     <Dialog
       eyebrow="Uninstall"
-      title={items.length === 1 ? `Delete ${items[0].name}?` : `Delete ${plural(items.length, "mod")}?`}
+      title={`Delete ${what}?`}
       onClose={onClose}
       footer={
         <>

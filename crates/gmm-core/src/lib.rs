@@ -52,7 +52,7 @@ pub use conflicts::{
 };
 pub use error::CoreError;
 pub use fetch::{FetchEvent, FetchedArchive, MAX_DOWNLOAD_BYTES, choose_file, fetch_archive};
-pub use images::{CachedImage, IMAGE_HOST, ImageCache, MAX_IMAGE_CACHE_BYTES};
+pub use images::{CachedImage, IMAGE_HOST, ImageCache, MAX_IMAGE_CACHE_BYTES, clear_image_cache};
 pub use install::{
     InstallEvent, InstallOptions, InstallReport, InstallRequest, InstalledFolder, ModMeta,
     Prepared, Sidecar, VariantChoice, install, install_analyzed, install_gate, install_prepared,

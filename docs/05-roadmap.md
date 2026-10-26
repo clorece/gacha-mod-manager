@@ -35,8 +35,9 @@ far: RAR, the whole backend list (2026-10-25), the startup check, Downloads, the
 confirmation, and (2026-10-25, first review checkpoint) the Dashboard polish, the setup
 guide, the first-run preferences screen and the banner art, each checked in a real `tauri
 dev` window against the real XXMI setup; and (2026-10-25, second checkpoint) the Mods Store
-and GMM's own mod page. Next: the Library, Mod settings, Settings and Documentation (third
-checkpoint), then the tests.
+and GMM's own mod page; and (2026-10-25, third checkpoint) the Library, Mod settings,
+Settings with the Storage breakdown, and Documentation. Every screen is built; next are the
+tests.
 
 **Decisions for the rest of Phase 5** (the project owner, 2026-10-25): Store sort offers all
 six GameBanana sorts (Recommended first); **Hide installed** and **Show sensitive** are toggle
@@ -149,17 +150,47 @@ edited by the owner); the contrast and overlap audit runs with Playwright on Lin
       Credits; Download / Add versions / Mod settings by install state; "View on
       GameBanana" through the confirmed opener. Opened from Store cards, the featured
       gallery and Mod settings ("View mod page")
-- [ ] Mods Library: category and character filters (ModRow categories), Show sensitive chip
-      (content rating stored at install), stored preview images on cards, select mode with
-      Enable / Disable / Delete selected (`UninstallDialog`), version groups with
-      `switch_version`, update badges and **Update all** from the startup report
-- [ ] Mod settings panel: Versions section (install more from the cached archive, switch,
-      remove); the itemized, permanent uninstall is built (2026-10-25)
-- [ ] Settings: Appearance and Mods Store on the stored preferences, XXMI folder, games,
-      Storage (full breakdown without "Last used" or the drive line; download / image /
-      HTTP caches with Clear) and About (notices, disclaimer, credits)
-- [ ] Documentation page: guides as repo Markdown built into the app; Report a Bug stays the
-      WIP page
+- [x] Mods Library (2026-10-25, third checkpoint): `pages/Library.tsx`. The versions of one
+      GameBanana file share a card ("Name · N versions" chip; its switch turns the current
+      version on, or every version off), and every count (sidebar, Dashboard, banners)
+      counts them as one mod; Category and Characters filters from the categories stored at
+      install; the **Show sensitive** chip (the shared preference) with "N hidden as
+      sensitive"; stored preview images on cards (also on the Dashboard's recently
+      installed); Update and Conflict badges; **Update all (N)** in the header queues every
+      update the startup check found; select mode (checkbox per card, Select all / none,
+      Enable / Disable / **Delete selected** through `UninstallDialog`, which now takes
+      several games); the "XXMI isn't set up for this game yet" notice; empty states with
+      Reset filters. Backend: migration 0005 stores the sensitive flag and the first preview
+      image's address with each mod (`ModListing`, refreshed by updates); `ModRow.preview`
+      is a `gmmimg` address, `ModRow.sensitive`
+- [x] Mod settings panel (2026-10-25): the preview and source line in the header; a
+      **Versions** section (each installed version with its own switch through
+      `switch_version`, which switches off the clashing ones, and a remove button; **Add
+      versions** / "Look for other versions" opens the install confirmation on the same file,
+      which reads the cached archive and locks the installed versions); details (added,
+      size and folder count, the cached file); Uninstall removes every version
+- [x] Settings (2026-10-25): `pages/Settings.tsx`. Appearance (Dark / Light / Match
+      Windows) and Mods Store (show sensitive, blur) on the stored preferences; XXMI
+      Launcher (folder, found or chosen, version; Choose folder / Find automatically); Games
+      (how each was found, its setup state, folders added by hand with Forget, Add a
+      folder); Storage (downloaded archives, preview images and GameBanana answers, each
+      with Clear; free space; Show breakdown); About (version, license, database location,
+      the README's Disclaimer and Credits, and THIRD-PARTY-NOTICES.md in a dialog, both
+      bundled at build time). Backend: `ImageCache::clear` and `clear_image_cache` (command
+      and `gmm storage --clear-images`), `CacheStorage.images`
+- [x] Storage breakdown (2026-10-25): `pages/Storage.tsx` from Settings › Storage. All
+      games: one bar per game (GMM's mods, added by hand, other files) and one for the
+      cache; per game: a bar of the eight biggest mods plus "Other" with a legend, and a
+      table (Mod, Character, Size, State) sortable by every column, with Select all / Select
+      switched off, Switch off and Delete… (confirmed). Colors are a validated categorical
+      palette per theme (`--viz-1..8`); no "Last used", no drive line, no per-mod cache
+      clearing (the cache is cleared as a whole in Settings)
+- [x] Documentation page (2026-10-25): `pages/Docs.tsx`, six guides in
+      [docs/guides/](guides/) (Getting started, How mods load, Fixing setup problems,
+      Installing safely, Conflicts, Privacy), bundled at build time and rendered by
+      `markdown.tsx` (React elements, never HTML; links between guides open in the app,
+      other addresses show as text). Drafted by Claude for the owner to edit. Report a Bug
+      stays the WIP page
 
 **Tests**
 - [ ] Vitest component tests and fixture-based snapshots
@@ -175,10 +206,9 @@ uninstall, storage and settings exercised in the app against the real setup.
 
 ## Phase 6 — Power features (in progress)
 
-Started 2026-10-25 at your request, alongside the Phase 5 screens still to build (the Store,
-mod page, Settings...). Each feature is built backend first (`gmm-core`, a `gmm` command,
-an app command) and shown where a screen already exists; the rest of its UI arrives with its
-Phase 5 screen.
+Started 2026-10-25 at your request, alongside the Phase 5 screens (all built since the third
+checkpoint). Each feature is built backend first (`gmm-core`, a `gmm` command, an app
+command) and shown in its screen.
 
 - [x] **Update and roll back** (2026-10-25): `gmm_core::change_file` moves every installed
       folder of a GameBanana mod to another of its files, keeping each folder's name (so
@@ -223,9 +253,10 @@ Phase 5 screen.
       themselves; GMM never connects to GitHub, so R2 is unchanged
 - [ ] 1-click install deep links (`gmm://`): needs GameBanana to add GMM as a mod-manager
       integration for ZZZ/WuWa (none listed today, [10](10-gamebanana-api.md)); then T6
-- [ ] UI still to come with Phase 5 screens: version groups and switching in the Library,
-      Update badges on Library cards (the Store's cards have them since 2026-10-25), profiles
-      in the Dashboard
+- [x] Version groups and switching in the Library, Update badges on Library cards
+      (2026-10-25, third checkpoint)
+- [ ] Profiles on the Dashboard (apply a profile from a game's bubble; today they live in
+      the Library's Profiles panel)
 
 ## Phase 7 — Release
 
@@ -291,6 +322,14 @@ Epic install to confirm the Epic reader (fixture-tested only).
   exact within a page and close across pages; GameBanana's own order and "most downloaded"
   are interleaved, not sorted (downloads aren't in listings). The result count is
   GameBanana's total before sensitive and installed mods are left out.
+- Library: mods installed before migration 0005 (and hand-installed ones) have no stored
+  preview or sensitive flag, so they show the placeholder and count as not sensitive until
+  an update refreshes them. A version group's "current" version is the one that's on, else
+  the first installed; GMM doesn't remember which one was on last. Hiding sensitive mods
+  hides installed ones too (the same preference as the Store).
+- Library switches and Mod settings' Versions switches haven't been driven from the smoke
+  window, because switching writes the real `d3dx_user.ini`; they reuse the commands the
+  earlier checkpoints exercised (`set_enabled`, `switch_version`).
 
 ## Open questions
 

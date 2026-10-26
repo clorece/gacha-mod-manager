@@ -253,6 +253,7 @@ pub async fn storage(
     db: &Db,
     game: Option<&'static GameManifest>,
     clear_downloads: bool,
+    clear_images: bool,
     xxmi: Option<PathBuf>,
     folders: Vec<(String, PathBuf)>,
     json: bool,
@@ -266,6 +267,19 @@ pub async fn storage(
             println!(
                 "deleted {} cached download(s) ({})",
                 cleared.archives,
+                bytes(cleared.bytes)
+            );
+        }
+        return Ok(());
+    }
+    if clear_images {
+        let cleared = gmm_core::clear_image_cache(&gmm_core::AppDirs::system()?.cache)?;
+        if json {
+            println!("{}", serde_json::to_string_pretty(&cleared)?);
+        } else {
+            println!(
+                "deleted {} cached image(s) ({})",
+                cleared.files,
                 bytes(cleared.bytes)
             );
         }
@@ -346,9 +360,11 @@ pub async fn storage(
     let c = &out.cache;
     let _ = writeln!(
         text,
-        "cache: downloads {} ({} files), API responses {} ({}), drive free {}",
+        "cache: downloads {} ({} files), images {} ({}), API responses {} ({}), drive free {}",
         size(&c.downloads),
         c.downloads.files,
+        size(&c.images),
+        c.images.files,
         bytes(c.http_bytes),
         c.http_entries,
         free(c.free_bytes)

@@ -10,8 +10,8 @@ Development happens on Windows (primary target). Linux follows later from the sa
 ## Where we are (2026-10-25)
 
 **Done:** the backend (Phases 0–2), the app foundations (Phase 3) and the design (Phase 4),
-2026-10-23 to 25. Phase 5 (screens) is under way, and Phase 6 (power features) started
-alongside it on 2026-10-25 (below).
+2026-10-23 to 25. Every Phase 5 screen is built (third checkpoint, 2026-10-25); its tests
+are next. Phase 6 (power features) started alongside it on 2026-10-25 (below).
 Every feature works from the `gmm` command line: browse GameBanana, install (download, safe
 extraction, policy scan, variants), switch mods on and off (keeping their saved in-game
 toggles), uninstall for good, conflicts, storage, launch through XXMI. The Phase 2 exit check
@@ -21,8 +21,9 @@ types, the `gmmimg` image protocol, a locked-down capability and CSP, and the de
 the sidebar (General, Mods with Select Game, Development, theme switch), the Mods Store and
 mod page, a first-run
 preferences screen, the Dashboard (game banners with key art that open to Launch, last
-played, recently installed, setup cards with a setup guide) and the Mods Library (switches,
-conflict prompt, a first Mod settings panel with Uninstall). The visual system from the
+played, recently installed, setup cards with a setup guide), the Mods Library (previews,
+filters, version groups, select mode, Update all) with its Mod settings panel, Settings
+with the Storage breakdown, and Documentation (player guides). The visual system from the
 design canvas is in the code: tokens for both themes, bundled Nunito, hand-built primitives
 (`src/ui`) and a dev-only style guide page. Run it with
 `corepack pnpm tauri dev` in `apps/desktop` (or `just app-dev`). A cleanup pass followed
@@ -39,20 +40,23 @@ design canvas is in the code: tokens for both themes, bundled Nunito, hand-built
 | `gmm-detect` | Finds games: Steam, HoYoPlay, Epic, manual folders |
 | `gmm-xxmi` | Reads XXMI's setup (allowlisted config fields only) and works out each game's setup state |
 | `gmm-migoto` | Reads 3DMigoto mod `.ini` files: override hashes, what they replace, namespaces, key bindings |
-| `gmm-db` | SQLite database (`%APPDATA%\GMM\gmm.db`): settings and preferences, manual game folders, installed mods (with categories), last played, profiles, saved in-game toggles, download cache, GameBanana response cache |
-| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`, in one go or in two steps with an install plan; one download per file at a time), the install queue and stop signal, versions (grouping, switching), the update check, the featured gallery (trending, backfilled), Store pages merged from several lists (characters, games), the library (list with disk state, unmanaged mods, enable/disable keeping saved in-game toggles, open folder, uninstall for good with the cached archives), update and roll back, profiles, key bindings, adopting hand-installed mods, installing from a local archive, conflict detection, storage accounting, launching through XXMI (with exe confirmation, recording "last played"), app folders, the image cache behind `gmmimg` |
+| `gmm-db` | SQLite database (`%APPDATA%\GMM\gmm.db`): settings and preferences, manual game folders, installed mods (with categories, sensitive flag and preview address), last played, profiles, saved in-game toggles, download cache, GameBanana response cache |
+| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`, in one go or in two steps with an install plan; one download per file at a time), the install queue and stop signal, versions (grouping, switching), the update check, the featured gallery (trending, backfilled), Store pages merged from several lists (characters, games), the library (list with disk state, unmanaged mods, enable/disable keeping saved in-game toggles, open folder, uninstall for good with the cached archives), update and roll back, profiles, key bindings, adopting hand-installed mods, installing from a local archive, conflict detection, storage accounting, launching through XXMI (with exe confirmation, recording "last played"), app folders, the image cache behind `gmmimg` (with Clear) |
 | `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, a command per CLI action plus the install confirmation, queue, versions, startup check, featured mods, card stats and the confirmed openers (ids only), the queue worker, the `gmmimg` protocol, the description address rewrite, navigation guard; the React UI is in `apps/desktop/src` |
-| `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm install-file`, `gmm list`, `gmm enable/disable/uninstall`, `gmm update`, `gmm rollback`, `gmm keys`, `gmm adopt`, `gmm profile …`, `gmm conflicts`, `gmm storage`, `gmm launch`, `gmm detect`, `gmm status`, `gmm config` |
+| `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm install-file`, `gmm list`, `gmm enable/disable/uninstall`, `gmm update`, `gmm rollback`, `gmm keys`, `gmm adopt`, `gmm profile …`, `gmm conflicts`, `gmm storage` (`--clear-downloads`, `--clear-images`), `gmm launch`, `gmm detect`, `gmm status`, `gmm config` |
 
-On the dev machine, `gmm status` and the app report ZZZ `Ready` (HoYoPlay install) and WuWa
-`Ready` (Steam install; its Steam copy runs with XXMI's Game Launch on Direct).
+On the dev machine, WuWa is `Ready` (Steam install; its Steam copy runs with XXMI's Game
+Launch on Direct). ZZZ (HoYoPlay install) was `Ready` until XXMI's "Game Folder" for it
+changed to `D:\HoYoverse\ZenlessZoneZero Game` while the game is at `C:\HoYoverse\...`
+(seen 2026-10-25 evening); GMM reports it as "game folder in XXMI is wrong" with the fix.
 
 **Design** (Phase 4): the canvas (23 artboards, every screen dark and light, signed off
 2026-10-25) is written up in [08-design-system.md](08-design-system.md); file formats and the
 RAR plan in [09-archive-formats.md](09-archive-formats.md).
 
-**Waiting on you:** a look at the second review checkpoint in the app (the Mods Store and the
-mod page); the human-only checks (a real file drop, the "Install from a file" dialog, the
+**Waiting on you:** a look at the third review checkpoint in the app (the Library, Mod
+settings, Settings with Storage, Documentation) and an edit of the six player guides in
+[guides/](guides/); ZZZ's "Game Folder" in XXMI (above); the human-only checks (a real file drop, the "Install from a file" dialog, the
 browser openers' native confirmations, a real install from the Store). Decided 2026-10-25: the banners are official key art (bundled
 with a notice), GMM keeps saved in-game toggles across every switch (R3 amended), deletes are
 permanent (R8 amended), the name stays "Gacha Mod Manager", the setup guide is text only, and
@@ -122,8 +126,22 @@ combines with category and sort) and `gmm_core::browse`, which merges one list p
 character or per game. Every Download button now opens the install confirmation. Checked in
 a real `tauri dev` window.
 
-**Next:** the Library, Mod settings, Settings and Documentation (third checkpoint), then the
-Phase 5 tests; Phase 6's Report a Bug (GitHub issue link plus a local log) and deep links if
+**Third review checkpoint** (2026-10-25): every Phase 5 screen is built. The **Mods
+Library** shows each mod's stored preview, groups the versions of one file into one card,
+filters by category and character, hides sensitive mods with the shared chip, badges updates
+and conflicts, and has **Update all** and a select mode (Enable / Disable / Delete
+selected). **Mod settings** gained a Versions section (switch which version is on, remove
+one, add more from the cached archive). **Settings** covers Appearance, the Mods Store
+switches, the XXMI folder, games and their folders, Storage (three caches with Clear, plus a
+breakdown page with a per-mod bar and a sortable, multi-select table) and About (credits,
+disclaimer and third-party notices from the repo files). **Documentation** shows six
+player guides from [guides/](guides/), bundled at build time. Behind it: migration 0005
+(sensitive flag and preview address per mod, refreshed by updates), clearing the image
+cache (`clear_image_cache`, `gmm storage --clear-images`). Checked in a real `tauri dev`
+window (a three-version install switched off, Add versions, select-mode delete, Settings,
+Storage, Documentation in both themes).
+
+**Next:** the Phase 5 tests; Phase 6's Report a Bug (GitHub issue link plus a local log) and deep links if
 GameBanana adds GMM. See the roadmap.
 
 ## Docs
@@ -139,6 +157,7 @@ GameBanana adds GMM. See the roadmap.
 | [08-design-system.md](08-design-system.md) | Navigation, screen layouts, tokens (dark and light), type, motion, data constraints on the design |
 | [09-archive-formats.md](09-archive-formats.md) | Which archive formats GMM installs from, error messages, and the RAR plan |
 | [10-gamebanana-api.md](10-gamebanana-api.md) | GameBanana's terms (no permission needed), rate limits per IP, how GMM backs off and keeps its load low, API limits users meet |
+| [guides/](guides/) | The player guides the app's Documentation page shows (bundled at build time) |
 | [brand/](brand/) | The GMM mark and lockups, and how to use them |
 | [../crates/gmm-adapters/games/](../crates/gmm-adapters/games/) | The game manifests for ZZZ and WuWa |
 | `research/` (local only, git-ignored) | Prior-art notes and Phase 0 observations |

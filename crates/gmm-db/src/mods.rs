@@ -25,19 +25,24 @@ pub struct InstalledMod {
     pub size_bytes: u64,
     pub installed_at: i64,
     pub scan_report_json: Option<String>,
-    pub categories: ModCategories,
+    pub listing: ModListing,
 }
 
-/// The mod's GameBanana categories when it was installed (empty for mods installed before
-/// GMM recorded them).
+/// What GameBanana's listing said about the mod when it was installed: categories, the
+/// sensitive flag and the first preview image (empty for mods installed before GMM recorded
+/// them, and for hand-installed ones).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ModCategories {
+pub struct ModListing {
     pub root_category_id: Option<u64>,
     /// e.g. "Character Skins".
     pub root_category: Option<String>,
     pub category_id: Option<u64>,
     /// The subcategory: for skins, the character.
     pub category: Option<String>,
+    /// GameBanana flagged it (visibility or content ratings); `None` when unknown.
+    pub sensitive: Option<bool>,
+    /// The first preview image on GameBanana's image host.
+    pub preview_url: Option<String>,
 }
 
 /// What the install pipeline records for a new mod. It starts enabled.
@@ -54,11 +59,12 @@ pub struct NewInstalledMod {
     pub archive_sha256: Option<String>,
     pub size_bytes: u64,
     pub scan_report_json: Option<String>,
-    pub categories: ModCategories,
+    pub listing: ModListing,
 }
 
 /// What changes when an installed mod moves to another GameBanana file (an update or a
-/// roll back). The folder name, on/off state and install date stay.
+/// roll back), including a fresh listing from the mod page. The folder name, on/off state
+/// and install date stay.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FileChange {
     pub gb_file_id: Option<u64>,
@@ -67,6 +73,7 @@ pub struct FileChange {
     pub archive_sha256: Option<String>,
     pub size_bytes: u64,
     pub scan_report_json: Option<String>,
+    pub listing: ModListing,
 }
 
 /// `SELECT <every column> FROM installed_mods <rest>`, as a static string (sqlx only takes
@@ -76,7 +83,7 @@ macro_rules! select {
         concat!(
             "SELECT id, game_id, folder_name, name, gb_mod_id, gb_file_id, variant, version, ",
             "file_date, enabled, archive_sha256, size_bytes, installed_at, scan_report_json, ",
-            "root_category_id, root_category, category_id, category ",
+            "root_category_id, root_category, category_id, category, sensitive, preview_url ",
             "FROM installed_mods ",
             $rest
         )
@@ -91,8 +98,8 @@ impl Db {
             "INSERT INTO installed_mods (game_id, folder_name, name, gb_mod_id, gb_file_id,
                  variant, version, file_date, enabled, archive_sha256, size_bytes,
                  installed_at, scan_report_json, root_category_id, root_category, category_id,
-                 category)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)",
+                 category, sensitive, preview_url)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&m.game_id)
         .bind(&m.folder_name)
@@ -106,13 +113,12 @@ impl Db {
         .bind(to_db(m.size_bytes, "size_bytes")?)
         .bind(now())
         .bind(&m.scan_report_json)
-        .bind(opt_to_db(
-            m.categories.root_category_id,
-            "root_category_id",
-        )?)
-        .bind(&m.categories.root_category)
-        .bind(opt_to_db(m.categories.category_id, "category_id")?)
-        .bind(&m.categories.category)
+        .bind(opt_to_db(m.listing.root_category_id, "root_category_id")?)
+        .bind(&m.listing.root_category)
+        .bind(opt_to_db(m.listing.category_id, "category_id")?)
+        .bind(&m.listing.category)
+        .bind(m.listing.sensitive)
+        .bind(&m.listing.preview_url)
         .execute(&self.pool)
         .await?;
         Ok(result.last_insert_rowid())
@@ -195,7 +201,9 @@ impl Db {
     ) -> Result<bool, DbError> {
         let result = sqlx::query(
             "UPDATE installed_mods SET gb_file_id = ?, version = ?, file_date = ?,
-                 archive_sha256 = ?, size_bytes = ?, scan_report_json = ?
+                 archive_sha256 = ?, size_bytes = ?, scan_report_json = ?,
+                 root_category_id = ?, root_category = ?, category_id = ?, category = ?,
+                 sensitive = ?, preview_url = ?
              WHERE id = ?",
         )
         .bind(opt_to_db(change.gb_file_id, "gb_file_id")?)
@@ -204,6 +212,15 @@ impl Db {
         .bind(&change.archive_sha256)
         .bind(to_db(change.size_bytes, "size_bytes")?)
         .bind(&change.scan_report_json)
+        .bind(opt_to_db(
+            change.listing.root_category_id,
+            "root_category_id",
+        )?)
+        .bind(&change.listing.root_category)
+        .bind(opt_to_db(change.listing.category_id, "category_id")?)
+        .bind(&change.listing.category)
+        .bind(change.listing.sensitive)
+        .bind(&change.listing.preview_url)
         .bind(id)
         .execute(&self.pool)
         .await?;
@@ -236,11 +253,13 @@ fn map_row(row: &SqliteRow) -> Result<InstalledMod, DbError> {
         size_bytes: from_db(row.try_get("size_bytes")?, "size_bytes")?,
         installed_at: row.try_get("installed_at")?,
         scan_report_json: row.try_get("scan_report_json")?,
-        categories: ModCategories {
+        listing: ModListing {
             root_category_id: opt_from_db(row.try_get("root_category_id")?, "root_category_id")?,
             root_category: row.try_get("root_category")?,
             category_id: opt_from_db(row.try_get("category_id")?, "category_id")?,
             category: row.try_get("category")?,
+            sensitive: row.try_get("sensitive")?,
+            preview_url: row.try_get("preview_url")?,
         },
     })
 }
