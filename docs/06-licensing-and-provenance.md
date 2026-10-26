@@ -77,7 +77,8 @@ Since no GPL code is used, we can pick any license:
 Our dependencies must fit this license. `cargo-deny` and an npm license checker
 (`scripts/check-npm-licenses.mjs`, `pnpm run check-licenses` in `apps/desktop`, in CI) enforce
 an allowlist (MIT, Apache-2.0, BSD-2/3-Clause, ISC, Zlib, MPL-2.0, Unicode-3.0, CC0-1.0; the npm
-check also allows 0BSD and BlueOak-1.0.0, common permissive npm licenses). Any GPL,
+check also allows 0BSD, BlueOak-1.0.0 and MIT-0, common permissive npm licenses; MIT-0, MIT
+without the attribution clause, arrived with jsdom in the Phase 5 tests). Any GPL,
 LGPL or AGPL dependency fails the build. Watch out for:
 - **UnRAR** (vendored in `crates/gmm-extract`, Phase 5): RARLAB's freeware *UnRAR license*
   lets any software use the source to handle RAR archives, free of charge, but bans using it
@@ -113,13 +114,15 @@ LGPL or AGPL dependency fails the build. Watch out for:
   feature, generates the TypeScript types). On Linux Tauri brings gtk-rs 0.18; its build-time
   `proc-macro-error` is flagged unmaintained (RUSTSEC-2024-0370, not a vulnerability) and
   ignored in `deny.toml` with that reason. The desktop crate also uses `sha2` and `hex`
-  (workspace dependencies already listed) for description link keys. npm (49 packages):
+  (workspace dependencies already listed) for description link keys. npm (117 packages with the test tools):
   `react`, `react-dom`, `@tauri-apps/api`, `@tanstack/react-virtual` 3.14.22 (MIT, with
   `@tanstack/virtual-core`; the Mods Store's virtualized grid, Phase 5), `dompurify` 3.4.17 (MPL-2.0 OR Apache-2.0,
   taken as Apache-2.0; sanitizes GameBanana HTML, Phase 5) (runtime); `@fontsource-variable/nunito` 5.3 (the UI font, OFL-1.1, font
   files only: the one exception in `scripts/check-npm-licenses.mjs`, see below); `vite`, `@vitejs/plugin-react`, `tailwindcss`,
   `@tailwindcss/vite`, `typescript`, `@biomejs/biome`, `@tauri-apps/cli`, `@types/react*`
-  (build/dev only). Every npm package must be older than pnpm's minimum release age (one day);
+  (build/dev only); `vitest` 5.0.5, `jsdom` 30.1.3, `@testing-library/react` 16.3.3 and
+  `@testing-library/dom` 10.4.2 (MIT) and `playwright` 1.64.1 (Apache-2.0) for the Phase 5
+  tests and the contrast audit (test only, never bundled). Every npm package must be older than pnpm's minimum release age (one day);
   no exemptions are configured.
 - **Brand assets** (`docs/brand/`, the app icons, `apps/desktop/src/assets/gmm-logo.svg`): the
   GMM mark and lockups, provided by the project owner (made with Claude Design, 2026-10-24),

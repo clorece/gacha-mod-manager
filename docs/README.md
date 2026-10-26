@@ -10,8 +10,9 @@ Development happens on Windows (primary target). Linux follows later from the sa
 ## Where we are (2026-10-25)
 
 **Done:** the backend (Phases 0–2), the app foundations (Phase 3) and the design (Phase 4),
-2026-10-23 to 25. Every Phase 5 screen is built (third checkpoint, 2026-10-25); its tests
-are next. Phase 6 (power features) started alongside it on 2026-10-25 (below).
+2026-10-23 to 25. Phase 5 (screens) is built and tested (2026-10-25); only its exit check,
+which needs a person at the real setup, is left. Phase 6 (power features) started alongside
+it on 2026-10-25 (below).
 Every feature works from the `gmm` command line: browse GameBanana, install (download, safe
 extraction, policy scan, variants), switch mods on and off (keeping their saved in-game
 toggles), uninstall for good, conflicts, storage, launch through XXMI. The Phase 2 exit check
@@ -56,8 +57,10 @@ RAR plan in [09-archive-formats.md](09-archive-formats.md).
 
 **Waiting on you:** a look at the third review checkpoint in the app (the Library, Mod
 settings, Settings with Storage, Documentation) and an edit of the six player guides in
-[guides/](guides/); ZZZ's "Game Folder" in XXMI (above); the human-only checks (a real file drop, the "Install from a file" dialog, the
-browser openers' native confirmations, a real install from the Store). Decided 2026-10-25: the banners are official key art (bundled
+[guides/](guides/); ZZZ's "Game Folder" in XXMI (above); the Phase 5 exit check by hand
+(switching mods and versions from the app, a real install from the Store seen in game, a
+real file drop and the "Install from a file" dialog, the browser openers' native
+confirmations; listed in the roadmap). Decided 2026-10-25: the banners are official key art (bundled
 with a notice), GMM keeps saved in-game toggles across every switch (R3 amended), deletes are
 permanent (R8 amended), the name stays "Gacha Mod Manager", the setup guide is text only, and
 the rest of Phase 5 follows the decisions listed in the roadmap.
@@ -141,8 +144,19 @@ cache (`clear_image_cache`, `gmm storage --clear-images`). Checked in a real `ta
 window (a three-version install switched off, Add versions, select-mode delete, Settings,
 Storage, Documentation in both themes).
 
-**Next:** the Phase 5 tests; Phase 6's Report a Bug (GitHub issue link plus a local log) and deep links if
-GameBanana adds GMM. See the roadmap.
+**Phase 5 tests** (2026-10-25, all in CI): Vitest component tests on a fake bridge with
+synthetic fixtures typed against the Rust types (73 tests: the Library, the install
+confirmation, the storage table, the slideshow, the Markdown renderer, a mod page
+snapshot); the XSS corpus through `RichText.sanitize` (it found image and table size
+attributes always stripped, now fixed); the IPC fuzz harness (`ipc_fuzz.rs`: about 1,500
+hostile calls through Tauri's mock runtime with the real capability, a fake XXMI and a
+network that refuses everything; nothing outside GMM's folders may change); and the
+contrast and overlap audit (`tests/ui-audit.mjs`, Playwright, 20 states in both themes, no
+findings).
+
+**Next:** the Phase 5 exit check (by hand), then Phase 6's Report a Bug (GitHub issue link
+plus a local log), profiles on the Dashboard, and deep links if GameBanana adds GMM. See
+the roadmap.
 
 ## Docs
 

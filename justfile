@@ -34,7 +34,11 @@ app-dev:
     cd apps/desktop; corepack pnpm tauri dev
 
 app-check:
-    cd apps/desktop; corepack pnpm install --frozen-lockfile; corepack pnpm typecheck; corepack pnpm lint; corepack pnpm audit; corepack pnpm run check-licenses
+    cd apps/desktop; corepack pnpm install --frozen-lockfile; corepack pnpm typecheck; corepack pnpm lint; corepack pnpm test; corepack pnpm audit; corepack pnpm run check-licenses
+
+# The contrast and overlap audit with an installed browser (CI uses Playwright's Chromium).
+app-audit:
+    cd apps/desktop; $env:GMM_AUDIT_CHANNEL = "msedge"; corepack pnpm ui-audit
 
 bindings:
     $env:GMM_UPDATE_BINDINGS = "1"; cargo test -p gmm-desktop bindings

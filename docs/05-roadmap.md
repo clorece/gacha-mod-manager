@@ -27,7 +27,7 @@ phases condensed in this file.
 Phase 4 decisions: the primitives are built by hand (no component library). The theme
 choice and the banner source, open then, were settled in Phase 5 (below).
 
-## Phase 5 — Screens (in progress)
+## Phase 5 — Screens (built and tested; exit check waiting on you)
 
 Every screen sits on commands that exist or are small additions. Order: what unblocks
 installs first, then the screens in the order users meet them. Started 2026-10-24. Done so
@@ -36,8 +36,10 @@ confirmation, and (2026-10-25, first review checkpoint) the Dashboard polish, th
 guide, the first-run preferences screen and the banner art, each checked in a real `tauri
 dev` window against the real XXMI setup; and (2026-10-25, second checkpoint) the Mods Store
 and GMM's own mod page; and (2026-10-25, third checkpoint) the Library, Mod settings,
-Settings with the Storage breakdown, and Documentation. Every screen is built; next are the
-tests.
+Settings with the Storage breakdown, and Documentation; and (2026-10-25) the tests: Vitest
+component tests and snapshots, the XSS corpus, the IPC fuzz harness and the contrast and
+overlap audit, all in CI. What's left is the exit check below, which needs a person at the
+real setup.
 
 **Decisions for the rest of Phase 5** (the project owner, 2026-10-25): Store sort offers all
 six GameBanana sorts (Recommended first); **Hide installed** and **Show sensitive** are toggle
@@ -193,16 +195,36 @@ edited by the owner); the contrast and overlap audit runs with Playwright on Lin
       stays the WIP page
 
 **Tests**
-- [ ] Vitest component tests and fixture-based snapshots
-- [ ] XSS corpus through the description renderer (T3): the Rust rewrite has unit tests
-      (`html.rs`); the DOMPurify side (`RichText.sanitize`) still needs the Vitest corpus
-- [ ] IPC fuzz harness: hostile arguments to every command (R5; so far checked by hand)
-- [ ] The contrast and overlap audit from Phase 4, run with Playwright (Chromium, cached) on
-      Linux CI against the Vite frontend with the commands faked from recorded data
+- [x] Vitest component tests and fixture-based snapshots (2026-10-25): `pnpm test`, 73
+      tests in CI. A fake bridge (`src/test/fakeBridge.ts`, installed with
+      `@tauri-apps/api/mocks`) answers from synthetic fixtures typed against `bindings.ts`
+      (`src/test/fixtures.ts`), so a changed Rust type breaks the tests' build. Covered: the
+      Library (cards, version groups, sensitive filter, conflict prompt, select-mode delete,
+      the Versions section), the install confirmation, the storage table, the slideshow, the
+      Markdown renderer, formatting and mod counts, and a snapshot of the mod page header
+      and license
+- [x] XSS corpus through `RichText.sanitize` (T3, 2026-10-25): 46 hostile inputs plus the
+      ordinary formatting that must survive. It found `width` / `height` / `colspan` /
+      `rowspan` always stripped; fixed
+- [x] IPC fuzz harness (R5, 2026-10-25): `src-tauri/src/ipc_fuzz.rs`, about 1,500 hostile
+      calls through Tauri's mock runtime with the app's real capability, against a fake XXMI
+      setup, the network refused (`Allowlist::deny_all`); nothing outside GMM's folders may
+      change. Needed: commands generic over the runtime (`handler()`), `AppState::open_with`
+- [x] The contrast and overlap audit (2026-10-25): `tests/ui-audit.mjs` (`pnpm ui-audit`),
+      Playwright with Chromium (cached) in the CI frontend job, 20 states in both themes
+      against the Vite frontend with the fake bridge; a planted-problem self-check first.
+      Locally `just app-audit` uses the installed Edge. First run: no findings
 
 Exit: everything the CLI does is reachable in the app for ZZZ and WuWa (RAR included), with
 the designed loading, empty and error states; install (all confirmation paths), versions,
 uninstall, storage and settings exercised in the app against the real setup.
+
+Exit check, still to do by hand (the smoke runs covered installs switched off, Add versions,
+uninstall and select-mode delete, Settings and Storage): switching a mod and a version on
+and off from the app (it writes the real `d3dx_user.ini`, so the smoke window avoids it), a
+real install from the Store switched on and seen in game, a file dropped on the window and
+"Install from a file", and the browser openers' native confirmations. Then this phase is
+done.
 
 ## Phase 6 — Power features (in progress)
 

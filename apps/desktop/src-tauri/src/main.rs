@@ -18,6 +18,8 @@ mod views;
 
 #[cfg(test)]
 mod bindings;
+#[cfg(test)]
+mod ipc_fuzz;
 
 use std::sync::Arc;
 
@@ -51,11 +53,16 @@ pub struct AppState {
 
 impl AppState {
     async fn open() -> Result<Self, Box<dyn std::error::Error>> {
-        let dirs = AppDirs::system()?;
+        Self::open_with(AppDirs::system()?, NetConfig::production()).await
+    }
+
+    /// The IPC fuzz harness opens it on temporary folders with a network that refuses
+    /// everything (`ipc_fuzz.rs`).
+    async fn open_with(dirs: AppDirs, net: NetConfig) -> Result<Self, Box<dyn std::error::Error>> {
         let db = open_db(&dirs).await?;
         // Every client shares one connection pool and one "slow down" state: they all reach
         // GameBanana from the same IP address (docs/10-gamebanana-api.md).
-        let net = Client::new(NetConfig::production())?;
+        let net = Client::new(net)?;
         let gb = GameBanana::new(net.clone(), Arc::new(db.clone()));
         // Background reads (card counters) spend the API budget too, at most 1/s of it.
         let background_net = net.sibling(
@@ -124,6 +131,75 @@ fn image_response(status: StatusCode, mime: &str, body: Vec<u8>) -> Response<Vec
         .unwrap_or_else(|_| Response::new(Vec::new()))
 }
 
+/// Every command the webview may call (each also listed in build.rs and allowed in
+/// capabilities/main.json). Generic over the runtime, so the IPC fuzz harness runs the same
+/// list on Tauri's mock runtime.
+fn handler<R: Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync + 'static {
+    tauri::generate_handler![
+        commands::games,
+        commands::statuses,
+        commands::catalog_list,
+        commands::catalog_search,
+        commands::catalog_mod,
+        commands::catalog_updates,
+        commands::catalog_categories,
+        commands::catalog_featured,
+        commands::catalog_stats,
+        commands::prepare_install,
+        commands::install,
+        queue::queue_install,
+        queue::queue_change_file,
+        queue::queue_jobs,
+        queue::queue_watch,
+        queue::queue_pause,
+        queue::queue_resume,
+        queue::queue_cancel,
+        queue::queue_dismiss,
+        queue::queue_clear_finished,
+        startup::startup_check,
+        commands::library,
+        commands::switch_version,
+        commands::rollback_files,
+        commands::set_enabled,
+        commands::uninstall_preview,
+        commands::uninstall,
+        commands::mod_keybindings,
+        commands::adopt_candidates,
+        commands::adopt,
+        local::drop_watch,
+        local::pick_archive,
+        local::prepare_local,
+        local::install_local,
+        local::discard_local,
+        commands::conflicts,
+        commands::storage,
+        commands::clear_download_cache,
+        commands::clear_http_cache,
+        commands::clear_image_cache,
+        commands::network_status,
+        commands::launch_plan,
+        commands::launch,
+        commands::settings,
+        commands::preferences,
+        commands::set_preferences,
+        commands::pick_xxmi_folder,
+        commands::clear_xxmi_folder,
+        commands::pick_game_folder,
+        commands::remove_game_folder,
+        open::open_mod_page,
+        open::open_xxmi_releases,
+        open::open_link,
+        open::open_mod_folder,
+        profiles::profiles,
+        profiles::profile_save,
+        profiles::profile_apply,
+        profiles::profile_rename,
+        profiles::profile_delete,
+        profiles::profile_export,
+        profiles::profile_import,
+    ]
+}
+
 fn main() {
     let result = tauri::Builder::default()
         .plugin(navigation_guard())
@@ -159,69 +235,7 @@ fn main() {
                 local::dropped(window.app_handle(), paths);
             }
         })
-        .invoke_handler(tauri::generate_handler![
-            commands::games,
-            commands::statuses,
-            commands::catalog_list,
-            commands::catalog_search,
-            commands::catalog_mod,
-            commands::catalog_updates,
-            commands::catalog_categories,
-            commands::catalog_featured,
-            commands::catalog_stats,
-            commands::prepare_install,
-            commands::install,
-            queue::queue_install,
-            queue::queue_change_file,
-            queue::queue_jobs,
-            queue::queue_watch,
-            queue::queue_pause,
-            queue::queue_resume,
-            queue::queue_cancel,
-            queue::queue_dismiss,
-            queue::queue_clear_finished,
-            startup::startup_check,
-            commands::library,
-            commands::switch_version,
-            commands::rollback_files,
-            commands::set_enabled,
-            commands::uninstall_preview,
-            commands::uninstall,
-            commands::mod_keybindings,
-            commands::adopt_candidates,
-            commands::adopt,
-            local::drop_watch,
-            local::pick_archive,
-            local::prepare_local,
-            local::install_local,
-            local::discard_local,
-            commands::conflicts,
-            commands::storage,
-            commands::clear_download_cache,
-            commands::clear_http_cache,
-            commands::clear_image_cache,
-            commands::network_status,
-            commands::launch_plan,
-            commands::launch,
-            commands::settings,
-            commands::preferences,
-            commands::set_preferences,
-            commands::pick_xxmi_folder,
-            commands::clear_xxmi_folder,
-            commands::pick_game_folder,
-            commands::remove_game_folder,
-            open::open_mod_page,
-            open::open_xxmi_releases,
-            open::open_link,
-            open::open_mod_folder,
-            profiles::profiles,
-            profiles::profile_save,
-            profiles::profile_apply,
-            profiles::profile_rename,
-            profiles::profile_delete,
-            profiles::profile_export,
-            profiles::profile_import,
-        ])
+        .invoke_handler(handler())
         .run(tauri::generate_context!());
     if let Err(e) = result {
         eprintln!("GMM could not start: {e}");

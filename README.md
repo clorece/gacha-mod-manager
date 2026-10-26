@@ -19,8 +19,8 @@ and filters, a scrolling grid) with a mod page for every mod, the Mods Library (
 filters, versions, select mode, profiles) with per-mod settings, Downloads (the install
 queue), the install confirmation, Settings (with a storage breakdown) and player guides on
 the Documentation page. Power features have started: update and roll back, profiles, key
-bindings, adopting hand-installed mods, and installing from a local archive. Tests for the
-screens come next.
+bindings, adopting hand-installed mods, and installing from a local archive. The screens
+have component tests, an XSS corpus, an IPC fuzz harness and a contrast audit in CI.
 Progress and plans: [docs/README.md](docs/README.md).
 
 First games: Zenless Zone Zero and Wuthering Waves.

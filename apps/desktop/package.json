@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "ui-audit": "node tests/ui-audit.mjs",
     "lint": "biome check .",
     "format": "biome check --write .",
     "check-licenses": "node ../../scripts/check-npm-licenses.mjs",
@@ -25,11 +27,16 @@
     "@biomejs/biome": "2.5.15",
     "@tailwindcss/vite": "4.3.3",
     "@tauri-apps/cli": "2.12.4",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
+    "jsdom": "30.1.3",
+    "playwright": "1.64.1",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
-    "vite": "8.3.5"
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
   }
 }

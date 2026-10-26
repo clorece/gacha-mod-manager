@@ -38,6 +38,9 @@ const CONFIG = {
     "code pre span div a img table thead tbody tr th td"
   ).split(" "),
   ALLOWED_ATTR: ["href", "src", "alt", "title", "width", "height", "colspan", "rowspan"],
+  // DOMPurify judges every other attribute's value as an address; these hold numbers, so
+  // without this they were always dropped (found by the XSS corpus test).
+  ADD_URI_SAFE_ATTR: ["width", "height", "colspan", "rowspan"],
   ALLOW_DATA_ATTR: false,
   ALLOW_ARIA_ATTR: false,
   // Only the two shapes Rust produces; the hook above checks them exactly.

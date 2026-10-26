@@ -292,3 +292,8 @@ small local log for this (errors only, rotated, no paths that identify the user)
   variant picker, conflict dialog and storage table.
 - The description renderer has an XSS test corpus.
 - Snapshot of the mod page against recorded GameBanana fixtures (no live network in tests).
+- Built 2026-10-25: all three, in CI (`pnpm test`). The mod card is tested through the
+  Library, the conflict dialog is the Library's conflict notice, and the fixtures are
+  synthetic data in GameBanana's shape (`src/test/fixtures.ts`), typed against the Rust
+  types. A contrast and overlap audit of every screen in both themes runs in CI too
+  (`pnpm ui-audit`).

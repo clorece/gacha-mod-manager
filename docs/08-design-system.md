@@ -9,7 +9,9 @@ the catalogue and mod page fields stays in [07](07-frontend-design.md).
 **Status (2026-10-25): signed off, in the app.** The layout and theme are signed off; the
 second round added the startup check, the install confirmation (versions and files), mod
 settings with versions, and the sticky search and filter bar. Every state was checked in both
-themes (screenshots plus an automated contrast and overlap check over 62 states).
+themes (screenshots plus an automated contrast and overlap check over 62 states). Since
+2026-10-25 the same kind of audit runs on the built app in CI (`apps/desktop/tests/ui-audit.mjs`:
+20 states in both themes, WCAG AA contrast, no overlapping text, no sideways scroll).
 
 **In the app** (Phase 4): the tokens below, base styles, scrollbars and the `:where()`
 button base are in `apps/desktop/src/styles.css`; Nunito is bundled; the primitives are in

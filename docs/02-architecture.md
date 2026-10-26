@@ -414,6 +414,14 @@ and `network_status`. Phase 6 adds `queue_change_file` (queue), `rollback_files`
     Actions, details, Uninstall with the itemized confirmation; the Phase 6 sections are in
     `ModExtras`), `UninstallDialog` (several games at once), `Preview`,
     `AdoptDialog`, `ProfilesPanel`.
+- **Tests** (Phase 5): `src/**/*.test.ts(x)` run in Vitest on jsdom (`pnpm test`,
+  `vitest.config.ts`) against `src/test/fakeBridge.ts`, a stand-in for the Rust commands
+  answering from `src/test/fixtures.ts` (synthetic data typed against `bindings.ts`);
+  `tests/ui-audit.mjs` (`pnpm ui-audit`) serves the app with Vite and checks contrast,
+  overlap and overflow in Chromium with the same fake bridge. On the Rust side,
+  `src-tauri/src/ipc_fuzz.rs` sends hostile arguments to every command through Tauri's
+  mock runtime: `handler()` (the command list, generic over the runtime) and
+  `AppState::open_with` (folders and network config chosen by the caller) exist for it.
 - Logic both front ends need lives below them, not in either: `Page::hide_sensitive`
   (`gmm-catalog`, the NSFW filter), `game_for_mod`, `Machine::launch_plan` and
   `conflicts_after_install` (`gmm-core`).

@@ -10,7 +10,7 @@
 //! address and asks; the webview can't skip or answer it. Folders need no question: they are
 //! GMM's own Mods folders, opened as folders only.
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Runtime, State};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 use crate::AppState;
@@ -19,7 +19,7 @@ use crate::error::{CmdError, CmdResult};
 use crate::views::ModKey;
 
 /// Asks before leaving the app; true when the user chose to open the page.
-async fn confirm_page(app: &AppHandle, url: &str, what: &str) -> bool {
+async fn confirm_page<R: Runtime>(app: &AppHandle<R>, url: &str, what: &str) -> bool {
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .message(format!("{what}\n\n{url}"))
@@ -36,7 +36,7 @@ async fn confirm_page(app: &AppHandle, url: &str, what: &str) -> bool {
 }
 
 /// Confirms, then opens. Returns false when the user said no.
-async fn open_page(app: &AppHandle, url: &str, what: &str) -> CmdResult<bool> {
+async fn open_page<R: Runtime>(app: &AppHandle<R>, url: &str, what: &str) -> CmdResult<bool> {
     if !confirm_page(app, url, what).await {
         return Ok(false);
     }
@@ -46,14 +46,14 @@ async fn open_page(app: &AppHandle, url: &str, what: &str) -> CmdResult<bool> {
 
 /// A mod's page on GameBanana. Returns false when the user cancelled.
 #[tauri::command]
-pub async fn open_mod_page(app: AppHandle, mod_id: u64) -> CmdResult<bool> {
+pub async fn open_mod_page<R: Runtime>(app: AppHandle<R>, mod_id: u64) -> CmdResult<bool> {
     let url = format!("https://gamebanana.com/mods/{mod_id}");
     open_page(&app, &url, "This opens the mod's page on GameBanana.").await
 }
 
 /// XXMI Launcher's official releases page (setup guide, "XXMI not found").
 #[tauri::command]
-pub async fn open_xxmi_releases(app: AppHandle) -> CmdResult<bool> {
+pub async fn open_xxmi_releases<R: Runtime>(app: AppHandle<R>) -> CmdResult<bool> {
     open_page(
         &app,
         gmm_xxmi::XXMI_RELEASES,
@@ -65,7 +65,11 @@ pub async fn open_xxmi_releases(app: AppHandle) -> CmdResult<bool> {
 /// A link from a mod description, by the key the rewritten HTML carries. The dialog shows
 /// where it really goes, since a description's link text can say anything.
 #[tauri::command]
-pub async fn open_link(app: AppHandle, state: State<'_, AppState>, key: String) -> CmdResult<bool> {
+pub async fn open_link<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    key: String,
+) -> CmdResult<bool> {
     let url = state
         .links
         .get(&key)

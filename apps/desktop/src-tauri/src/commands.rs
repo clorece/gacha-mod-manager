@@ -20,7 +20,7 @@ use gmm_core::{
 };
 use gmm_xxmi::GameStatus;
 use tauri::ipc::Channel;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Runtime, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::AppState;
@@ -762,7 +762,7 @@ pub async fn set_preferences(
 }
 
 /// A folder the user picks in the system dialog, or `None` if they cancel.
-async fn pick_folder(app: &AppHandle, title: &str) -> Option<PathBuf> {
+async fn pick_folder<R: Runtime>(app: &AppHandle<R>, title: &str) -> Option<PathBuf> {
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
@@ -776,8 +776,8 @@ async fn pick_folder(app: &AppHandle, title: &str) -> Option<PathBuf> {
 /// Asks for the XXMI Launcher folder (portable installs detection doesn't find) and
 /// remembers it if it really is one. `None` when the user cancels.
 #[tauri::command]
-pub async fn pick_xxmi_folder(
-    app: AppHandle,
+pub async fn pick_xxmi_folder<R: Runtime>(
+    app: AppHandle<R>,
     state: State<'_, AppState>,
 ) -> CmdResult<Option<PathBuf>> {
     let Some(folder) = pick_folder(&app, "Choose the XXMI Launcher folder").await else {
@@ -803,8 +803,8 @@ pub async fn clear_xxmi_folder(state: State<'_, AppState>) -> CmdResult<()> {
 /// Asks for a game folder detection didn't find and remembers it if it holds the game.
 /// `None` when the user cancels.
 #[tauri::command]
-pub async fn pick_game_folder(
-    app: AppHandle,
+pub async fn pick_game_folder<R: Runtime>(
+    app: AppHandle<R>,
     state: State<'_, AppState>,
     game: String,
 ) -> CmdResult<Option<PathBuf>> {

@@ -21,6 +21,8 @@ const NUMBERED_HOSTS: &[(&str, &str)] = &[("filecache", "gamebanana.com")];
 pub struct Allowlist {
     /// Test builds only: allow plain HTTP to 127.0.0.1 (mock servers).
     loopback_http: bool,
+    /// Refuse every URL ([`Allowlist::deny_all`]).
+    deny_all: bool,
 }
 
 impl Allowlist {
@@ -28,6 +30,17 @@ impl Allowlist {
     pub fn production() -> Self {
         Self {
             loopback_http: false,
+            deny_all: false,
+        }
+    }
+
+    /// Refuses every URL before a connection is made. For harnesses that must prove nothing
+    /// reaches the network (the desktop app's IPC fuzz harness); it can only take hosts away,
+    /// so it is safe in any build.
+    pub fn deny_all() -> Self {
+        Self {
+            loopback_http: false,
+            deny_all: true,
         }
     }
 
@@ -36,11 +49,15 @@ impl Allowlist {
     pub fn with_loopback_for_tests() -> Self {
         Self {
             loopback_http: true,
+            deny_all: false,
         }
     }
 
     pub fn check(&self, url: &Url) -> Result<(), NetError> {
         let denied = || NetError::Disallowed(redact(url));
+        if self.deny_all {
+            return Err(denied());
+        }
         if !url.username().is_empty() || url.password().is_some() {
             return Err(denied());
         }
@@ -130,6 +147,18 @@ mod tests {
         );
         assert!(!ok("file:///C:/Windows/win.ini"));
         assert!(!ok("ftp://gamebanana.com/x"));
+    }
+
+    #[test]
+    fn deny_all_refuses_even_gamebanana() {
+        let none = Allowlist::deny_all();
+        for url in [
+            "https://gamebanana.com/apiv11/Mod/1/ProfilePage",
+            "https://images.gamebanana.com/img/ss/mods/a.jpg",
+            "https://filecache42.gamebanana.com/mods/x.zip",
+        ] {
+            assert!(none.check(&Url::parse(url).unwrap()).is_err(), "{url}");
+        }
     }
 
     #[test]

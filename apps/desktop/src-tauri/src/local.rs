@@ -11,7 +11,7 @@ use std::sync::{Mutex, PoisonError};
 
 use gmm_core::{InstallOptions, InstalledFolder, LocalPlan, LocalPrepared, ModsTarget};
 use tauri::ipc::Channel;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager, Runtime, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::AppState;
@@ -62,7 +62,10 @@ pub fn drop_watch(state: State<'_, AppState>, on_drop: Channel<String>) {
 
 /// Opens a file dialog for an archive; returns its name, or `None` when cancelled.
 #[tauri::command]
-pub async fn pick_archive(app: AppHandle, state: State<'_, AppState>) -> CmdResult<Option<String>> {
+pub async fn pick_archive<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+) -> CmdResult<Option<String>> {
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()

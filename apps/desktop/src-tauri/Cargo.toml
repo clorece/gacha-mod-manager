@@ -32,5 +32,10 @@ tauri-plugin-dialog.workspace = true
 tokio.workspace = true
 ts-rs.workspace = true
 
+[dev-dependencies]
+# The IPC fuzz harness (src/ipc_fuzz.rs) drives the real command list on the mock runtime.
+tauri = { workspace = true, features = ["test"] }
+tempfile.workspace = true
+
 [lints]
 workspace = true

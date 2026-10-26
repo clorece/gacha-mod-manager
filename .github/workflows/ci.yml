@@ -85,6 +85,15 @@ jobs:
           if cargo tree -p gmm-desktop -e features -i tauri | grep -q 'devtools'; then
             echo "tauri/devtools is enabled without the dev feature"; exit 1
           fi
+      # The IPC fuzz harness runs on Tauri's mock runtime (`tauri/test`), a dev-dependency:
+      # it must never reach the shipped desktop build.
+      - name: Shipped desktop builds never enable tauri/test
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if cargo tree -p gmm-desktop -e features,normal,build -i tauri | grep -q 'feature "test"'; then
+            echo "tauri/test reaches the shipped desktop build"; exit 1
+          fi
 
   frontend:
     name: Desktop frontend
@@ -102,9 +111,20 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
+      # Component tests, fixture snapshots and the XSS corpus (Vitest, jsdom).
+      - run: pnpm test
       - run: pnpm audit
       - run: pnpm run check-licenses
       - run: pnpm build
+      # The contrast and overlap audit (tests/ui-audit.mjs): every screen in both themes in
+      # Chromium, with the commands answered from the test fixtures.
+      - name: Cache Playwright's Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm ui-audit
 
   deny:
     name: Dependency policy (cargo-deny)

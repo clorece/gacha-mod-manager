@@ -5,7 +5,8 @@
 
 import { execFileSync } from "node:child_process";
 
-// Same list as deny.toml's [licenses].allow, plus 0BSD and BlueOak (permissive, common in npm).
+// Same list as deny.toml's [licenses].allow, plus 0BSD, BlueOak and MIT-0 (permissive, common in
+// npm; MIT-0 is MIT without the attribution clause, reached through jsdom, a test-only dependency).
 const ALLOWED = new Set([
   "MIT",
   "Apache-2.0",
@@ -18,6 +19,7 @@ const ALLOWED = new Set([
   "CC0-1.0",
   "0BSD",
   "BlueOak-1.0.0",
+  "MIT-0",
 ]);
 
 // Per-package exceptions, as [name, license], each with a reason.
