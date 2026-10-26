@@ -1,11 +1,13 @@
 # Privacy
 
-No accounts, no tracking: nothing leaves your computer except requests to GameBanana.
+No accounts, no tracking: nothing leaves your computer except requests to GameBanana (and
+GitHub, to check for a newer GMM).
 
 ## Network
 
 GMM only talks to GameBanana: its website for mod information, and its image and file servers
-for previews and downloads. Every request goes over HTTPS to an address built into the app;
+for previews and downloads. When it starts, it also reads GMM's list of releases on GitHub to
+tell you if a newer version is out; it never downloads or installs anything from there. Every request goes over HTTPS to an address built into the app;
 anything else is refused. There's no GMM server, no account and no telemetry. The app window
 itself never connects to the internet: pictures come through GMM, which fetches them from
 GameBanana and keeps a copy in its cache.

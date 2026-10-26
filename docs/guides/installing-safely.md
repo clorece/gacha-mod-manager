@@ -19,13 +19,14 @@ absurd size. RAR files are opened by a separate, locked-down helper program.
 ## Checked before installing
 
 Every file that came out is scanned. Programs and scripts (`.exe`, `.dll`, `.bat` and the
-like) are **blocked**: mods for XXMI don't need them. The install confirmation lists anything
-blocked, and installs the rest only if you agree.
+like) are **blocked**: mods for XXMI don't need them. If anything was blocked, the install
+waits on **Downloads** as **Needs action**, lists the files, and installs the rest only if you
+agree.
 
 ## You see it first
 
-Nothing is installed until you confirm: the file, the versions, where it goes and what was
-blocked. GMM only ever writes to its own folders and the Mods folders (plus the one file that
+Nothing is installed until you've picked the files, and anything unusual (several versions,
+blocked files, an outdated file) waits for your review. GMM only ever writes to its own folders and the Mods folders (plus the one file that
 keeps your in-game toggles), and never to the game's folder.
 
 ## Deleting is for good

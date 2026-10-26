@@ -15,4 +15,4 @@ other links show as plain text there.
 5. [Conflicts](conflicts.md)
 6. [Privacy](privacy.md)
 
-The detailed design lives in the numbered docs one folder up.
+Technical docs are one folder up.

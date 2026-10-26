@@ -18,9 +18,9 @@ description, files, updates, credits and the author's license.
 
 ## 3. Install it
 
-Press **Download**. GMM fetches the file, checks it, and shows what it will install before
-anything happens: which file, which versions if the archive holds several, and anything it
-refused to install. Confirm, and the install runs on the **Downloads** page.
+Press **Download**, pick the files you want and confirm. GMM downloads and checks them on the
+**Downloads** page. If a download needs a choice (several versions inside, or files GMM
+blocked), it waits there as **Needs action** until you review it.
 
 ## 4. Switch it on or off
 
