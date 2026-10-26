@@ -11,6 +11,9 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
 
+# Every job and every package install has a time limit, so a hung step fails in minutes
+# instead of running for GitHub's default six hours (2026-10-26: an apt-get install hung
+# for half an hour). The limits leave room for a cold cache.
 jobs:
   rust:
     name: Rust (${{ matrix.os }})
@@ -19,6 +22,7 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       # rust-toolchain.toml pins the version; rustup installs it on first use.
@@ -27,9 +31,11 @@ jobs:
       # WebKitGTK and friends to build.
       - name: Tauri system libraries
         if: runner.os == 'Linux'
+        timeout-minutes: 10
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libxdo-dev libssl-dev
+          apt="-o Acquire::Retries=3 -o Acquire::http::Timeout=30"
+          sudo apt-get $apt update -qq
+          sudo apt-get $apt install -y -qq libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libxdo-dev libssl-dev
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
@@ -39,8 +45,9 @@ jobs:
       # and writes outside GMM's own folders and Mods/.
       - name: Privacy harness under strace
         if: runner.os == 'Linux'
+        timeout-minutes: 15
         run: |
-          sudo apt-get install -y -qq strace
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y -qq strace
           GMM_PRIVACY_STRACE=1 cargo test -p gmm-cli --test privacy --locked -- --nocapture
       # The workspace denies unsafe code. Reviewed exceptions (docs/04-security.md, R7): the
       # ShellExecuteExW call that starts XXMI, the RAR helper's job object, and the helper
@@ -98,6 +105,7 @@ jobs:
   frontend:
     name: Desktop frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: apps/desktop
@@ -123,12 +131,15 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      # `--with-deps` installs Chromium's system libraries through apt.
       - run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 10
       - run: pnpm ui-audit
 
   deny:
     name: Dependency policy (cargo-deny)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
