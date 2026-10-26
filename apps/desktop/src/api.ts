@@ -7,6 +7,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import type {
   AdoptCandidate,
   Adopted,
+  AppRelease,
   BugReport,
   CardStats,
   CatalogPage,
@@ -20,7 +21,6 @@ import type {
   GameStatus,
   InstallArgs,
   InstalledFolder,
-  InstallPlan,
   InstallProgress,
   InstallResult,
   Job,
@@ -82,15 +82,10 @@ export const api = {
     return invoke<null>("catalog_stats", { modIds, onStats: channel });
   },
 
-  /** Fetches the file into the cache and looks inside, for the install confirmation. */
-  prepareInstall: (modId: number, fileId: number | null, onProgress: (p: InstallProgress) => void) => {
-    const channel = new Channel<InstallProgress>();
-    channel.onmessage = onProgress;
-    return invoke<InstallPlan>("prepare_install", { modId, fileId, onProgress: channel });
-  },
-
   /** The confirmed install goes to the queue (the Downloads page). */
   queueInstall: (args: InstallArgs) => invoke<number>("queue_install", { args }),
+  /** Goes ahead with an install that needs action (versions chosen, findings accepted). */
+  queueProceed: (id: number, variants: VariantPick | null) => invoke<boolean>("queue_proceed", { id, variants }),
   /** Moves an installed mod to its newest file (an update) or to `fileId` (a roll back). */
   queueChangeFile: (gbModId: number, fileId: number | null) => invoke<number>("queue_change_file", { gbModId, fileId }),
   /** Earlier files of an installed mod still in the download cache. */
@@ -107,6 +102,11 @@ export const api = {
   queueCancel: (id: number) => invoke<boolean>("queue_cancel", { id }),
   queueDismiss: (id: number) => invoke<boolean>("queue_dismiss", { id }),
   queueClearFinished: () => invoke<number>("queue_clear_finished"),
+
+  /** Whether a newer GMM is on GitHub (GMM's own releases list, nothing downloaded). */
+  appUpdateCheck: () => invoke<AppRelease | null>("app_update_check"),
+  /** Opens the page of the release the last check found, after a native dialog; false when cancelled. */
+  openAppRelease: (version: string) => invoke<boolean>("open_app_release", { version }),
 
   startupCheck: (onStep: (s: StartupStep) => void) => {
     const channel = new Channel<StartupStep>();
@@ -192,4 +192,12 @@ export const api = {
   clearXxmiFolder: () => invoke<null>("clear_xxmi_folder"),
   pickGameFolder: (game: string) => invoke<string | null>("pick_game_folder", { game }),
   removeGameFolder: (game: string, folder: string) => invoke<null>("remove_game_folder", { game, folder }),
+
+  /** The title bar's buttons and drag area; each acts on this window only. */
+  windowMinimize: () => invoke<null>("window_minimize"),
+  /** Resolves with whether the window is maximized afterwards. */
+  windowToggleMaximize: () => invoke<boolean>("window_toggle_maximize"),
+  windowIsMaximized: () => invoke<boolean>("window_is_maximized"),
+  windowClose: () => invoke<null>("window_close"),
+  windowStartDrag: () => invoke<null>("window_start_drag"),
 };

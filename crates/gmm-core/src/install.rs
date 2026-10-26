@@ -195,9 +195,8 @@ pub fn install_gate(status: &GameStatus) -> Result<Vec<String>, CoreError> {
 }
 
 /// A GameBanana mod fetched into the download cache and analysed, before anything is
-/// installed. The install confirmation is built from it ([`crate::install_plan`]);
-/// [`install_prepared`] installs from it. Its extraction folder stays in the cache until
-/// [`Prepared::discard`].
+/// installed. The background check reads it ([`crate::review`]) and [`install_prepared`]
+/// installs from it. Its extraction folder stays in the cache until [`Prepared::discard`].
 #[derive(Debug, Clone)]
 pub struct Prepared {
     pub mod_id: u64,

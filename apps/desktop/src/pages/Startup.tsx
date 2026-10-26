@@ -2,13 +2,15 @@
 // The startup check (docs/08, "Startup check"): a full-window screen while GMM pulls the
 // newest catalogue pages and checks the installed mods for updates (`startup_check`). The
 // app works offline, so a failing step is shown and the app opens anyway; Skip for now
-// opens it at once while the check finishes in the background.
+// opens it at once while the check finishes in the background. When a newer GMM is on GitHub
+// the screen stays up with Get the update (its release page) and Later.
 
 import { useEffect, useRef, useState } from "react";
 import { api, asCmdError, type GameInfo, type StartupReport, type StartupStep, type StepState } from "../api";
 import logo from "../assets/gmm-logo.svg";
 import { plural } from "../format";
-import { Button, Icon } from "../ui";
+import { Button, Icon, useToast } from "../ui";
+import { APP_VERSION, openRelease, versionLabel } from "../version";
 
 /** How long "All set" stays up before the app opens. */
 const OPEN_AFTER_MS = 900;
@@ -40,6 +42,7 @@ export function Startup({
   /** The report, or null when the check failed outright or was skipped before it ended. */
   onDone: (report: StartupReport | null) => void;
 }) {
+  const toast = useToast();
   const [rows, setRows] = useState<Row[]>(() => plannedRows(games));
   const [report, setReport] = useState<StartupReport | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -80,18 +83,20 @@ export function Startup({
   }, []);
 
   useEffect(() => {
-    if (!finished) return;
+    // A new GMM waits for the user (Get the update / Later); otherwise the app opens by itself.
+    if (!finished || report?.app_update) return;
     const timer = setTimeout(() => finishRef.current(report), OPEN_AFTER_MS);
     return () => clearTimeout(timer);
   }, [finished, report]);
 
-  const settled = rows.filter((r) => r.state === "done" || r.state === "skipped" || r.state === "failed").length;
+  const settled = rows.filter((r) => r.state === "done" || r.state === "failed").length;
   const pct = finished ? 100 : Math.round((settled / Math.max(rows.length, 1)) * 100);
   const working = rows.find((r) => r.state === "working");
   const failed = rows.filter((r) => r.state === "failed").length;
   const updates = report?.updates.length ?? 0;
 
-  let detail = working?.label.replace(/ mods$/, "") ?? "GMM 0.1.0";
+  const appUpdate = report?.app_update ?? null;
+  let detail = working?.label.replace(/ mods$/, "") ?? `GMM ${APP_VERSION}`;
   if (finished) {
     detail = updates > 0 ? `${plural(updates, "mod update")} found` : "Opening GMM";
   }
@@ -109,15 +114,21 @@ export function Startup({
 
         <section className="su-card" aria-live="polite">
           <h1 className="su-h">
-            {finished && failed === 0 && !failure ? "You’re up to date" : "Checking for updates"}
+            {appUpdate
+              ? "New software update available"
+              : finished && failed === 0 && !failure
+                ? "You’re up to date"
+                : "Checking for updates"}
           </h1>
-          <div className={`su-status${finished ? (failure || failed ? " is-warn" : " is-done") : ""}`}>
+          <div className={`su-status${finished ? (appUpdate || failure || failed ? " is-warn" : " is-done") : ""}`}>
             {!finished && <span className="spin" aria-hidden="true" />}
-            {failure
-              ? "Couldn't finish the check; GMM opens with what it has"
-              : failed
-                ? `All set, ${plural(failed, "step")} couldn't run`
-                : statusLine(rows, finished)}
+            {appUpdate
+              ? `GMM ${versionLabel(appUpdate.version)} is out; you have ${APP_VERSION}`
+              : failure
+                ? "Couldn't finish the check; GMM opens with what it has"
+                : failed
+                  ? `All set, ${plural(failed, "step")} couldn't run`
+                  : statusLine(rows, finished)}
           </div>
           <div
             className="bar"
@@ -146,10 +157,28 @@ export function Startup({
             ))}
           </div>
           {failure && <p className="sub">{failure}</p>}
+          {appUpdate && (
+            <div className="su-update">
+              <p>
+                {appUpdate.name ?? `GMM ${versionLabel(appUpdate.version)}`} is on GitHub. Its page has the new
+                installer and what changed; your mods and settings stay as they are.
+              </p>
+              <div className="su-update-actions">
+                <Button onClick={() => finish(report)}>Later</Button>
+                <Button
+                  variant="primary"
+                  icon="download"
+                  onClick={() => openRelease(appUpdate.version, (m) => toast("bad", m))}
+                >
+                  Get the update
+                </Button>
+              </div>
+            </div>
+          )}
         </section>
 
         <div className="su-foot">
-          <span>v0.1.0 · talks only to GameBanana</span>
+          <span>v{APP_VERSION} · talks only to GameBanana, and to GitHub for GMM updates</span>
           <Button variant="link" onClick={() => finish(report)}>
             {finished ? "Open GMM" : "Skip for now"}
           </Button>
@@ -173,12 +202,6 @@ function StepIcon({ state }: { state: Row["state"] }) {
       return (
         <span className="su-ic su-ic-up" role="img" aria-label="Needs attention">
           !
-        </span>
-      );
-    case "skipped":
-      return (
-        <span className="su-ic su-ic-skip" role="img" aria-label="Skipped">
-          –
         </span>
       );
     default:

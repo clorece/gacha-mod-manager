@@ -76,7 +76,12 @@ skip_blocked: boolean,
 /**
  * Install switched off ("Switch it on after installing" unticked).
  */
-start_disabled: boolean, };
+start_disabled: boolean, 
+/**
+ * Mods of the same game (library row ids) to switch off once this one is installed and
+ * on: the other side of a conflict resolved in the confirmation. The queue only.
+ */
+switch_off: Array<number>, };
 
 export type InstallProgress = { "type": "using_cache" } | { "type": "downloading", size: number, } | { "type": "progress", downloaded: number, total: number | null, } | { "type": "extracting" } | { "type": "installing", folder: string, };
 
@@ -140,7 +145,7 @@ export type Settings = { database: string,
  */
 xxmi_root: string | null, confirmed_xxmi_exe: string | null, manual_folders: Array<FolderRow>, http_cache_entries: number, http_cache_bytes: number, download_cache_entries: number, download_cache_bytes: number, };
 
-export type StepState = "working" | "done" | "skipped" | "failed";
+export type StepState = "working" | "done" | "failed";
 
 export type StartupStep = { 
 /**
@@ -156,7 +161,11 @@ checked: number, updates: Array<ModUpdateInfo>,
 /**
  * Mods or games that couldn't be checked.
  */
-notes: Array<string>, };
+notes: Array<string>, 
+/**
+ * A newer GMM on GitHub, when the check found one.
+ */
+app_update: AppRelease | null, };
 
 export type CardStats = { mod_id: number, stats: ModStats, };
 
@@ -460,29 +469,6 @@ export type ToggleOutcome = { id: number, folder_name: string, enabled: boolean,
  */
 changed: boolean, };
 
-export type InstallPlan = { game: string, mod_id: number, mod_name: string, 
-/**
- * The file that was fetched and analysed.
- */
-file: ModFile, 
-/**
- * The mod's other current files, newest first (for "Choose a file").
- */
-other_files: Array<ModFile>, archive_bytes: number, from_cache: boolean, 
-/**
- * The mod kind from the game's manifest, or `None` when nothing in the archive looks
- * like a mod for this game (installing would fail).
- */
-kind: string | null, versions: Array<VersionPlan>, 
-/**
- * Versions that replace the same things; only one of each pair should be on.
- */
-version_conflicts: Array<VersionConflict>, 
-/**
- * Where it installs, relative to XXMI: `ZZMI\Mods\GMM`.
- */
-install_to: string, };
-
 export type VersionPlan = { 
 /**
  * Empty for an archive with one mod; otherwise what `install` takes as a version name.
@@ -523,13 +509,17 @@ image: string | null,
 /**
  * How many versions were chosen (0 when the archive holds one mod).
  */
-versions: number, state: JobState, 
+versions: number, 
+/**
+ * Switched on once installed ("Switch it on after installing").
+ */
+switch_on: boolean, state: JobState, 
 /**
  * Unix seconds.
  */
 queued_at: number, finished_at: number | null, };
 
-export type JobState = { "type": "queued" } | { "type": "downloading", downloaded: number, total: number | null, } | { "type": "extracting" } | { "type": "installing", folder: string, } | { "type": "waiting", until: number, } | { "type": "paused" } | { "type": "done", installed: Array<InstalledFolder>, } | { "type": "failed", message: string, } | { "type": "cancelled" };
+export type JobState = { "type": "queued" } | { "type": "downloading", downloaded: number, total: number | null, } | { "type": "extracting" } | { "type": "installing", folder: string, } | { "type": "waiting", until: number, } | { "type": "paused" } | { "type": "needs_action", review: Review, } | { "type": "done", installed: Array<InstalledFolder>, } | { "type": "failed", message: string, } | { "type": "cancelled" };
 
 export type ModUpdateInfo = { game: string, gb_mod_id: number, name: string, 
 /**
@@ -556,6 +546,10 @@ summary: ModSummary,
 period: TopPeriod | null, };
 
 export type JobAction = "install" | "change_file";
+
+export type Review = { issues: Array<CheckIssue>, versions: Array<VersionPlan>, version_conflicts: Array<VersionConflict>, };
+
+export type CheckIssue = { "type": "choose_versions", count: number, } | { "type": "blocked", files: Array<string>, } | { "type": "warnings", items: Array<string>, } | { "type": "outdated", newest: string | null, };
 
 export type ModKeyBinding = { 
 /**
@@ -666,3 +660,17 @@ url: string,
  * The description was cut to fit the address.
  */
 shortened: boolean, };
+
+export type AppRelease = { 
+/**
+ * The version, without the tag's `v` (`0.2.0-beta`).
+ */
+version: string, 
+/**
+ * The release's title on GitHub, if it has one.
+ */
+name: string | null, prerelease: boolean, 
+/**
+ * ISO 8601, as GitHub sends it.
+ */
+published_at: string | null, };

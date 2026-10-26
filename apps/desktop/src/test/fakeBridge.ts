@@ -68,7 +68,11 @@ export async function fakeInvoke(cmd: string, args: Args = {}): Promise<unknown>
     case "storage":
       return fx.storage;
     case "startup_check":
-      return { checked: 4, updates: fx.updates, notes: [] };
+      return { checked: 4, updates: fx.updates, notes: [], app_update: null };
+    case "app_update_check":
+      return { version: "0.2.0-beta", name: "GMM 0.2 beta", prerelease: true, published_at: "2026-11-02T10:00:00Z" };
+    case "open_app_release":
+      return true;
     case "catalog_list":
     case "catalog_search": {
       const game = (a.query as { game?: string } | undefined)?.game ?? a.game;
@@ -82,16 +86,20 @@ export async function fakeInvoke(cmd: string, args: Args = {}): Promise<unknown>
     case "catalog_categories":
       return fx.categories;
     case "catalog_mod":
-      return fx.modProfile;
+      return a.modId === 700101 ? fx.jacketProfile : fx.modProfile;
     case "catalog_updates":
       return fx.modUpdates;
-    case "prepare_install":
-      return fx.installPlan;
     case "queue_jobs":
       return fx.jobs;
     case "queue_watch":
+      // The page gets the list the way the app does: through the channel.
+      (a.onChange as { onmessage?: (jobs: unknown) => void } | undefined)?.onmessage?.([...fx.jobs, fx.reviewJob]);
+      return null;
     case "drop_watch":
       return null;
+    case "queue_proceed":
+    case "queue_cancel":
+      return true;
     case "queue_install":
     case "queue_change_file":
       return 99;
@@ -170,6 +178,14 @@ export async function fakeInvoke(cmd: string, args: Args = {}): Promise<unknown>
     case "bug_report_draft":
       return fx.bugReport(a.title, a.description);
     case "open_bug_report":
+      return true;
+    case "window_is_maximized":
+      return false;
+    case "window_minimize":
+    case "window_close":
+    case "window_start_drag":
+      return null;
+    case "window_toggle_maximize":
       return true;
     default:
       return fail(`the fake bridge doesn't answer ${cmd}`);

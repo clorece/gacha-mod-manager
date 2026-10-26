@@ -13,9 +13,9 @@
     "allow-catalog-categories",
     "allow-catalog-featured",
     "allow-catalog-stats",
-    "allow-prepare-install",
     "allow-install",
     "allow-queue-install",
+    "allow-queue-proceed",
     "allow-queue-change-file",
     "allow-queue-jobs",
     "allow-queue-watch",
@@ -25,6 +25,8 @@
     "allow-queue-dismiss",
     "allow-queue-clear-finished",
     "allow-startup-check",
+    "allow-app-update-check",
+    "allow-open-app-release",
     "allow-library",
     "allow-switch-version",
     "allow-rollback-files",
@@ -70,6 +72,11 @@
     "allow-profile-rename",
     "allow-profile-delete",
     "allow-profile-export",
-    "allow-profile-import"
+    "allow-profile-import",
+    "allow-window-minimize",
+    "allow-window-toggle-maximize",
+    "allow-window-is-maximized",
+    "allow-window-close",
+    "allow-window-start-drag"
   ]
 }

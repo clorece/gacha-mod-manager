@@ -272,7 +272,12 @@ export default function StyleGuide({
               <Badge tone="art">Anby</Badge>
               <Badge tone="game">ZZZ</Badge>
             </span>
-            <span className="nav-count">3</span>
+            <span className="count-bubble" style={{ marginLeft: 0 }}>
+              3
+            </span>
+            <span className="count-bubble is-wide" style={{ marginLeft: 0 }}>
+              12
+            </span>
           </div>
         </Section>
 

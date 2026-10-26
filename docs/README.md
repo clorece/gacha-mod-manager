@@ -14,7 +14,8 @@ Development happens on Windows (primary target). Linux follows later from the sa
 which needs a person at the real setup, is left. Phase 6 (power features) is done
 (2026-10-25 to 26, below); 1-click install links moved to "Later" in the roadmap, since
 they need GameBanana to add GMM. A standalone dev build exists for hands-on testing
-(`target\release\gmm-desktop.exe`, built 2026-10-26).
+(`target\release\gmm-desktop.exe`, built 2026-10-26); the first round of feedback from it is
+done (below), and the dev build needs rebuilding to show it.
 Every feature works from the `gmm` command line: browse GameBanana, install (download, safe
 extraction, policy scan, variants), switch mods on and off (keeping their saved in-game
 toggles), uninstall for good, conflicts, storage, launch through XXMI. The Phase 2 exit check
@@ -44,8 +45,8 @@ design canvas is in the code: tokens for both themes, bundled Nunito, hand-built
 | `gmm-xxmi` | Reads XXMI's setup (allowlisted config fields only) and works out each game's setup state |
 | `gmm-migoto` | Reads 3DMigoto mod `.ini` files: override hashes, what they replace, namespaces, key bindings |
 | `gmm-db` | SQLite database (`%APPDATA%\GMM\gmm.db`): settings and preferences, manual game folders, installed mods (with categories, sensitive flag and preview address), last played, profiles, saved in-game toggles, download cache, GameBanana response cache |
-| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`, in one go or in two steps with an install plan; one download per file at a time), the install queue and stop signal, versions (grouping, switching), the update check, the featured gallery (trending, backfilled), Store pages merged from several lists (characters, games), the library (list with disk state, unmanaged mods, enable/disable keeping saved in-game toggles, open folder, uninstall for good with the cached archives), update and roll back, profiles, key bindings, adopting hand-installed mods, installing from a local archive, conflict detection, storage accounting, launching through XXMI (with exe confirmation, recording "last played"), app folders, the image cache behind `gmmimg` (with Clear), the local error log (redacted, rotated) and the bug report's pre-filled issue address |
-| `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, a command per CLI action plus the install confirmation, queue, versions, startup check, featured mods, card stats and the confirmed openers (ids only), Report a Bug (error log, pre-filled issue; errors, panics and webview errors recorded), the queue worker, the `gmmimg` protocol, the description address rewrite, navigation guard; the React UI is in `apps/desktop/src` |
+| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`, in one go or in two steps with the background check that can hold an install for review; one download per file at a time), the install queue and stop signal, versions (grouping, switching), the update check, the featured gallery (trending, backfilled), Store pages merged from several lists (characters, games), the library (list with disk state, unmanaged mods, enable/disable keeping saved in-game toggles, open folder, uninstall for good with the cached archives), update and roll back, profiles, key bindings, adopting hand-installed mods, installing from a local archive, conflict detection, storage accounting, launching through XXMI (with exe confirmation, recording "last played"), app folders, the image cache behind `gmmimg` (with Clear), the local error log (redacted, rotated) and the bug report's pre-filled issue address |
+| `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, a command per CLI action plus the queue (with Needs action), versions, the window frame, startup check, featured mods, card stats and the confirmed openers (ids only), Report a Bug (error log, pre-filled issue; errors, panics and webview errors recorded), the queue worker, the `gmmimg` protocol, the description address rewrite, navigation guard; the React UI is in `apps/desktop/src` |
 | `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm install-file`, `gmm list`, `gmm enable/disable/uninstall`, `gmm update`, `gmm rollback`, `gmm keys`, `gmm adopt`, `gmm profile …`, `gmm conflicts`, `gmm storage` (`--clear-downloads`, `--clear-images`), `gmm launch`, `gmm detect`, `gmm status`, `gmm config`, `gmm log` (`--clear`), `gmm report-bug` |
 
 On the dev machine, both games are `Ready` (2026-10-26): WuWa (Steam install; its Steam
@@ -57,7 +58,9 @@ wrong" with the fix, and following its steps made it `Ready` again.
 2026-10-25) is written up in [08-design-system.md](08-design-system.md); file formats and the
 RAR plan in [09-archive-formats.md](09-archive-formats.md).
 
-**Waiting on you:** a look at the third review checkpoint in the app (the Library, Mod
+**Waiting on you:** a look at round 1 of the hands-on feedback in a rebuilt dev build (the
+new install flow, Needs action, the title bar and window size; below), a look at the third
+review checkpoint in the app (the Library, Mod
 settings, Settings with Storage, Documentation) and an edit of the six player guides in
 [guides/](guides/); the Phase 5 exit check by hand
 (switching mods and versions from the app, a real install from the Store seen in game, a
@@ -74,7 +77,8 @@ the rest of Phase 5 follows the decisions listed in the roadmap.
 back while GMM checks and writes every file (libarchive was tried first and failed one of
 five real mods; details in [09](09-archive-formats.md)). All five sampled RAR mods extract,
 including the 113 MiB Yanagi pack. The backend for the install flow is in place too: the
-two-step install (`prepare_install` returns the plan the confirmation dialog shows),
+two-step install (a plan for the confirmation dialog; replaced on 2026-10-26 by the
+background check in the queue),
 versions as one mod (grouping, installing more from the cache, `switch_version`), the
 install queue with pause, resume and cancel, and the startup check (newest catalogue pages,
 update check of installed mods).
@@ -121,6 +125,25 @@ log` and `gmm report-bug` do the same from the command line; the egress harness 
 both make no connection. **Profiles on the Dashboard** (2026-10-26): a Ready game's open
 bubble has a Profile picker and Apply beside Launch (same apply as the Library).
 
+**Hands-on feedback, round 1** (2026-10-26, from the first session with the dev build):
+installing works differently now. The install confirmation downloads nothing: it asks for
+the variants (GameBanana's files, several at once, each switched on), then, if a GMM mod for
+the same character is on, which one to keep (or both), then confirms; the user stays on the
+page they're on. The download, extraction and safety scan run in Downloads as a background
+check, and an install that needs a choice or shows a risk waits there as **Needs action**
+(several versions inside the file, unsafe or odd files, an outdated file) with a Review
+dialog to go ahead or cancel. Picked versions all stay on unless one replaces the same
+things as another. The sidebar's Downloads count is a ringed disc that follows the theme.
+The Mods Store remembers its search, filters, results and scroll across pages; the Mods
+Library has Launch buttons. GameBanana requests no longer fail after the window sat in the
+background (`gmm-net` retries dropped connections and resumes downloads by itself). The
+window opens at 16:9 (1952 × 1098 where it fits) with a title bar drawn in the theme, no
+title, and its own caption buttons. Queue progress no longer redraws the page being browsed;
+images fade in once decoded; rarely used pages load on demand. Checked in a real `tauri dev`
+window against the real setup: a Store install switched off (then uninstalled), a two-piece
+pack stopping at Needs action and cancelled, the Store's memory, Library launch buttons,
+maximize and restore, both themes. `prepare_install` is gone.
+
 **First review checkpoint** (2026-10-25): the game banners use official key art (cropped
 2:1, one file per game for every banner size); a first-run screen asks for the theme and
 whether to show and blur sensitive mods, stored in the database (`preferences`); the
@@ -165,10 +188,10 @@ attributes always stripped, now fixed); the IPC fuzz harness (`ipc_fuzz.rs`: abo
 hostile calls through Tauri's mock runtime with the real capability, a fake XXMI and a
 network that refuses everything; nothing outside GMM's folders may change); and the
 contrast and overlap audit (`tests/ui-audit.mjs`, Playwright, 20 states in both themes, no
-findings).
+findings; 22 states since 2026-10-26).
 
-**Next:** the hands-on checks with the dev build (Phase 5's exit check plus Phase 6's
-features), then Phase 7 (release). See the roadmap.
+**Next:** a new dev build with round 1 of the feedback, then the rest of the hands-on checks
+(Phase 5's exit check plus Phase 6's features), then Phase 7 (release). See the roadmap.
 
 ## Docs
 

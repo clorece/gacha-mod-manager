@@ -118,4 +118,7 @@ pub enum CoreError {
     UnknownImage,
     #[error("GameBanana didn't send an image: {0}")]
     NotAnImage(String),
+    /// GitHub's answer to the app update check wasn't what GMM expects.
+    #[error("GitHub's releases list couldn't be read: {0}")]
+    Releases(String),
 }

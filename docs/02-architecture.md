@@ -270,7 +270,8 @@ slow down; identical requests in flight merged into one; an API budget of about 
 requests/second per install shared with background reads; a "slow down" (429, 503 with
 `Retry-After`, a Cloudflare challenge) pauses every GameBanana client of the app
 (`gmm-net/src/cooldown.rs`: `Retry-After`, else 30 s doubling, 5 s to 15 min) instead of
-being retried; 5xx retried with backoff; and an identifying `User-Agent`. GameBanana sends no rate-limit headers. Store each mod's
+being retried; 5xx and dropped connections retried with backoff (downloads resume where they
+stopped); and an identifying `User-Agent`. GameBanana sends no rate-limit headers. Store each mod's
 license, never re-host files, respect `_sInitialVisibility` / content ratings (NSFW hidden by
 default), and sanitize `_sText` HTML before display. The full mod page field mapping is in
 [07](07-frontend-design.md).
@@ -316,8 +317,8 @@ command per CLI action, in `src/commands.rs`: `games`, `statuses`, `catalog_list
 `clear_download_cache`, `launch_plan`, `launch`, `settings`, `preferences`,
 `set_preferences`, `pick_xxmi_folder`,
 `clear_xxmi_folder`, `pick_game_folder`, `remove_game_folder`; plus, for the Phase 5
-screens, `prepare_install`, `switch_version`, `catalog_featured`, `catalog_stats` and
-`clear_http_cache`, `clear_image_cache` there, the queue in `src/queue.rs` (`queue_install`, `queue_jobs`,
+screens, `switch_version`, `catalog_featured`, `catalog_stats` and
+`clear_http_cache`, `clear_image_cache` there, the queue in `src/queue.rs` (`queue_install`, `queue_proceed`, `queue_jobs`,
 `queue_watch`, `queue_pause`, `queue_resume`, `queue_cancel`, `queue_dismiss`,
 `queue_clear_finished`), `startup_check` in `src/startup.rs`, and the openers in
 `src/open.rs` (`open_mod_page`, `open_xxmi_releases`, `open_link`, `open_mod_folder`),
@@ -326,7 +327,9 @@ and `network_status`. Phase 6 adds `queue_change_file` (queue), `rollback_files`
 `src/profiles.rs` (`profiles`, `profile_save`, `profile_apply`, `profile_rename`,
 `profile_delete`, `profile_export`, `profile_import`) and the local install in
 `src/local.rs` (`drop_watch`, `pick_archive`, `prepare_local`, `install_local`,
-`discard_local`). Each calls the same `gmm-core` functions as the CLI.
+`discard_local`). The window frame has `window_minimize`, `window_toggle_maximize`,
+`window_is_maximized`, `window_close` and `window_start_drag` (`src/window.rs`; 2026-10-26).
+Each calls the same `gmm-core` functions as the CLI.
 
 - **Arguments are ids**: game ids, GameBanana ids, GMM mod ids, and `ModKey`
   (`{type: "managed", id}` or `{type: "unmanaged", path}`, where `path` must exactly match an
@@ -338,23 +341,38 @@ and `network_status`. Phase 6 adds `queue_change_file` (queue), `rollback_files`
 - **Errors** are a tagged `CmdError`: `choose_variant` (with the variant names) and
   `blocked` (with the file names) from `install`, `conflicts` from `set_enabled` (with the
   conflicts; call again with `anyway`), `not_ready`, and `other`.
-- **Install progress** goes over a Tauri `Channel` passed to `install` and
-  `prepare_install` (no event permissions needed), at most every 200 ms for download
+- **Install progress** goes over a Tauri `Channel` passed to `install`
+  (no event permissions needed), at most every 200 ms for download
   progress (`ProgressThrottle`; the download reports every chunk); `queue_watch`,
   `startup_check` and `catalog_stats` use channels the same way.
-- **Install confirmation, then the queue**: `prepare_install` fetches the file into the
-  download cache, analyses it and returns a `gmm_core::InstallPlan` (versions, blocked files,
-  installed versions, conflicts between versions, target folder), then removes the
-  extraction folder; nothing is installed. The confirmed choice goes to `queue_install`. One
-  worker task (`queue::spawn_worker`) runs queued installs in order through `gmm_core::install`
-  (the archive comes from the cache), with the job's `StopSignal` for pause and cancel, and
-  sends the list to every watcher when it changes (progress at most every 200 ms). A job
-  carries what the Downloads row shows (`JobLabel`: name, author, file, size, preview).
-  After a multi-version install that should start switched on, the worker runs
-  `switch_version` on the first version picked, so the ones that clash with it are off.
-  `gmm_core::fetch_archive` lets one download per GameBanana file run at a time (a
-  process-wide lock per file id): a second fetch of the same file waits, then finds it in
-  the cache or resumes the partial file.
+- **Install confirmation, then the queue, then the background check** (2026-10-26): the
+  confirmation downloads nothing. It reads the mod page and sends one `queue_install` per
+  GameBanana file the user picked (`InstallArgs`: file, switched on or off, and
+  `switch_off`, the mods on for the same character to switch off once this one is installed
+  and on; the command accepts only GMM-installed mods of the same game). One worker task
+  (`queue::spawn_worker`) runs queued installs in order, with the job's `StopSignal` for
+  pause and cancel, and sends the list to every watcher when it changes (progress at most
+  every 200 ms). For each install it calls `gmm_core::prepare` (download or the cached copy,
+  extraction, scan), then `gmm_core::review`: when the archive holds several versions and
+  none were chosen, has blocked files, scan warnings, or is an archived (outdated) file, the
+  job is held as `needs_action` with a `Review` (the issues and every version with its
+  blocked files, which are installed, which clash) and nothing is installed. `queue_proceed`
+  puts it back in the queue as reviewed, with the chosen versions and without the blocked
+  files; `queue_cancel` drops it. Otherwise `install_prepared` installs it, and for several
+  versions switched on `gmm_core::settle_versions` keeps every one on except a version that
+  replaces the same things as one picked before it. The extraction folder is removed either
+  way; the archive stays in the download cache, so going ahead extracts again without
+  downloading. A job carries what the Downloads row shows (`JobLabel`: name, author, file,
+  size, preview; `switch_on`). `gmm_core::fetch_archive` lets one download per GameBanana
+  file run at a time (a process-wide lock per file id): a second fetch of the same file
+  waits, then finds it in the cache or resumes the partial file.
+- **Window frame** (`src/window.rs`, 2026-10-26): the main window has no system title bar
+  (`decorations: false`); the webview draws one (`shell/TitleBar.tsx`) and calls
+  `window_minimize`, `window_toggle_maximize`, `window_is_maximized`, `window_close` and
+  `window_start_drag`, which act only on the calling window, so the capability still grants
+  GMM's own commands only. The window starts hidden; `fit_to_screen` sizes it (16:9, 1952
+  logical pixels wide where the screen has room, otherwise about three quarters of its
+  width) and centres it before it shows.
 - **Openers** (`src/open.rs`): a page address is built in Rust from an id (or looked up from a
   link key) and shown in a native dialog (`tauri-plugin-dialog`, Rust side) before
   `gmm_xxmi::open_page` hands it to the browser; `open_mod_folder` resolves the folder with
@@ -394,14 +412,18 @@ and `network_status`. Phase 6 adds `queue_change_file` (queue), `rollback_files`
   - `ui/`: the primitives (`Button`, `IconButton`, `Switch`, `Checkbox`, `Radio`,
     `Segmented`, `Dropdown`, `Badge`, `Chip`, `Notice`, `Dialog` and `SidePanel` on the
     native `<dialog>`, `ToastProvider` / `useToast`, `ProgressBar`, `Spinner`, `Icon`).
-  - `App.tsx` + `shell/`: the startup check first, then the sidebar (`Sidebar` with the
-    active-download count, `GamePicker`), page switching and the install confirmation;
-    `data.ts` loads games, setup states and every game's library once for all pages;
-    `queue.ts` keeps the install queue (`queue_watch`), refreshes a game's library when one
-    of its installs finishes and dismisses installed rows after 5 s.
+  - `App.tsx` + `shell/`: the title bar on every screen (`TitleBar`), the startup check
+    first, then the sidebar (`Sidebar` with the Downloads count, `GamePicker`), page
+    switching (each page's scroll position kept; Settings, Docs and Report a Bug load on
+    first use) and the install confirmation; installing never moves the user to another
+    page. `data.ts` loads games, setup states and every game's library once for all pages;
+    `queue.tsx` keeps the install queue (`queue_watch`) in a context of its own, so progress
+    redraws only the sidebar's count and Downloads, refreshes a game's library when one of
+    its installs finishes and dismisses installed rows after 5 s. `remember.ts` keeps page
+    state across page switches (the Store's search, filters, results and gallery).
   - `pages/`: `Startup` (the startup check), `Dashboard` (bubbles, Launch, a profile picker, recently
-    installed, setup), `Downloads` (the queue by game, with Pause / Resume / Cancel),
-    `Library` (game cards, Update all, filters, version groups as one card, select mode,
+    installed, setup), `Downloads` (the queue by game, with Pause / Resume / Cancel / Review),
+    `Library` (game cards, Update all, Launch, filters, version groups as one card, select mode,
     conflict prompt), `Store` and `ModPage`, `Settings` (preferences, XXMI, games, caches,
     About) with `Storage` (the breakdown), `Docs` (the guides from `docs/guides/`, bundled
     as `?raw` imports), `ReportBug` (the issue form, its preview and the error log),
@@ -409,7 +431,8 @@ and `network_status`. Phase 6 adds `queue_change_file` (queue), `rollback_files`
     dropped from release builds by `import.meta.env.DEV`).
   - `markdown.tsx`: a small Markdown renderer for files bundled at build time (guides,
     README sections, THIRD-PARTY-NOTICES.md) that builds React elements, never HTML.
-  - `components/`: `InstallDialog` (the install confirmation from `InstallPlan`),
+  - `components/`: `InstallDialog` (the install confirmation: variants, conflicts, confirm),
+    `ReviewDialog` (an install that needs action),
     `LocalInstallDialog` (the same for a local archive), `RichText` (GameBanana HTML through
     DOMPurify), `NetworkNotice`, `Launch` (exe confirmation dialog), `SetupCard`,
     `ModSettings` (side panel: preview, switch, Versions, Updates / Roll back, Key bindings,

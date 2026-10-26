@@ -27,7 +27,7 @@ url.workspace = true
 [dev-dependencies]
 gmm-net = { path = ".", features = ["test-util"] }
 tempfile.workspace = true
-tokio = { workspace = true, features = ["rt-multi-thread", "test-util"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "test-util", "net", "io-util"] }
 wiremock.workspace = true
 
 [lints]

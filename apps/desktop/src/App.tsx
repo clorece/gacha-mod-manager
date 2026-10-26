@@ -1,33 +1,39 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The app shell (docs/08, "Navigation"): the startup check first, the preferences screen on
-// the first run, then the sidebar and the current page, the install queue, the install
-// confirmation and the local install (a file dropped on the window). The mod page opens
-// over the page it came from, which stays mounted (hidden), so Back returns to the Store
-// with its filters and scroll position.
+// The app shell (docs/08, "Navigation"): the title bar on every screen, then the startup
+// check first, the preferences screen on the first run, then the sidebar and the current
+// page, the install queue, the install confirmation and the local install (a file dropped
+// on the window). The mod page opens over the page it came from, which stays mounted
+// (hidden), so Back returns to the Store with its filters and scroll position. Each page's
+// scroll position is kept when the user goes elsewhere, and installs never take the user
+// away from the page they're on: Downloads shows them.
 
 import { lazy, type ReactNode, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { api, type ModKey, type ModUpdateInfo } from "./api";
+import { type AppRelease, api, type Job, type ModKey, type ModUpdateInfo } from "./api";
 import { useOwned } from "./catalog";
 import { InstallDialog } from "./components/InstallDialog";
 import { LocalInstallDialog } from "./components/LocalInstallDialog";
 import { NetworkNotice } from "./components/NetworkNotice";
 import { modCounts, useAppData } from "./data";
+import { plural } from "./format";
 import { ALL, type Scope } from "./games";
 import { Dashboard } from "./pages/Dashboard";
-import { Docs } from "./pages/Docs";
 import { Downloads } from "./pages/Downloads";
 import { Library } from "./pages/Library";
 import { ModPage } from "./pages/ModPage";
-import { ReportBug } from "./pages/ReportBug";
-import { Settings } from "./pages/Settings";
 import { Startup } from "./pages/Startup";
 import { Store } from "./pages/Store";
 import { Welcome } from "./pages/Welcome";
 import { usePrefs } from "./prefs";
-import { isActive, useQueue } from "./queue";
+import { QueueProvider } from "./queue";
 import { type Page, Sidebar } from "./shell/Sidebar";
+import { TitleBar } from "./shell/TitleBar";
 import { useAppliedTheme } from "./theme";
+import { useToast } from "./ui";
 
+// Pages visited less often load on first use, so the first screen comes up sooner.
+const Settings = lazy(() => import("./pages/Settings").then((m) => ({ default: m.Settings })));
+const Docs = lazy(() => import("./pages/Docs").then((m) => ({ default: m.Docs })));
+const ReportBug = lazy(() => import("./pages/ReportBug").then((m) => ({ default: m.ReportBug })));
 // Dev builds only; `import.meta.env.DEV` is false in release builds, so the page is dropped.
 const StyleGuide = import.meta.env.DEV ? lazy(() => import("./pages/StyleGuide")) : null;
 
@@ -36,6 +42,7 @@ const pageNames: Partial<Record<Page, string>> = { store: "Mods Store", library:
 export default function App() {
   const data = useAppData();
   const { prefs, loaded, update } = usePrefs();
+  const toast = useToast();
   const theme = useAppliedTheme(prefs.theme);
   const choose = (next: typeof prefs.theme) => void update({ theme: next });
   const [page, setPage] = useState<Page>("dashboard");
@@ -43,6 +50,8 @@ export default function App() {
   const [started, setStarted] = useState(false);
   // Newer files the startup check found; the Mod settings panel offers Update for them.
   const [updates, setUpdates] = useState<ModUpdateInfo[]>([]);
+  /** A newer GMM on GitHub, from the startup check (the sidebar offers it). */
+  const [appUpdate, setAppUpdate] = useState<AppRelease | null>(null);
   const owned = useOwned(data, updates);
   const [installing, setInstalling] = useState<{ modId: number; fileId: number | null } | null>(null);
   /** The mod page, over the page it was opened from. */
@@ -54,11 +63,14 @@ export default function App() {
   const main = useRef<HTMLElement>(null);
   const savedScroll = useRef(0);
   const restoreScroll = useRef(false);
-  const jobs = useQueue((job) => {
+  /** Where each page was scrolled to when the user left it. */
+  const pageScroll = useRef<Partial<Record<Page, number>>>({});
+  const restorePage = useRef(false);
+  /** A finished install: refresh that game's library; a finished update is no longer one to offer. */
+  const installed = (job: Job) => {
     void data.refreshLibrary(job.game);
-    // An update that finished is no longer one to offer.
     if (job.action === "change_file") setUpdates((all) => all.filter((u) => u.gb_mod_id !== job.mod_id));
-  });
+  };
 
   useEffect(() => {
     api.dropWatch((name) => setLocalFile(name)).catch(() => {});
@@ -75,24 +87,51 @@ export default function App() {
     }
   }, [modPage]);
 
+  // Back on a page lands where the user left it (the Store's grid sizes itself first).
+  useLayoutEffect(() => {
+    const el = main.current;
+    if (!el || !restorePage.current) return;
+    restorePage.current = false;
+    const top = pageScroll.current[page] ?? 0;
+    el.scrollTop = top;
+    const again = requestAnimationFrame(() => {
+      if (Math.abs(el.scrollTop - top) > 1) el.scrollTop = top;
+    });
+    return () => cancelAnimationFrame(again);
+  }, [page]);
+
+  const shell = (body: ReactNode, sideColumn = false) => (
+    <div className="window">
+      <TitleBar withSide={sideColumn} />
+      {body}
+    </div>
+  );
+
   if (started && loaded && !prefs.onboarded) {
-    return <Welcome />;
+    return shell(<Welcome />);
   }
 
   if (!started) {
-    return (
+    return shell(
       <Startup
         games={data.games}
         onDone={(report) => {
           setUpdates(report?.updates ?? []);
+          setAppUpdate(report?.app_update ?? null);
           setStarted(true);
         }}
-      />
+      />,
     );
   }
 
-  const gameName = (id: string) => data.games.find((g) => g.id === id)?.name ?? id;
   const go = (next: Page) => {
+    if (next === page) {
+      // The sidebar's item for the page under a mod page: back to where it was.
+      if (modPage !== null) restoreScroll.current = true;
+    } else {
+      if (main.current && modPage === null) pageScroll.current[page] = main.current.scrollTop;
+      restorePage.current = true;
+    }
     setModPage(null);
     setPage(next);
   };
@@ -138,7 +177,6 @@ export default function App() {
     case "downloads":
       content = (
         <Downloads
-          jobs={jobs}
           games={data.games}
           onShowLibrary={showLibrary}
           onInstallFile={async () => {
@@ -156,7 +194,6 @@ export default function App() {
           onScope={setScope}
           updates={updates}
           owned={owned}
-          onQueued={() => go("downloads")}
           focus={libraryFocus}
           onFocusDone={() => setLibraryFocus(null)}
           onOpenMod={openMod}
@@ -177,66 +214,75 @@ export default function App() {
       content = <ReportBug />;
       break;
     case "styleguide":
-      content = StyleGuide && (
-        <Suspense fallback={null}>
-          <StyleGuide theme={theme} onTheme={choose} />
-        </Suspense>
-      );
+      content = StyleGuide && <StyleGuide theme={theme} onTheme={choose} />;
       break;
   }
 
-  return (
-    <div className="app">
-      <Sidebar
-        page={page}
-        onGo={go}
-        games={pickerGames}
-        scope={scope}
-        onScope={setScope}
-        theme={theme}
-        onToggleTheme={() => choose(theme === "dark" ? "light" : "dark")}
-        activeDownloads={jobs.filter(isActive).length}
-      />
-      <main className="main" ref={main}>
-        <NetworkNotice />
-        <div hidden={modPage !== null}>{content}</div>
-        {modPage !== null && (
-          <ModPage
-            key={modPage}
-            modId={modPage}
-            owned={owned.get(modPage)}
-            backLabel={pageNames[page] ?? "Back"}
-            onBack={closeMod}
-            onDownload={download}
-            onManage={() => manage(modPage)}
+  return shell(
+    <QueueProvider onInstalled={installed}>
+      <div className="app">
+        <Sidebar
+          page={page}
+          onGo={go}
+          games={pickerGames}
+          scope={scope}
+          onScope={setScope}
+          theme={theme}
+          onToggleTheme={() => choose(theme === "dark" ? "light" : "dark")}
+          appUpdate={appUpdate}
+        />
+        <main className="main" ref={main}>
+          <NetworkNotice />
+          <div hidden={modPage !== null}>
+            <Suspense fallback={null}>
+              <div key={page} className="page-in">
+                {content}
+              </div>
+            </Suspense>
+          </div>
+          {modPage !== null && (
+            <ModPage
+              key={modPage}
+              modId={modPage}
+              owned={owned.get(modPage)}
+              backLabel={pageNames[page] ?? "Back"}
+              onBack={closeMod}
+              onDownload={download}
+              onManage={() => manage(modPage)}
+            />
+          )}
+        </main>
+        {localFile !== null && data.games.length > 0 && (
+          <LocalInstallDialog
+            fileName={localFile}
+            games={data.games}
+            defaultGame={scope === ALL ? (data.games[0]?.id ?? "") : scope}
+            onClose={() => setLocalFile(null)}
+            onInstalled={async (game) => {
+              setLocalFile(null);
+              await data.refreshLibrary(game);
+              showLibrary(game);
+            }}
           />
         )}
-      </main>
-      {localFile !== null && data.games.length > 0 && (
-        <LocalInstallDialog
-          fileName={localFile}
-          games={data.games}
-          defaultGame={scope === ALL ? (data.games[0]?.id ?? "") : scope}
-          onClose={() => setLocalFile(null)}
-          onInstalled={async (game) => {
-            setLocalFile(null);
-            await data.refreshLibrary(game);
-            showLibrary(game);
-          }}
-        />
-      )}
-      {installing !== null && (
-        <InstallDialog
-          modId={installing.modId}
-          initialFileId={installing.fileId}
-          gameName={gameName}
-          onClose={() => setInstalling(null)}
-          onQueued={() => {
-            setInstalling(null);
-            go("downloads");
-          }}
-        />
-      )}
-    </div>
+        {installing !== null && (
+          <InstallDialog
+            modId={installing.modId}
+            initialFileId={installing.fileId}
+            games={data.games}
+            libraries={data.libraries}
+            onClose={() => setInstalling(null)}
+            onQueued={(count, name) => {
+              setInstalling(null);
+              toast(
+                "ok",
+                `${count > 1 ? `${plural(count, "variant")} of ${name}` : name} added to Downloads. GMM checks and installs it in the background.`,
+              );
+            }}
+          />
+        )}
+      </div>
+    </QueueProvider>,
+    true,
   );
 }

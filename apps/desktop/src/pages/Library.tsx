@@ -19,6 +19,7 @@ import {
   type UninstallItem,
 } from "../api";
 import type { Owned } from "../catalog";
+import { LaunchButton } from "../components/Launch";
 import { ModSettings } from "../components/ModSettings";
 import { Preview } from "../components/Preview";
 import { ProfilesPanel } from "../components/ProfilesPanel";
@@ -181,7 +182,6 @@ export function Library({
   onScope,
   updates,
   owned,
-  onQueued,
   focus,
   onFocusDone,
   onOpenMod,
@@ -194,7 +194,6 @@ export function Library({
   updates: ModUpdateInfo[];
   /** Installed GameBanana mods with their conflict state. */
   owned: Map<number, Owned>;
-  onQueued: () => void;
   /** A mod whose settings to open (asked for from the Store or a mod page). */
   focus: { game: string; key: ModKey } | null;
   onFocusDone: () => void;
@@ -264,6 +263,8 @@ export function Library({
     const s = data.statuses.find((st) => st.game_id === g.id);
     return s && s.state !== "ready" && !data.libraries[g.id]?.problem && modCounts(data.libraries[g.id]).total > 0;
   });
+  /** Games in scope that XXMI is set up for: the header's Launch buttons. */
+  const launchable = inScope.filter((g) => data.statuses.find((st) => st.game_id === g.id)?.state === "ready");
   const scopedUpdates = updates.filter((u) => inScope.some((g) => g.id === u.game));
   const updateFor = (item: LibraryItem) =>
     item.gbModId === null ? undefined : scopedUpdates.find((u) => u.gb_mod_id === item.gbModId);
@@ -352,8 +353,10 @@ export function Library({
     }
     setBusy(false);
     if (queued > 0) {
-      toast("ok", `${plural(queued, "update")} queued. Each version keeps its folder and its on/off state.`);
-      onQueued();
+      toast(
+        "ok",
+        `${plural(queued, "update")} added to Downloads. Each version keeps its folder and its on/off state.`,
+      );
     }
   };
 
@@ -368,11 +371,16 @@ export function Library({
           <h1>Mods Library</h1>
           <p>Your installed mods. Switch one off and XXMI skips it next time the game starts.</p>
         </div>
-        {scopedUpdates.length > 0 && (
-          <Button variant="primary" icon="download" disabled={busy} onClick={updateAll}>
-            Update all ({scopedUpdates.length})
-          </Button>
-        )}
+        <div className="chips">
+          {scopedUpdates.length > 0 && (
+            <Button variant="primary" icon="download" disabled={busy} onClick={updateAll}>
+              Update all ({scopedUpdates.length})
+            </Button>
+          )}
+          {launchable.map((g) => (
+            <LaunchButton key={g.id} game={g} label={launchable.length > 1 ? `Launch ${g.short_name}` : "Launch"} />
+          ))}
+        </div>
       </div>
 
       <div className="lib-games">
@@ -616,10 +624,7 @@ export function Library({
             await data.refreshLibrary(settingsItem.game.id);
           }}
           update={updateFor(settingsItem)}
-          onQueued={() => {
-            setSettingsFor(null);
-            onQueued();
-          }}
+          onQueued={() => setSettingsFor(null)}
           onChanged={async () => {
             setSettingsFor(null);
             await data.refreshLibrary(settingsItem.game.id);

@@ -17,7 +17,9 @@ designed sidebar shell with the startup check, a first-run preferences screen, t
 (game banners, Launch, last played, a setup guide), the Mods Store (trending gallery, search
 and filters, a scrolling grid) with a mod page for every mod, the Mods Library (previews,
 filters, versions, select mode, profiles) with per-mod settings, Downloads (the install
-queue), the install confirmation, Settings (with a storage breakdown) and player guides on
+queue, where each install is downloaded and checked in the background and waits for you if it
+needs a choice), the install confirmation (variants and conflicts before anything downloads),
+Settings (with a storage breakdown) and player guides on
 the Documentation page. Power features are done: update and roll back, profiles (also on
 the Dashboard), key
 bindings, adopting hand-installed mods, installing from a local archive, and Report a Bug
@@ -27,6 +29,15 @@ have component tests, an XSS corpus, an IPC fuzz harness and a contrast audit in
 Progress and plans: [docs/README.md](docs/README.md).
 
 First games: Zenless Zone Zero and Wuthering Waves.
+
+## Download
+
+Windows installers (`.msi`) and their SHA-256 checksums are on the
+[Releases page](https://github.com/clorece/gacha-mod-manager/releases). The first beta,
+0.1.0-beta, is in preparation.
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
+[SignPath Foundation](https://signpath.org).
 
 ## Try it (developers)
 

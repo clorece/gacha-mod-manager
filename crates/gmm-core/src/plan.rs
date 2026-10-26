@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! What the install confirmation shows (docs/08, "Install confirmation"), built from a
-//! [`Prepared`] mod: the file, the mod's other files, every version in the archive with its
-//! blocked files and warnings, which versions are already installed ("Add versions" mode),
-//! which ones replace the same things, and where it all goes.
+//! The background check before a queued install goes ahead (docs/08, "Downloads"), built
+//! from a [`Prepared`] mod: every version in the archive with its blocked files and warnings,
+//! which versions are already installed ("Add versions"), which ones replace the same things,
+//! and what the user has to look at first ([`review`]). The local install shows the same
+//! versions (`local.rs`).
 
 use gmm_adapters::GameManifest;
 use gmm_archive::Severity;
-use gmm_catalog::ModFile;
 use gmm_db::Db;
 use serde::Serialize;
 
 use crate::analyze::{Analysis, VersionConflict};
 use crate::error::CoreError;
-use crate::install::Prepared;
+use crate::install::{InstallOptions, Prepared, VariantChoice};
 use crate::names::{GMM_DIR, mod_folder_name};
 
 /// One version (variant) of the archive.
@@ -32,67 +32,6 @@ pub struct VersionPlan {
     pub blocked: Vec<String>,
     /// Scan warnings, as `path: reason`.
     pub warnings: Vec<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
-pub struct InstallPlan {
-    pub game: String,
-    pub mod_id: u64,
-    pub mod_name: String,
-    /// The file that was fetched and analysed.
-    pub file: ModFile,
-    /// The mod's other current files, newest first (for "Choose a file").
-    pub other_files: Vec<ModFile>,
-    pub archive_bytes: u64,
-    pub from_cache: bool,
-    /// The mod kind from the game's manifest, or `None` when nothing in the archive looks
-    /// like a mod for this game (installing would fail).
-    pub kind: Option<String>,
-    pub versions: Vec<VersionPlan>,
-    /// Versions that replace the same things; only one of each pair should be on.
-    pub version_conflicts: Vec<VersionConflict>,
-    /// Where it installs, relative to XXMI: `ZZMI\Mods\GMM`.
-    pub install_to: String,
-}
-
-/// Builds the confirmation for `prepared`, marking versions that are already installed.
-pub async fn install_plan(
-    db: &Db,
-    game: &GameManifest,
-    prepared: &Prepared,
-) -> Result<InstallPlan, CoreError> {
-    let analysis = &prepared.analysis;
-    let versions = version_plans(
-        db,
-        game,
-        analysis,
-        &prepared.mod_name,
-        Some(prepared.mod_id),
-    )
-    .await?;
-    let file = prepared.fetched.file.clone();
-    let mut other_files: Vec<ModFile> = prepared
-        .files
-        .files
-        .iter()
-        .filter(|f| f.id != file.id)
-        .cloned()
-        .collect();
-    other_files.sort_by_key(|f| std::cmp::Reverse(f.date_added));
-    Ok(InstallPlan {
-        game: game.id().to_owned(),
-        mod_id: prepared.mod_id,
-        mod_name: prepared.mod_name.clone(),
-        file,
-        other_files,
-        archive_bytes: prepared.fetched.bytes,
-        from_cache: prepared.fetched.from_cache,
-        kind: analysis.kind.clone(),
-        versions,
-        version_conflicts: analysis.version_conflicts.clone(),
-        install_to: install_to(game),
-    })
 }
 
 /// Where mods install, relative to XXMI: `ZZMI\Mods\GMM`.
@@ -146,4 +85,102 @@ pub(crate) async fn version_plans(
         });
     }
     Ok(versions)
+}
+
+/// Why a queued install stopped after its background check and waits for the user (the
+/// Downloads page's "Needs action"). Each one can be accepted ("Install anyway").
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CheckIssue {
+    /// The archive holds several versions and none were chosen yet.
+    ChooseVersions { count: usize },
+    /// Programs, scripts or shortcuts GMM never installs; installing goes on without them.
+    Blocked { files: Vec<String> },
+    /// Scan warnings (odd files that are installed but worth a look), as `path: reason`.
+    Warnings { items: Vec<String> },
+    /// The file is in the mod's archived (old) files on GameBanana; `newest` is the name of
+    /// the newest current file, when there is one.
+    Outdated { newest: Option<String> },
+}
+
+/// What the user sees when an install needs action: the issues, and the archive's versions
+/// for choosing (as in the install confirmation).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Review {
+    pub issues: Vec<CheckIssue>,
+    pub versions: Vec<VersionPlan>,
+    pub version_conflicts: Vec<VersionConflict>,
+}
+
+/// The background check of a fetched and analysed mod before it installs: `None` when it
+/// can install as asked, otherwise what the user has to look at first. An archive with no
+/// mod in it isn't an issue to accept; installing fails on it with its own error.
+pub async fn review(
+    db: &Db,
+    game: &GameManifest,
+    prepared: &Prepared,
+    options: &InstallOptions,
+) -> Result<Option<Review>, CoreError> {
+    let analysis = &prepared.analysis;
+    if analysis.kind.is_none() || analysis.variants.is_empty() {
+        return Ok(None);
+    }
+    let versions = version_plans(
+        db,
+        game,
+        analysis,
+        &prepared.mod_name,
+        Some(prepared.mod_id),
+    )
+    .await?;
+    let multi = versions.len() > 1;
+    let mut issues = Vec::new();
+    if multi && options.variants == VariantChoice::Only {
+        issues.push(CheckIssue::ChooseVersions {
+            count: versions.len(),
+        });
+    }
+    // The versions that would install: the chosen ones, or every one still to choose from.
+    let chosen = |v: &VersionPlan| match &options.variants {
+        VariantChoice::Named(names) => names.iter().any(|n| n.eq_ignore_ascii_case(&v.name)),
+        VariantChoice::Only | VariantChoice::All => true,
+    };
+    let label = |v: &VersionPlan, item: &str| {
+        if multi {
+            format!("{}: {item}", v.name)
+        } else {
+            item.to_owned()
+        }
+    };
+    let blocked: Vec<String> = versions
+        .iter()
+        .filter(|v| chosen(v))
+        .flat_map(|v| v.blocked.iter().map(|b| label(v, b)))
+        .collect();
+    if !blocked.is_empty() && !options.skip_blocked {
+        issues.push(CheckIssue::Blocked { files: blocked });
+    }
+    let warnings: Vec<String> = versions
+        .iter()
+        .filter(|v| chosen(v))
+        .flat_map(|v| v.warnings.iter().map(|w| label(v, w)))
+        .collect();
+    if !warnings.is_empty() {
+        issues.push(CheckIssue::Warnings { items: warnings });
+    }
+    if prepared.fetched.file.archived {
+        issues.push(CheckIssue::Outdated {
+            newest: prepared.files.default_choice().map(|f| f.name.clone()),
+        });
+    }
+    if issues.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(Review {
+        issues,
+        versions,
+        version_conflicts: analysis.version_conflicts.clone(),
+    }))
 }

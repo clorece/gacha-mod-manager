@@ -96,6 +96,7 @@ likely), then the comparison.
 | An install in the queue | Shows "Waiting · GameBanana asked GMM to slow down · carries on at 14:32" and continues by itself, keeping the part already downloaded; Pause and Cancel still work. Fails only after four waits in a row |
 | The startup check | Steps that can't reach GameBanana are shown as failed; the app opens with saved data |
 | 5xx without `Retry-After` (an outage) | Retried 3 times with 1, 2, 4 s backoff, then saved data or a plain error |
+| A dropped connection (reset or closed while sending or reading, a timeout; 2026-10-26) | Retried on a fresh connection, 3 times with 1, 2, 4 s backoff; a download picks up where it stopped with a range request. Idle connections are retired after 30 s and kept HTTP/2 connections are pinged every 15 s, so a request after a quiet spell (the user was in another window) doesn't go out on a connection GameBanana's edge already closed. Before this, such a request failed at once ("connection reset" in the error log) |
 
 ### Prevention: keeping GMM's load low
 

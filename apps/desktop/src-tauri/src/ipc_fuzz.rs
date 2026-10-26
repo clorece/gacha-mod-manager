@@ -18,7 +18,9 @@
 //! Left out, each because a valid call opens something on the user's desktop: the folder
 //! and archive pickers and `open_xxmi_releases` (native dialogs; they take no arguments),
 //! `open_log_folder` (the file manager) and `clear_xxmi_folder` (it would point GMM back at
-//! the real XXMI); `launch`, `pick_game_folder`, `open_mod_page` and `open_bug_report` only
+//! the real XXMI), and the window commands (they act on the calling window itself and take
+//! no arguments); `launch`, `pick_game_folder`, `open_mod_page`, `open_bug_report` and
+//! `open_app_release` only
 //! get arguments that must be refused before anything opens.
 
 // The harness builds and inspects its fake world directly; GMM itself still goes through
@@ -117,11 +119,6 @@ fn specs() -> Vec<Spec> {
             &[("modIds", Keys), ("onStats", Channel)],
         ),
         s(
-            "prepare_install",
-            json!({"modId": 1, "fileId": null, "onProgress": "nope"}),
-            &[("modId", GbId), ("fileId", GbId), ("onProgress", Channel)],
-        ),
-        s(
             "install",
             json!({"args": {}, "onProgress": "nope"}),
             &[("args", Object), ("onProgress", Channel)],
@@ -137,11 +134,23 @@ fn specs() -> Vec<Spec> {
             json!({"gbModId": 1, "fileId": null}),
             &[("gbModId", GbId), ("fileId", GbId)],
         ),
+        s("app_update_check", json!({}), &[]),
+        // Only the version the last check found opens anything; the checks here never find one.
+        s(
+            "open_app_release",
+            json!({"version": "9.9.9"}),
+            &[("version", Text)],
+        ),
         s("queue_jobs", json!({}), &[]),
         s(
             "queue_watch",
             json!({"onChange": "nope"}),
             &[("onChange", Channel)],
+        ),
+        s(
+            "queue_proceed",
+            json!({"id": 999_999, "variants": null}),
+            &[("id", Id), ("variants", Object)],
         ),
         s("queue_pause", json!({"id": 999_999}), &[("id", Id)]),
         s("queue_resume", json!({"id": 999_999}), &[("id", Id)]),
@@ -316,6 +325,11 @@ const LEFT_OUT: &[&str] = &[
     "open_xxmi_releases",
     "clear_xxmi_folder",
     "open_log_folder",
+    "window_minimize",
+    "window_toggle_maximize",
+    "window_is_maximized",
+    "window_close",
+    "window_start_drag",
 ];
 
 /// JSON values of the wrong type for anything.

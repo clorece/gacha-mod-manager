@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The startup check (docs/08, "Startup check"): the GMM app step (skipped until the release
-//! updater exists), the newest catalogue page per game, and an update check of every
+//! The startup check (docs/08, "Startup check"): the GMM app step (whether a newer GMM is on
+//! GitHub, `app_update.rs`), the newest catalogue page per game, and an update check of every
 //! GMM-installed mod. Each step is reported on the channel as it starts and ends; a failing
 //! step (offline, say) doesn't stop the others, and the app works on with cached data.
 
@@ -31,12 +31,31 @@ pub async fn startup_check(
         });
     };
 
+    let mut report = StartupReport::default();
     send(
         step,
         "GMM app",
-        StepState::Skipped,
-        "Update checks arrive with the signed release builds".to_owned(),
+        StepState::Working,
+        "Looking for a newer GMM on GitHub".to_owned(),
     );
+    match crate::app_update::check(&state).await {
+        Ok(Some(release)) => {
+            send(
+                step,
+                "GMM app",
+                StepState::Done,
+                format!("GMM {} is out", release.version),
+            );
+            report.app_update = Some(release);
+        }
+        Ok(None) => send(
+            step,
+            "GMM app",
+            StepState::Done,
+            format!("{} is the newest", gmm_core::APP_VERSION),
+        ),
+        Err(e) => send(step, "GMM app", StepState::Failed, e.to_string()),
+    }
 
     for game in games {
         step += 1;
@@ -66,7 +85,6 @@ pub async fn startup_check(
         StepState::Working,
         "Comparing with GameBanana".to_owned(),
     );
-    let mut report = StartupReport::default();
     for game in games {
         match check_updates(&state.gb, &state.db, game).await {
             Ok(check) => {

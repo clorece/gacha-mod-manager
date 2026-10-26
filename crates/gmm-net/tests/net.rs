@@ -511,3 +511,106 @@ async fn a_429_on_a_download_keeps_the_partial_file() {
     assert!(matches!(again, NetError::SlowDown { .. }));
     assert_eq!(server.received_requests().await.unwrap().len(), 1);
 }
+
+// ---- dropped connections --------------------------------------------------------------------
+
+/// A server that answers each connection from `script`, in turn: `None` reads the request
+/// and closes the connection without a word (what an edge server does to a connection it
+/// already dropped); `Some(bytes)` writes those bytes and closes.
+async fn flaky_server(script: Vec<Option<Vec<u8>>>) -> (Url, tokio::task::JoinHandle<usize>) {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = Url::parse(&format!("http://{}", listener.local_addr().unwrap())).unwrap();
+    let handle = tokio::spawn(async move {
+        let mut served = 0;
+        for answer in script {
+            let (mut sock, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 4096];
+            let _ = sock.read(&mut buf).await;
+            if let Some(bytes) = answer {
+                sock.write_all(&bytes).await.unwrap();
+            }
+            served += 1;
+            drop(sock);
+        }
+        served
+    });
+    (base, handle)
+}
+
+fn http_ok(body: &[u8], extra: &str) -> Vec<u8> {
+    let mut out = format!(
+        "HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n{extra}\r\n",
+        body.len()
+    )
+    .into_bytes();
+    out.extend_from_slice(body);
+    out
+}
+
+#[tokio::test]
+async fn a_dropped_connection_is_retried() {
+    let (base, server) = flaky_server(vec![None, Some(http_ok(b"ok", ""))]).await;
+    let resp = test_client()
+        .get(&base.join("/api").unwrap())
+        .await
+        .unwrap();
+    assert_eq!((resp.status, resp.body.as_slice()), (200, b"ok".as_slice()));
+    assert_eq!(server.await.unwrap(), 2);
+}
+
+#[tokio::test]
+async fn a_body_cut_short_is_retried() {
+    // The first answer promises 10 bytes and stops after 2.
+    let cut = b"HTTP/1.1 200 OK\r\ncontent-length: 10\r\nconnection: close\r\n\r\nok".to_vec();
+    let (base, server) = flaky_server(vec![Some(cut), Some(http_ok(b"0123456789", ""))]).await;
+    let resp = test_client()
+        .get(&base.join("/api").unwrap())
+        .await
+        .unwrap();
+    assert_eq!(resp.body, b"0123456789");
+    assert_eq!(server.await.unwrap(), 2);
+}
+
+#[tokio::test]
+async fn a_download_cut_short_resumes_by_itself() {
+    let data = payload();
+    let half = 50_000usize;
+    let mut cut = format!(
+        "HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+        data.len()
+    )
+    .into_bytes();
+    cut.extend_from_slice(&data[..half]);
+    let rest = {
+        let mut out = format!(
+            "HTTP/1.1 206 Partial Content\r\ncontent-length: {}\r\ncontent-range: bytes {half}-{}/{}\r\nconnection: close\r\n\r\n",
+            data.len() - half,
+            data.len() - 1,
+            data.len()
+        )
+        .into_bytes();
+        out.extend_from_slice(&data[half..]);
+        out
+    };
+    let (base, server) = flaky_server(vec![Some(cut), Some(rest)]).await;
+    let env = dl_env();
+    env.guard
+        .create_dir_all(&env.guard.path(env.root, "downloads").unwrap())
+        .unwrap();
+    let req = DownloadRequest {
+        url: base.join("/files/mod.zip").unwrap(),
+        dest: env.guard.path(env.root, "downloads/mod.zip").unwrap(),
+        expected_size: Some(data.len() as u64),
+        expected_md5: Some(hex_md5(&data)),
+        max_bytes: 10 * 1024 * 1024,
+    };
+    let outcome = test_client()
+        .download(&env.guard, &req, |_| ControlFlow::Continue(()))
+        .await
+        .unwrap();
+    assert!(outcome.resumed);
+    assert_eq!(outcome.sha256, hex_sha256(&data));
+    assert_eq!(env.guard.read(&req.dest).unwrap(), data);
+    assert_eq!(server.await.unwrap(), 2);
+}

@@ -33,7 +33,7 @@ Local archives (drag and drop, Phase 6) use the same formats and the same pipeli
 | Unsupported method (e.g. BZip2 inside a 7z, a RAR 7 dictionary over 4 GB) | During extraction; nothing is installed | "This archive uses a compression method GMM doesn't support (BZip2)." |
 | Multi-part archive | Before download when the name shows it | "This mod is split into several files, which GMM can't install." |
 | Not an archive | After download | "This file isn't an archive GMM can open." |
-| Archive with blocked files | In the install confirmation | The files are listed; install without them or cancel |
+| Archive with blocked files | After the background check, as "Needs action" in Downloads (2026-10-26) | The files are listed; install without them or cancel the download |
 
 ## RAR plan (decision record)
 

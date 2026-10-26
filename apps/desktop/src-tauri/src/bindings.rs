@@ -48,9 +48,9 @@ fn render() -> String {
         gmm_core::CacheStorage, gmm_core::ClearedCache, gmm_core::InstalledFolder,
         gmm_core::InstallReport, gmm_core::ToggleOutcome,
         // Two-step install, versions, queue, update check (gmm-core, Phase 5).
-        gmm_core::InstallPlan, gmm_core::VersionPlan, gmm_core::VersionConflict,
+        gmm_core::VersionPlan, gmm_core::VersionConflict,
         gmm_core::Job, gmm_core::JobState, gmm_core::ModUpdateInfo, gmm_core::FeaturedMod,
-        gmm_core::JobAction,
+        gmm_core::JobAction, gmm_core::Review, gmm_core::CheckIssue,
         gmm_core::ModKeyBinding, gmm_core::KeyBindings,
         gmm_core::ProfileInfo, gmm_core::ProfileApplied, gmm_core::SharedMod,
         gmm_core::ProfileImported, gmm_core::MatchReason, gmm_core::AdoptCandidate,
@@ -58,6 +58,8 @@ fn render() -> String {
         gmm_core::LocalPlan,
         // Report a Bug (gmm-core, Phase 6).
         gmm_core::LogEntry, gmm_core::BugReport,
+        // The app update check (Phase 7).
+        gmm_core::AppRelease,
     ];
     let mut out = String::from(
         "// SPDX-License-Identifier: MIT OR Apache-2.0\n\

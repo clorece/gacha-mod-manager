@@ -1,6 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Gacha Mod Manager",
+  "version": "0.1.0",
   "identifier": "dev.gacha-mod-manager.desktop",
   "build": {
     "beforeDevCommand": "cargo build -p gmm-extract && corepack pnpm dev",
@@ -14,10 +15,14 @@
       {
         "label": "main",
         "title": "Gacha Mod Manager",
-        "width": 1200,
-        "height": 780,
-        "minWidth": 900,
-        "minHeight": 600
+        "width": 1600,
+        "height": 900,
+        "minWidth": 960,
+        "minHeight": 600,
+        "decorations": false,
+        "shadow": true,
+        "visible": false,
+        "center": true
       }
     ],
     "security": {
@@ -28,6 +33,11 @@
   },
   "bundle": {
     "active": false,
+    "publisher": "Gacha Mod Manager contributors",
+    "copyright": "Copyright the Gacha Mod Manager contributors. MIT OR Apache-2.0.",
+    "homepage": "https://github.com/clorece/gacha-mod-manager",
+    "category": "Utility",
+    "shortDescription": "Find, download and organize GameBanana mods for gacha games, loaded by XXMI",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

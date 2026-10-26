@@ -12,7 +12,7 @@ use gmm_catalog::{
     Category, Image, ImageVariant, Member, ModProfile, ModStats, ModSummary, ModUpdate, Page,
 };
 use gmm_core::{
-    CacheStorage, Conflict, DiskState, FetchEvent, GameStorage, ImageCache, InstallEvent,
+    AppRelease, CacheStorage, Conflict, DiskState, FetchEvent, GameStorage, ImageCache, InstallEvent,
     InstallReport, ModUpdateInfo, UnmanagedMod, VariantChoice,
 };
 use serde::{Deserialize, Serialize};
@@ -189,6 +189,10 @@ pub struct InstallArgs {
     /// Install switched off ("Switch it on after installing" unticked).
     #[serde(default)]
     pub start_disabled: bool,
+    /// Mods of the same game (library row ids) to switch off once this one is installed and
+    /// on: the other side of a conflict resolved in the confirmation. The queue only.
+    #[serde(default)]
+    pub switch_off: Vec<i64>,
 }
 
 /// Install progress, sent on the command's channel.
@@ -253,7 +257,6 @@ pub struct InstallResult {
 pub enum StepState {
     Working,
     Done,
-    Skipped,
     Failed,
 }
 
@@ -274,6 +277,8 @@ pub struct StartupReport {
     pub updates: Vec<ModUpdateInfo>,
     /// Mods or games that couldn't be checked.
     pub notes: Vec<String>,
+    /// A newer GMM on GitHub, when the check found one.
+    pub app_update: Option<AppRelease>,
 }
 
 #[derive(Debug, Serialize, TS)]

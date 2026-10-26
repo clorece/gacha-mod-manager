@@ -2,7 +2,8 @@
 
 // Each GMM command gets a generated permission (`allow-<command>`); the main window's
 // capability (capabilities/main.json) grants exactly those, nothing from Tauri's plugins.
-// Keep this list, main.rs's `generate_handler!` and the capability in step.
+// Keep this list, main.rs's `generate_handler!` and the capability in step. The window
+// commands (`window_*`) act only on the window that calls them (window.rs).
 const COMMANDS: &[&str] = &[
     "games",
     "statuses",
@@ -13,9 +14,9 @@ const COMMANDS: &[&str] = &[
     "catalog_categories",
     "catalog_featured",
     "catalog_stats",
-    "prepare_install",
     "install",
     "queue_install",
+    "queue_proceed",
     "queue_change_file",
     "queue_jobs",
     "queue_watch",
@@ -25,6 +26,8 @@ const COMMANDS: &[&str] = &[
     "queue_dismiss",
     "queue_clear_finished",
     "startup_check",
+    "app_update_check",
+    "open_app_release",
     "library",
     "switch_version",
     "rollback_files",
@@ -71,9 +74,18 @@ const COMMANDS: &[&str] = &[
     "profile_delete",
     "profile_export",
     "profile_import",
+    "window_minimize",
+    "window_toggle_maximize",
+    "window_is_maximized",
+    "window_close",
+    "window_start_drag",
 ];
 
 fn main() {
+    let mut seen = std::collections::HashSet::new();
+    if let Some(twice) = COMMANDS.iter().find(|c| !seen.insert(*c)) {
+        panic!("{twice} is listed twice in build.rs");
+    }
     tauri_build::try_build(
         tauri_build::Attributes::new()
             .app_manifest(tauri_build::AppManifest::new().commands(COMMANDS)),

@@ -11,7 +11,6 @@ import type {
   GameInfo,
   GameStatus,
   Image,
-  InstallPlan,
   Job,
   KeyBindings,
   LibraryView,
@@ -25,6 +24,7 @@ import type {
   Page,
   Preferences,
   ProfileInfo,
+  Review,
   Settings,
   StorageView,
   UninstallItem,
@@ -169,7 +169,15 @@ export const libraries: Record<string, LibraryView> = {
       row({ id: 1, name: "Casual Outfit", gb_mod_id: 688491, preview: art("#43cbbe") }),
       row({ id: 2, name: "Swimsuit Recolor", enabled: false, disk: "disabled", sensitive: true, category: "Nicole" }),
       ...swords,
-      row({ id: 3, name: "Old Install", root_category: null, root_category_id: null, category: null, preview: null }),
+      row({
+        id: 3,
+        name: "Old Install",
+        root_category: null,
+        root_category_id: null,
+        category: null,
+        category_id: null,
+        preview: null,
+      }),
     ],
     unmanaged: [
       { name: "Hand Folder", path: "Hand Folder", enabled: true, is_dir: true },
@@ -327,6 +335,14 @@ export const modProfile: ModProfile = {
   is_withheld: false,
 };
 
+/** A mod with one file, for Ellen: Casual Outfit (on) dresses her too. */
+export const jacketProfile: ModProfile = {
+  ...modProfile,
+  summary: summary(700101, "Street Jacket", { category: { id: 43004, name: "Ellen" } }),
+  files: { files: [file({ id: 1500101, name: "street_jacket.zip", description: null })], archived_files: [] },
+  updates_count: 0,
+};
+
 export const modUpdates: Page<ModUpdate> = {
   items: [
     {
@@ -369,6 +385,7 @@ export const jobs: Job[] = [
     file_size: 48_000_000,
     image: null,
     versions: 1,
+    switch_on: true,
     state: { type: "downloading", downloaded: 20_000_000, total: 48_000_000 },
     queued_at: NOW - 60,
     finished_at: null,
@@ -384,6 +401,7 @@ export const jobs: Job[] = [
     file_size: 1_000,
     image: null,
     versions: 1,
+    switch_on: true,
     state: { type: "failed", message: "the archive is damaged" },
     queued_at: NOW - 600,
     finished_at: NOW - 590,
@@ -397,15 +415,13 @@ export const keybindings: KeyBindings = {
   notes: [],
 };
 
-export const installPlan: InstallPlan = {
-  game: "zzz",
-  mod_id: 553203,
-  mod_name: "Sample Sword Pack",
-  file: modProfile.files.files[0],
-  other_files: [modProfile.files.files[1]],
-  archive_bytes: 6_300_000,
-  from_cache: true,
-  kind: "3dmigoto",
+/** The background check of the sword pack: three versions installed, two to choose from (one with a
+ *  blocked file), and those two replace the same things. */
+export const review: Review = {
+  issues: [
+    { type: "choose_versions", count: 5 },
+    { type: "blocked", files: ["Spirit Blade: tools/setup.exe"] },
+  ],
   versions: [
     {
       name: "Blue Blade",
@@ -446,7 +462,24 @@ export const installPlan: InstallPlan = {
     },
   ],
   version_conflicts: [{ a: 3, b: 4, hashes: 6 }],
-  install_to: "ZZMI\\Mods\\GMM",
+};
+
+/** An install stopped by its background check, waiting on the Downloads page. */
+export const reviewJob: Job = {
+  id: 3,
+  action: "install",
+  game: "zzz",
+  mod_id: 553203,
+  mod_name: "Sample Sword Pack",
+  author: "author553203",
+  file_name: "sample_swords_v12.zip",
+  file_size: 6_300_000,
+  image: null,
+  versions: 0,
+  switch_on: true,
+  state: { type: "needs_action", review },
+  queued_at: NOW - 30,
+  finished_at: null,
 };
 
 export function uninstallPreview(keys: { type: string; id?: number; path?: string }[]): UninstallItem[] {

@@ -6,6 +6,7 @@
 // No console window in release builds on Windows.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod app_update;
 mod commands;
 mod error;
 mod html;
@@ -16,6 +17,7 @@ mod queue;
 mod report;
 mod startup;
 mod views;
+mod window;
 
 #[cfg(test)]
 mod bindings;
@@ -52,6 +54,10 @@ pub struct AppState {
     pub watchers: queue::Watchers,
     /// Errors kept for bug reports (`report.rs`).
     pub errors: Arc<gmm_core::ErrorLog>,
+    /// The app update check's GitHub client (`app_update.rs`).
+    pub releases: Client,
+    /// The newer GMM the last check found: the only version `open_app_release` opens.
+    pub newest_release: std::sync::Mutex<Option<String>>,
 }
 
 impl AppState {
@@ -65,6 +71,17 @@ impl AppState {
         let db = open_db(&dirs).await?;
         // Every client shares one connection pool and one "slow down" state: they all reach
         // GameBanana from the same IP address (docs/10-gamebanana-api.md).
+        // The app update check reads GMM's releases list on GitHub through a client of its own:
+        // its own allowlist (that list only), connections and slow-down state, so GitHub can
+        // never hold up GameBanana traffic (R2).
+        let releases = Client::new(NetConfig {
+            allowlist: net.allowlist.for_github_releases(),
+            rate_limit: RateLimit {
+                per_second: 0.2,
+                burst: 2,
+            },
+            ..net.clone()
+        })?;
         let net = Client::new(net)?;
         let gb = GameBanana::new(net.clone(), Arc::new(db.clone()));
         // Background reads (card counters) spend the API budget too, at most 1/s of it.
@@ -100,6 +117,8 @@ impl AppState {
             wake: tokio::sync::Notify::new(),
             watchers: queue::Watchers::default(),
             errors,
+            releases,
+            newest_release: std::sync::Mutex::new(None),
         })
     }
 }
@@ -150,9 +169,9 @@ fn handler<R: Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync
         commands::catalog_categories,
         commands::catalog_featured,
         commands::catalog_stats,
-        commands::prepare_install,
         commands::install,
         queue::queue_install,
+        queue::queue_proceed,
         queue::queue_change_file,
         queue::queue_jobs,
         queue::queue_watch,
@@ -162,6 +181,8 @@ fn handler<R: Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync
         queue::queue_dismiss,
         queue::queue_clear_finished,
         startup::startup_check,
+        app_update::app_update_check,
+        app_update::open_app_release,
         commands::library,
         commands::switch_version,
         commands::rollback_files,
@@ -208,6 +229,11 @@ fn handler<R: Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync
         profiles::profile_delete,
         profiles::profile_export,
         profiles::profile_import,
+        window::window_minimize,
+        window::window_toggle_maximize,
+        window::window_is_maximized,
+        window::window_close,
+        window::window_start_drag,
     ]
 }
 
@@ -255,6 +281,11 @@ fn main() {
             error::install_log(state.errors.clone());
             app.manage(state);
             queue::spawn_worker(app.handle().clone());
+            // The window starts hidden, so it appears once, at its size for this screen.
+            if let Some(main) = app.get_webview_window("main") {
+                window::fit_to_screen(&main);
+                main.show()?;
+            }
             Ok(())
         })
         // Files dropped on the window reach Rust, not the webview (R5): a local install.

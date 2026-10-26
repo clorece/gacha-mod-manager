@@ -14,12 +14,14 @@
 //!    and record it in the database.
 //!
 //! [`install`] runs all three and removes the extraction folder afterwards. The app splits it
-//! in two for its confirmation dialog: [`prepare`] (steps 1 and 2, then [`install_plan`] for
-//! what the dialog shows) and [`install_prepared`]. [`install_gate`] decides from a game's
-//! setup state whether installing makes sense yet. A [`StopSignal`] pauses or cancels an
-//! install; [`InstallQueue`] keeps the Downloads page's list.
+//! in two for its install queue: [`prepare`] (steps 1 and 2, then [`review`], the background
+//! check that can stop the install for the user to look at first) and [`install_prepared`].
+//! [`install_gate`] decides from a game's setup state whether installing makes sense yet. A
+//! [`StopSignal`] pauses or cancels an install; [`InstallQueue`] keeps the Downloads page's
+//! list.
 
 mod adopt;
+mod app_update;
 mod analyze;
 mod conflicts;
 mod errlog;
@@ -47,6 +49,9 @@ mod versions;
 mod workspace;
 
 pub use adopt::{AdoptCandidate, Adopted, MatchReason, adopt, adopt_candidates};
+pub use app_update::{
+    APP_VERSION, AppRelease, RELEASES_PAGE, check_app_update, newest_release, release_page,
+};
 pub use analyze::{Analysis, Variant, VersionConflict, analyze};
 pub use conflicts::{
     Conflict, ConflictReport, ModRef, conflicts, conflicts_after_install, conflicts_for,
@@ -75,7 +80,7 @@ pub use local::{
 pub use names::{
     DISABLED_PREFIX, GMM_DIR, SIDECAR_FILE, STAGING_DIR, mod_folder_name, on_disk_name,
 };
-pub use plan::{InstallPlan, VersionPlan, install_plan};
+pub use plan::{CheckIssue, Review, VersionPlan, review};
 pub use profiles::{
     MAX_PROFILE_NAME, MAX_SHARE_CODE, ProfileApplied, ProfileImported, ProfileInfo, SharedMod,
     apply_profile, delete_profile, export_profile, import_profile, profiles, rename_profile,
@@ -93,5 +98,5 @@ pub use store::{Browse, FEATURED_COUNT, FeaturedMod, MAX_BROWSE_STREAMS, browse,
 pub use toggles::{USER_INI, restore_pending};
 pub use update::{ChangedFolder, FileChangeReport, change_file, rollback_choices};
 pub use updates::{ModUpdateInfo, UpdateCheck, check_updates, refresh_catalog};
-pub use versions::{switch_version, version_group};
+pub use versions::{settle_versions, switch_version, version_group};
 pub use workspace::{AppDirs, Workspace, open_db};

@@ -15,7 +15,11 @@ const logUiError = (what: unknown) => {
   const text = what instanceof Error ? `${what.name}: ${what.message}` : String(what);
   api.logUiError(text).catch(() => {});
 };
-window.addEventListener("error", (e) => logUiError(e.error ?? e.message));
+window.addEventListener("error", (e) => {
+  // Benign: the browser dropped one resize notification for a frame; nothing went wrong.
+  if (String(e.message).startsWith("ResizeObserver loop")) return;
+  logUiError(e.error ?? e.message);
+});
 window.addEventListener("unhandledrejection", (e) => logUiError(e.reason));
 
 const root = document.getElementById("root");

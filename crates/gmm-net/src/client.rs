@@ -98,6 +98,14 @@ impl Client {
             .user_agent(config.user_agent.clone())
             .connect_timeout(Duration::from_secs(10))
             .read_timeout(Duration::from_secs(30))
+            // GameBanana's edge drops idle connections after a while. Retire them early and
+            // ping a kept HTTP/2 connection, so a request after a quiet spell (the user was
+            // in another window) doesn't go out on a connection that's already gone.
+            .pool_idle_timeout(Duration::from_secs(30))
+            .tcp_keepalive(Duration::from_secs(15))
+            .http2_keep_alive_interval(Duration::from_secs(15))
+            .http2_keep_alive_timeout(Duration::from_secs(10))
+            .http2_keep_alive_while_idle(true)
             .redirect(policy)
             .build()
             .map_err(|e| NetError::Setup(e.to_string()))?;
@@ -168,8 +176,8 @@ impl Client {
         self.cooldown.clear();
     }
 
-    /// GET for API calls: allowlisted, rate-limited, size-capped; retried on 5xx and
-    /// connection errors. A "slow down" (429, a 503 with `Retry-After`, a Cloudflare
+    /// GET for API calls: allowlisted, rate-limited, size-capped; retried on 5xx, timeouts
+    /// and dropped connections (while connecting, sending or reading the body). A "slow down" (429, a 503 with `Retry-After`, a Cloudflare
     /// challenge) is not retried: it pauses every sibling client ([`NetError::SlowDown`]).
     /// Other statuses (including 4xx) are returned for the caller to interpret.
     pub async fn get(&self, url: &Url) -> Result<HttpResponse, NetError> {
@@ -203,15 +211,22 @@ impl Client {
                             status,
                         });
                     }
-                    let body = read_capped(resp, url, self.config.max_body_bytes).await?;
+                    let body = match read_capped(resp, url, self.config.max_body_bytes).await {
+                        Ok(body) => body,
+                        Err(Body::Dropped(_)) if attempt < self.config.max_retries => {
+                            sleep(backoff(attempt).min(self.config.max_backoff)).await;
+                            attempt += 1;
+                            continue;
+                        }
+                        Err(Body::Dropped(e)) => return Err(request_error(url, e)),
+                        Err(Body::Failed(e)) => return Err(e),
+                    };
                     if (200..300).contains(&status) {
                         self.succeeded();
                     }
                     return Ok(HttpResponse { status, body });
                 }
-                Err(e)
-                    if attempt < self.config.max_retries && (e.is_connect() || e.is_timeout()) =>
-                {
+                Err(e) if attempt < self.config.max_retries && is_transient(&e) => {
                     sleep(backoff(attempt).min(self.config.max_backoff)).await;
                     attempt += 1;
                 }
@@ -221,7 +236,7 @@ impl Client {
     }
 }
 
-fn backoff(attempt: u32) -> Duration {
+pub(crate) fn backoff(attempt: u32) -> Duration {
     Duration::from_secs(1u64 << attempt.min(6))
 }
 
@@ -244,26 +259,40 @@ fn slowdown_kind(status: u16, headers: &HeaderMap) -> Option<Slowdown> {
     }
 }
 
-async fn read_capped(
-    mut resp: reqwest::Response,
-    url: &Url,
-    limit: u64,
-) -> Result<Vec<u8>, NetError> {
-    let too_large = || NetError::BodyTooLarge {
-        url: redact(url),
-        limit,
+/// Why a body couldn't be read.
+enum Body {
+    /// The connection went away mid-body: worth another try.
+    Dropped(reqwest::Error),
+    Failed(NetError),
+}
+
+async fn read_capped(mut resp: reqwest::Response, url: &Url, limit: u64) -> Result<Vec<u8>, Body> {
+    let too_large = || {
+        Body::Failed(NetError::BodyTooLarge {
+            url: redact(url),
+            limit,
+        })
     };
     if resp.content_length().is_some_and(|len| len > limit) {
         return Err(too_large());
     }
     let mut body = Vec::new();
-    while let Some(chunk) = resp.chunk().await.map_err(|e| request_error(url, e))? {
+    while let Some(chunk) = resp.chunk().await.map_err(Body::Dropped)? {
         if (body.len() + chunk.len()) as u64 > limit {
             return Err(too_large());
         }
         body.extend_from_slice(&chunk);
     }
     Ok(body)
+}
+
+/// Worth another try on a fresh connection: connecting failed, it timed out, or the
+/// connection was reset or closed while the request or the body was in flight (GameBanana's
+/// edge closing an idle connection GMM was about to reuse). Never a refused redirect.
+pub(crate) fn is_transient(e: &reqwest::Error) -> bool {
+    !e.is_redirect()
+        && !e.is_builder()
+        && (e.is_connect() || e.is_timeout() || e.is_request() || e.is_body() || e.is_decode())
 }
 
 pub(crate) fn request_error(url: &Url, e: reqwest::Error) -> NetError {

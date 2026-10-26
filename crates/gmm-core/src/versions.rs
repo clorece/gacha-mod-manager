@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 //! Versions as one mod (docs/08, "Mod settings"): the folders GMM installed from the same
-//! GameBanana file are versions of one mod. Switching one on switches off the others that
-//! replace the same things; versions that don't clash are left alone.
+//! GameBanana file are versions of one mod. Any number of them can be on together (a mod
+//! split into pieces, say); switching one on switches off only the others that replace the
+//! same things.
 
 use gmm_adapters::GameManifest;
 use gmm_db::Db;
@@ -27,6 +28,64 @@ pub async fn switch_version(
     game: &GameManifest,
     id: i64,
 ) -> Result<Vec<ToggleOutcome>, CoreError> {
+    let siblings = siblings(db, game, id).await?;
+    let clashing = clashing_siblings(db, ws, mods, game, id, &siblings).await?;
+    let mut changes = vec![set_enabled(db, ws, mods, game, id, true).await?];
+    for other in clashing {
+        if changes.iter().any(|c| c.id == other) {
+            continue;
+        }
+        changes.push(set_enabled(db, ws, mods, game, other, false).await?);
+    }
+    Ok(changes)
+}
+
+/// After installing several versions of one mod switched on, in the order the user picked
+/// them: the first stays on (switching off the versions already installed that clash with
+/// it, as [`switch_version`] does), and each later one stays on unless it clashes with a
+/// version that is on. Every version that can work alongside the others ends up on.
+/// Returns the ids switched off.
+pub async fn settle_versions(
+    db: &Db,
+    ws: &Workspace,
+    mods: RootId,
+    game: &GameManifest,
+    ids: &[i64],
+) -> Result<Vec<i64>, CoreError> {
+    let Some((&first, rest)) = ids.split_first() else {
+        return Ok(Vec::new());
+    };
+    let mut off: Vec<i64> = switch_version(db, ws, mods, game, first)
+        .await?
+        .into_iter()
+        .filter(|c| !c.enabled && c.changed)
+        .map(|c| c.id)
+        .collect();
+    for (at, &id) in rest.iter().enumerate() {
+        if off.contains(&id) {
+            continue;
+        }
+        // Only versions already settled (or installed before) count; later picks are still
+        // on and wait their turn.
+        let later = &rest[at + 1..];
+        let siblings: Vec<i64> = siblings(db, game, id)
+            .await?
+            .into_iter()
+            .filter(|s| !later.contains(s))
+            .collect();
+        if !clashing_siblings(db, ws, mods, game, id, &siblings)
+            .await?
+            .is_empty()
+        {
+            set_enabled(db, ws, mods, game, id, false).await?;
+            off.push(id);
+        }
+    }
+    Ok(off)
+}
+
+/// The other versions of `id` (same GameBanana mod and file, same game).
+async fn siblings(db: &Db, game: &GameManifest, id: i64) -> Result<Vec<i64>, CoreError> {
     let not_a_version = || CoreError::NotAVersion {
         id,
         game: game.game.name.clone(),
@@ -37,7 +96,7 @@ pub async fn switch_version(
         .filter(|m| m.game_id == game.id())
         .ok_or_else(not_a_version)?;
     let group = version_group(row.gb_mod_id, row.gb_file_id).ok_or_else(not_a_version)?;
-    let siblings: Vec<i64> = match row.gb_mod_id {
+    Ok(match row.gb_mod_id {
         Some(gb) => db
             .installed_mods_for_gb(gb)
             .await?
@@ -50,11 +109,20 @@ pub async fn switch_version(
             .map(|m| m.id)
             .collect(),
         None => Vec::new(),
-    };
+    })
+}
 
-    // What it clashes with among the mods that are on, worked out before switching it on.
+/// The versions among `siblings` that are on and replace the same things as `id`.
+async fn clashing_siblings(
+    db: &Db,
+    ws: &Workspace,
+    mods: RootId,
+    game: &GameManifest,
+    id: i64,
+    siblings: &[i64],
+) -> Result<Vec<i64>, CoreError> {
     let report = conflicts_for(db, ws, mods, game, id).await?;
-    let clashing: Vec<i64> = report
+    let mut clashing: Vec<i64> = report
         .conflicts
         .iter()
         .flat_map(|c| [&c.a, &c.b])
@@ -65,13 +133,6 @@ pub async fn switch_version(
             _ => None,
         })
         .collect();
-
-    let mut changes = vec![set_enabled(db, ws, mods, game, id, true).await?];
-    for other in clashing {
-        if changes.iter().any(|c| c.id == other) {
-            continue;
-        }
-        changes.push(set_enabled(db, ws, mods, game, other, false).await?);
-    }
-    Ok(changes)
+    clashing.dedup();
+    Ok(clashing)
 }

@@ -5,10 +5,11 @@
 // they fill in for the cards on screen (`catalog_stats`). A click on a card opens GMM's mod
 // page; its round button opens the install confirmation (or, for a mod already installed,
 // its settings or "Add versions"). With sensitive mods hidden a page can come back nearly
-// empty, so the grid keeps asking for more until the screen is full.
+// empty, so the grid keeps asking for more until the screen is full. Search, filters, results
+// and the gallery are remembered (remember.ts) while the user is on other pages.
 
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   asCmdError,
@@ -25,6 +26,7 @@ import type { AppData } from "../data";
 import { compact } from "../format";
 import { ALL, type Scope } from "../games";
 import { usePrefs } from "../prefs";
+import { useRemembered } from "../remember";
 import { Badge, Button, Dropdown, Icon, IconButton, Notice, ToggleChip, useToast } from "../ui";
 
 /** Cards asked for per page (split between characters when several are ticked). */
@@ -78,39 +80,51 @@ export function Store({
   const toast = useToast();
   const game = scope === ALL ? null : (data.games.find((g) => g.id === scope) ?? null);
 
-  const [text, setText] = useState("");
+  // Search, filters and results are remembered while the user is on other pages.
+  const [text, setText] = useRemembered("store.text", "");
   const query = useDebounced(text.trim(), 350);
-  const [category, setCategory] = useState<number | null>(null);
-  const [characters, setCharacters] = useState<number[]>([]);
-  const [sort, setSort] = useState<Sort>("default");
-  const [hideInstalled, setHideInstalled] = useState(false);
+  const [category, setCategoryRaw] = useRemembered<number | null>("store.category", null);
+  const [characters, setCharacters] = useRemembered<number[]>("store.characters", []);
+  const [sort, setSort] = useRemembered<Sort>("store.sort", "default");
+  const [hideInstalled, setHideInstalled] = useRemembered("store.hideInstalled", false);
   const show = prefs.show_sensitive;
-
-  // A category belongs to one game.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset whenever the game scope changes
-  useEffect(() => {
-    setCategory(null);
+  /** Characters belong to a category. */
+  const setCategory = (next: number | null) => {
+    setCategoryRaw(next);
     setCharacters([]);
-  }, [scope]);
+  };
+
+  // A category belongs to one game: a new game scope starts without one.
+  const [filtersScope, setFiltersScope] = useRemembered<Scope>("store.scope", scope);
+  if (filtersScope !== scope) {
+    setFiltersScope(scope);
+    setCategoryRaw(null);
+    setCharacters([]);
+  }
 
   const cat = game?.categories.find((c) => c.id === category) ?? null;
-  const [charOptions, setCharOptions] = useState<Category[]>([]);
+  const [charOptions, setCharOptions] = useRemembered<Category[]>("store.charOptions", []);
+  const catId = cat?.characters ? cat.id : null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the options follow the game and the category's id, not object identity
   useEffect(() => {
-    setCharacters([]);
-    setCharOptions([]);
-    if (!game || !cat?.characters) return;
+    if (!game || catId === null) {
+      setCharOptions([]);
+      return;
+    }
     let live = true;
     api
-      .catalogCategories(game.id, cat.id)
+      .catalogCategories(game.id, catId)
       .then((list) => live && setCharOptions(list.filter((c) => !c.obsolete)))
       .catch(() => live && setCharOptions([]));
     return () => {
       live = false;
     };
-  }, [game, cat]);
+  }, [game?.id, catId]);
 
   // ---- results ---------------------------------------------------------------------------
-  const [results, setResults] = useState<Results>(fresh);
+  const [results, setResults] = useRemembered<Results>("store.results", fresh);
+  /** The filters the remembered results were loaded for. */
+  const [loadedFor, setLoadedFor] = useRemembered("store.loadedFor", "");
   const generation = useRef(0);
   // The latest results and whether a page is on its way, for the scroll and fill triggers
   // (two can fire before React re-renders).
@@ -156,12 +170,18 @@ export function Store({
         if (gen === generation.current) inflight.current = false;
       }
     },
-    [filters],
+    [filters, setResults],
   );
 
+  const filtersKey = JSON.stringify(filters);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reload when the filters change, not when the remembered key does
   useEffect(() => {
+    // Back on the Store with the same filters: keep what was loaded (and where it was).
+    const kept = latest.current;
+    if (loadedFor === filtersKey && kept.page > 0 && !kept.loading && !kept.error) return;
     generation.current += 1;
     inflight.current = false;
+    setLoadedFor(filtersKey);
     setResults(fresh);
     void loadPage(1);
   }, [loadPage]);
@@ -186,31 +206,52 @@ export function Store({
   }, [results, visible.length, loadMore]);
 
   // ---- download counts -------------------------------------------------------------------
-  const [stats, setStats] = useState<Record<number, ModStats>>({});
-  const requested = useRef(new Set<number>());
+  const [stats, setStats] = useRemembered<Record<number, ModStats>>("store.stats", {});
+  const requested = useRef(new Set<number>(Object.keys(stats).map(Number)));
   const pendingIds = useRef<number[]>([]);
   const statsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wantStats = useCallback((ids: number[]) => {
-    pendingIds.current = ids.filter((id) => !requested.current.has(id));
-    if (statsTimer.current) clearTimeout(statsTimer.current);
-    statsTimer.current = setTimeout(() => {
-      const batch = pendingIds.current.slice(0, STATS_BATCH);
-      if (batch.length === 0) return;
-      for (const id of batch) requested.current.add(id);
-      api
-        .catalogStats(batch, (s) => setStats((all) => ({ ...all, [s.mod_id]: s.stats })))
-        .catch(() => {
-          // Cards keep their placeholder; scrolling back asks again.
-          for (const id of batch) requested.current.delete(id);
-        });
-    }, 300);
-  }, []);
+  const arrived = useRef<Record<number, ModStats>>({});
+  const flush = useRef<number | null>(null);
+  const wantStats = useCallback(
+    (ids: number[]) => {
+      pendingIds.current = ids.filter((id) => !requested.current.has(id));
+      if (statsTimer.current) clearTimeout(statsTimer.current);
+      statsTimer.current = setTimeout(() => {
+        const batch = pendingIds.current.slice(0, STATS_BATCH);
+        if (batch.length === 0) return;
+        for (const id of batch) requested.current.add(id);
+        api
+          .catalogStats(batch, (s) => {
+            // Counts arrive one mod at a time; draw them once per frame, not once each.
+            arrived.current[s.mod_id] = s.stats;
+            if (flush.current === null) {
+              flush.current = requestAnimationFrame(() => {
+                flush.current = null;
+                const add = arrived.current;
+                arrived.current = {};
+                setStats((all) => ({ ...all, ...add }));
+              });
+            }
+          })
+          .catch(() => {
+            // Cards keep their placeholder; scrolling back asks again.
+            for (const id of batch) requested.current.delete(id);
+          });
+      }, 300);
+    },
+    [setStats],
+  );
 
   // ---- featured gallery ------------------------------------------------------------------
-  const [featured, setFeatured] = useState<FeaturedMod[]>([]);
+  const [featured, setFeatured] = useRemembered<FeaturedMod[]>("store.featured", []);
+  const [featuredFor, setFeaturedFor] = useRemembered("store.featuredFor", "");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the gallery follows the scope, the game list and the sensitive switch
   useEffect(() => {
-    let live = true;
     const games = game ? [game] : data.games;
+    const key = `${games.map((g) => g.id).join(",")}:${show}`;
+    if (key === featuredFor && featured.length > 0) return;
+    let live = true;
+    setFeaturedFor(key);
     setFeatured([]);
     Promise.all(games.map((g) => api.catalogFeatured(g.id, show).catch(() => [] as FeaturedMod[]))).then((lists) => {
       if (!live) return;
@@ -224,7 +265,7 @@ export function Store({
     return () => {
       live = false;
     };
-  }, [game, data.games, show]);
+  }, [game?.id, data.games, show]);
 
   const pickCharacters = (next: number[]) => {
     if (next.length > MAX_CHARACTERS) {
@@ -393,7 +434,7 @@ function Featured({
   onOpen: (modId: number) => void;
   onDownload: (mod: { id: number; name: string }) => void;
 }) {
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useRemembered("store.featuredIndex", 0);
   const at = Math.min(index, picks.length - 1);
   const pick = picks[at];
   const m = pick.summary;
@@ -523,8 +564,9 @@ function StoreGrid({
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const scrollEl = useRef<HTMLElement | null>(null);
-  const [width, setWidth] = useState(0);
-  const [margin, setMargin] = useState(0);
+  // The last layout, so the grid comes back at its size when the Store is opened again.
+  const [width, setWidth] = useRemembered("store.gridWidth", 0);
+  const [margin, setMargin] = useRemembered("store.gridMargin", 0);
 
   useLayoutEffect(() => {
     scrollEl.current = wrap.current?.closest("main") ?? null;
@@ -535,11 +577,20 @@ function StoreGrid({
     const measure = () => {
       if (el.clientWidth > 0) setWidth(el.clientWidth);
     };
-    const ro = new ResizeObserver(measure);
+    // Measured on the next frame: setting the width inside the observer's callback changes the
+    // layout it just reported, which the browser flags as a "ResizeObserver loop".
+    let frame = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    });
     ro.observe(el);
     measure();
-    return () => ro.disconnect();
-  }, []);
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+    };
+  }, [setWidth]);
 
   // Where the grid starts inside the scrolling page (the gallery above can change it).
   useLayoutEffect(() => {
@@ -569,6 +620,10 @@ function StoreGrid({
   });
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the column layout changes
   useEffect(() => virtualizer.measure(), [rowHeight, cols]);
+
+  // Stable for the memoized cards, whatever the page passes.
+  const open = useStable(onOpen);
+  const download = useStable(onDownload);
 
   const rows = virtualizer.getVirtualItems();
   const first = rows[0]?.index ?? 0;
@@ -608,8 +663,8 @@ function StoreGrid({
                     owned={owned.get(m.id)}
                     downloads={stats[m.id]?.downloads ?? m.stats.downloads}
                     game={showGame ? gameOf(m.game_id) : null}
-                    onOpen={() => onOpen(m.id)}
-                    onDownload={() => onDownload({ id: m.id, name: m.name })}
+                    onOpen={open}
+                    onDownload={download}
                   />
                 ))
               : Array.from({ length: cols }, (_, i) => (
@@ -629,7 +684,8 @@ function StoreGrid({
   );
 }
 
-function StoreCard({
+/** One card; memoized, so a re-render of the grid redraws only the cards whose data changed. */
+const StoreCard = memo(function StoreCard({
   mod,
   width,
   owned,
@@ -643,14 +699,14 @@ function StoreCard({
   owned: Owned | undefined;
   downloads: number | null;
   game: GameInfo | null;
-  onOpen: () => void;
-  onDownload: () => void;
+  onOpen: (modId: number) => void;
+  onDownload: (mod: { id: number; name: string }) => void;
 }) {
   const sensitive = isSensitive(mod);
   const label = mod.category?.name ?? mod.root_category?.name;
   return (
     <article className="card mod store-card">
-      <button type="button" className="card-hit" aria-label={`Open ${mod.name}`} onClick={onOpen} />
+      <button type="button" className="card-hit" aria-label={`Open ${mod.name}`} onClick={() => onOpen(mod.id)} />
       <Preview image={mod.images[0]} width={width} sensitive={sensitive} alt={mod.name}>
         <div className="badges">
           <div className="badges-l">{label && <Badge tone="art">{label}</Badge>}</div>
@@ -709,7 +765,7 @@ function StoreCard({
                 : `Download ${mod.name}`
             }
             title={owned ? (owned.versions ? "Add versions" : "Installed: open its settings") : "Download"}
-            onClick={onDownload}
+            onClick={() => onDownload({ id: mod.id, name: mod.name })}
           >
             <Icon name={owned ? "check" : "download"} size={18} stroke={2.6} />
           </button>
@@ -717,4 +773,11 @@ function StoreCard({
       </div>
     </article>
   );
+});
+
+/** A callback that keeps its identity across renders and always calls the latest `fn`. */
+function useStable<A extends unknown[]>(fn: (...args: A) => void): (...args: A) => void {
+  const latest = useRef(fn);
+  latest.current = fn;
+  return useCallback((...args: A) => latest.current(...args), []);
 }

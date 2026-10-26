@@ -213,8 +213,41 @@ edited by the owner); the contrast and overlap audit runs with Playwright on Lin
       change. Needed: commands generic over the runtime (`handler()`), `AppState::open_with`
 - [x] The contrast and overlap audit (2026-10-25): `tests/ui-audit.mjs` (`pnpm ui-audit`),
       Playwright with Chromium (cached) in the CI frontend job, 20 states in both themes
+      (22 since 2026-10-26)
       against the Vite frontend with the fake bridge; a planted-problem self-check first.
       Locally `just app-audit` uses the installed Edge. First run: no findings
+
+### Hands-on feedback, round 1 (2026-10-26)
+
+From the project owner's first session with the dev build. All done the same day:
+
+- [x] Install confirmation without a download: variants first (GameBanana's files, several
+      at once, each switched on), then a conflict step for GMM-installed mods on for the
+      same character (use the new one, keep what's on, or skip), then the confirmation
+      (`components/InstallDialog.tsx`). `prepare_install` and `gmm_core::install_plan` are
+      gone
+- [x] The download, extraction and scan run in the queue as a background check
+      (`gmm_core::review`); a job that needs a choice or shows a risk waits as `needs_action`
+      with the reasons (several versions, unsafe files, odd files, an outdated file) until
+      the user goes ahead (`queue_proceed`) or cancels (`components/ReviewDialog.tsx`)
+- [x] Installing never takes the user off the page they're on (a toast points to Downloads)
+- [x] Every picked version switched on unless it clashes with one picked before it
+      (`gmm_core::settle_versions`), and the tags say so
+- [x] The Downloads count: a disc in the theme's text colour with an inset ring and the
+      number in the base colour, for installs queued, running or needing action
+- [x] Mods Store search, filters, results, gallery and scroll remembered across pages
+      (`remember.ts`)
+- [x] Launch from the Mods Library header (one button per Ready game in scope)
+- [x] GameBanana requests after a quiet spell no longer fail on a dropped connection:
+      `gmm-net` retries dropped connections and timeouts on a fresh connection, resumes
+      downloads by itself, retires idle connections after 30 s and pings HTTP/2 ones
+- [x] The window opens at 16:9 (1952 × 1098 where the screen has room), with a title bar in
+      the theme's colours, no title, and GMM's own caption buttons (`src-tauri/src/window.rs`)
+- [x] Responsiveness: queue progress redraws only the sidebar count and Downloads, the
+      Store's download counts are drawn once per frame and its cards are memoized, previews
+      fade in once decoded, shimmers run on the compositor, long Library grids skip
+      off-screen cards, Settings / Documentation / Report a Bug load on first use, and the
+      benign "ResizeObserver loop" messages no longer fill the error log
 
 Exit: everything the CLI does is reachable in the app for ZZZ and WuWa (RAR included), with
 the designed loading, empty and error states; install (all confirmation paths), versions,
@@ -356,9 +389,14 @@ Epic install to confirm the Epic reader (fixture-tested only).
   integrity rather than in an AppContainer (it could still read the user's files or open a
   connection if UnRAR were exploited). Phase 7 hardening.
 - RAR "file copy" entries (identical files stored once, `rar -oi`) are refused, not copied.
-- The install confirmation fetches the archive before showing it (versions are only known
-  from inside), so the Downloads page mostly shows the install step; download progress
-  appears there only for files that weren't fetched first.
+- Versions inside one archive can only be chosen after GMM has downloaded and checked it
+  (GameBanana can't list an archive's contents), so for such a file the choice comes as
+  "Needs action" in Downloads rather than in the install confirmation. The confirmation's
+  conflict step is a guess from the character (GMM-installed mods only); the exact check, by
+  what each mod replaces, still happens after installing (the Library's conflict badge).
+- While a dialog is open the custom title bar is covered with the rest of the window, so the
+  window can't be moved, minimized or closed until the dialog is (Escape closes it).
+- The Store's remembered search and results last until the window closes.
 - Description images on third-party hosts (imgur and others) are never shown (R2);
   GameBanana's own image and file hosts are.
 - The browser openers (`open_mod_page`, `open_link`, `open_xxmi_releases`,

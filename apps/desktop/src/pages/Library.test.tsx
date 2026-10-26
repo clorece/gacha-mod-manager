@@ -24,7 +24,6 @@ function Harness({ onAddVersions = noop }: { onAddVersions?: (modId: number, fil
       onScope={noop}
       updates={fx.updates}
       owned={owned}
-      onQueued={noop}
       focus={null}
       onFocusDone={noop}
       onOpenMod={noop}

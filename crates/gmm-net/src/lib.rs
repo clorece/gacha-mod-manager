@@ -18,7 +18,7 @@ mod download;
 mod error;
 mod limiter;
 
-pub use allowlist::Allowlist;
+pub use allowlist::{Allowlist, GITHUB_RELEASES_HOST, GITHUB_RELEASES_PATH};
 pub use client::{Client, HttpResponse, NetConfig, Slowdown};
 pub use download::{DownloadOutcome, DownloadRequest, Progress};
 pub use error::NetError;

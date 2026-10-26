@@ -15,7 +15,7 @@ use std::time::Duration;
 use gmm_adapters::{GameManifest, Registry};
 use gmm_catalog::{GameBanana, NoCache};
 use gmm_core::{
-    Analysis, CoreError, InstallOptions, InstallRequest, ModMeta, Sidecar, StopSignal,
+    Analysis, CheckIssue, CoreError, InstallOptions, InstallRequest, ModMeta, Sidecar, StopSignal,
     VariantChoice, Workspace, analyze, fetch_archive, install, install_analyzed,
 };
 use gmm_db::Db;
@@ -1417,7 +1417,60 @@ async fn switching_a_version_turns_off_the_ones_it_clashes_with() {
 }
 
 #[tokio::test]
-async fn two_step_install_shows_the_plan_then_installs_from_it() {
+async fn picked_versions_all_stay_on_unless_they_clash() {
+    let f = Fixture::new().await;
+    // C is a separate piece; B replaces what A does; D replaces what C does.
+    let a = f.analyze(&[
+        ("Pack/A/a.ini", INI),
+        ("Pack/B/b.ini", INI),
+        ("Pack/C/c.ini", INI_OTHER),
+        ("Pack/D/d.ini", INI_OTHER),
+    ]);
+    let installed = f
+        .install(
+            &a,
+            InstallOptions {
+                variants: VariantChoice::Named(vec![
+                    "C".into(),
+                    "A".into(),
+                    "D".into(),
+                    "B".into(),
+                ]),
+                ..InstallOptions::default()
+            },
+        )
+        .await
+        .unwrap();
+    let id = |name: &str| {
+        installed
+            .iter()
+            .find(|i| i.variant.as_deref() == Some(name))
+            .unwrap()
+            .id
+    };
+    // In the order picked.
+    let ids: Vec<i64> = ["C", "A", "D", "B"].into_iter().map(id).collect();
+    let mut off = gmm_core::settle_versions(&f.db, &f.ws, f.mods, zzz(), &ids)
+        .await
+        .unwrap();
+    off.sort_unstable();
+    let mut want = vec![id("D"), id("B")];
+    want.sort_unstable();
+    assert_eq!(
+        off, want,
+        "each one that clashes with a piece already on goes off"
+    );
+    let rows = f.db.installed_mods(Some("zzz")).await.unwrap();
+    let on = |i: i64| rows.iter().find(|m| m.id == i).unwrap().enabled;
+    assert!(
+        on(id("C")) && on(id("A")),
+        "pieces that work together stay on"
+    );
+    assert!(!on(id("D")) && !on(id("B")));
+}
+
+#[tokio::test]
+async fn the_background_check_stops_for_review_then_installs() {
     let f = Fixture::new().await;
     let archive = zip_of(&[
         ("Pack/Red/red.ini", INI),
@@ -1440,38 +1493,51 @@ async fn two_step_install_shows_the_plan_then_installs_from_it() {
     )
     .await
     .unwrap();
-    let plan = gmm_core::install_plan(&f.db, zzz(), &prepared)
-        .await
-        .unwrap();
-    assert_eq!(plan.mod_name, "Test Outfit A");
-    assert_eq!(plan.install_to, r"ZZMI\Mods\GMM");
-    assert!(!plan.from_cache);
-    let names: Vec<&str> = plan.versions.iter().map(|v| v.name.as_str()).collect();
-    assert_eq!(names, ["Blue", "Red"]);
-    assert_eq!(plan.versions[0].blocked, ["tool.exe"]);
-    assert_eq!(plan.versions[0].folder, "Test Outfit A [gb-900001] (Blue)");
-    assert!(plan.versions.iter().all(|v| v.installed.is_none()));
-    assert_eq!(plan.version_conflicts.len(), 1);
+    assert!(!prepared.fetched.from_cache);
     assert!(f.tree().is_empty(), "preparing installs nothing");
 
-    let report = gmm_core::install_prepared(
-        &f.db,
-        &f.ws,
-        f.mods,
-        zzz(),
-        &prepared,
-        &InstallOptions {
-            variants: VariantChoice::Named(vec!["Red".into()]),
-            ..InstallOptions::default()
-        },
-        |_| {},
-    )
-    .await
-    .unwrap();
+    // Nothing chosen yet: choose a version, and see the blocked file.
+    let review = gmm_core::review(&f.db, zzz(), &prepared, &InstallOptions::default())
+        .await
+        .unwrap()
+        .expect("two versions need a choice");
+    assert_eq!(
+        review.issues,
+        [
+            CheckIssue::ChooseVersions { count: 2 },
+            CheckIssue::Blocked {
+                files: vec!["Blue: tool.exe".into()]
+            },
+        ]
+    );
+    let names: Vec<&str> = review.versions.iter().map(|v| v.name.as_str()).collect();
+    assert_eq!(names, ["Blue", "Red"]);
+    assert_eq!(
+        review.versions[0].folder,
+        "Test Outfit A [gb-900001] (Blue)"
+    );
+    assert!(review.versions.iter().all(|v| v.installed.is_none()));
+    assert_eq!(review.version_conflicts.len(), 1);
+
+    // Red alone has nothing to look at.
+    let red = InstallOptions {
+        variants: VariantChoice::Named(vec!["Red".into()]),
+        ..InstallOptions::default()
+    };
+    assert!(
+        gmm_core::review(&f.db, zzz(), &prepared, &red)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let report = gmm_core::install_prepared(&f.db, &f.ws, f.mods, zzz(), &prepared, &red, |_| {})
+        .await
+        .unwrap();
     prepared.discard(&f.ws);
     assert_eq!(report.installed.len(), 1);
 
-    // Preparing again reuses the cached archive and marks the installed version.
+    // Preparing again reuses the cached archive; the review marks the installed version, and
+    // Blue still stops for its blocked file until the user accepts it.
     let again = gmm_core::prepare(
         &gb,
         &net(),
@@ -1485,11 +1551,34 @@ async fn two_step_install_shows_the_plan_then_installs_from_it() {
     )
     .await
     .unwrap();
-    let plan = gmm_core::install_plan(&f.db, zzz(), &again).await.unwrap();
+    assert!(again.fetched.from_cache);
+    let blue = InstallOptions {
+        variants: VariantChoice::Named(vec!["Blue".into()]),
+        ..InstallOptions::default()
+    };
+    let review = gmm_core::review(&f.db, zzz(), &again, &blue)
+        .await
+        .unwrap()
+        .expect("a blocked file needs a look");
+    assert_eq!(
+        review.issues,
+        [CheckIssue::Blocked {
+            files: vec!["Blue: tool.exe".into()]
+        }]
+    );
+    assert_eq!(review.versions[1].installed, Some(report.installed[0].id));
+    assert_eq!(review.versions[0].installed, None);
+    let accepted = InstallOptions {
+        skip_blocked: true,
+        ..blue
+    };
+    assert!(
+        gmm_core::review(&f.db, zzz(), &again, &accepted)
+            .await
+            .unwrap()
+            .is_none()
+    );
     again.discard(&f.ws);
-    assert!(plan.from_cache);
-    assert_eq!(plan.versions[1].installed, Some(report.installed[0].id));
-    assert_eq!(plan.versions[0].installed, None);
     assert!(
         fs::read_dir(f.cache_dir.join("extract"))
             .unwrap()

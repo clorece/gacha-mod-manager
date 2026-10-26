@@ -1,29 +1,31 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Downloads (docs/08, "Downloads"): the install queue, grouped by game, newest first. Every
-// choice was made in the install confirmation, so rows only show progress and the actions
-// that fit their state. Installed rows clear themselves after a few seconds (queue.ts).
+// Downloads (docs/08, "Downloads"): the install queue, grouped by game, newest first. Each
+// row downloads, checks and installs in the background and shows where it is. When the check
+// finds something the row waits as "Needs action" until the user reviews it (ReviewDialog):
+// install anyway, with the versions they pick, or cancel. Installed rows clear themselves
+// after a few seconds (queue.ts).
 
 import { useState } from "react";
 import { api, asCmdError, type GameInfo, type Job } from "../api";
+import { issueSummary, ReviewDialog } from "../components/ReviewDialog";
 import { bytes, plural } from "../format";
 import { bannerClass } from "../games";
-import { CLEAR_DONE_AFTER_MS } from "../queue";
+import { CLEAR_DONE_AFTER_MS, useJobs } from "../queue";
 import { Button, IconButton, ProgressBar, useToast } from "../ui";
 import { artClass } from "./Dashboard";
 
 export function Downloads({
-  jobs,
   games,
   onShowLibrary,
   onInstallFile,
 }: {
-  jobs: Job[];
   games: GameInfo[];
   onShowLibrary: (game: string) => void;
   /** Opens a file dialog for a local archive. */
   onInstallFile: () => Promise<void>;
 }) {
   const toast = useToast();
+  const jobs = useJobs();
   const finished = jobs.filter((j) => ["done", "failed", "cancelled"].includes(j.state.type)).length;
 
   const act = (what: Promise<unknown>) => {
@@ -87,6 +89,7 @@ function DownloadRow({
   onShowLibrary: () => void;
 }) {
   const [opening, setOpening] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const s = job.state;
   const sub = [
     job.author,
@@ -98,7 +101,7 @@ function DownloadRow({
     .join(" · ");
 
   let line: string;
-  let tone: "run" | "ok" | "bad" | "wait";
+  let tone: "run" | "ok" | "bad" | "wait" | "warn";
   let bar: number | "ind" | null = null;
   switch (s.type) {
     case "queued":
@@ -116,7 +119,7 @@ function DownloadRow({
       break;
     }
     case "extracting":
-      [line, tone, bar] = ["Extracting and scanning", "run", "ind"];
+      [line, tone, bar] = ["Checking every file", "run", "ind"];
       break;
     case "installing":
       [line, tone, bar] = [`Installing · ${s.folder}`, "run", "ind"];
@@ -126,6 +129,9 @@ function DownloadRow({
       [line, tone] = [`Waiting · GameBanana asked GMM to slow down · carries on at ${at}`, "wait"];
       break;
     }
+    case "needs_action":
+      [line, tone] = [`Needs action · ${issueSummary(s.review)}`, "warn"];
+      break;
     case "paused":
       [line, tone] = ["Paused · the part already downloaded is kept", "wait"];
       break;
@@ -155,7 +161,7 @@ function DownloadRow({
   };
 
   return (
-    <div className={`card dl${s.type === "done" ? " is-done" : ""}`}>
+    <div className={`card dl${s.type === "done" ? " is-done" : s.type === "needs_action" ? " is-action" : ""}`}>
       {job.image ? (
         <img className="thumb dl-thumb" src={job.image} alt="" loading="lazy" />
       ) : (
@@ -181,6 +187,14 @@ function DownloadRow({
           <IconButton icon="close" label="Cancel" onClick={() => act(api.queueCancel(job.id))} />
         </>
       )}
+      {s.type === "needs_action" && (
+        <>
+          <Button variant="primary" onClick={() => setReviewing(true)}>
+            Review
+          </Button>
+          <IconButton icon="close" label="Cancel" onClick={() => act(api.queueCancel(job.id))} />
+        </>
+      )}
       {s.type === "done" && <Button onClick={onShowLibrary}>Show in library</Button>}
       {s.type === "failed" && (
         <Button onClick={viewOnGameBanana} disabled={opening}>
@@ -189,6 +203,9 @@ function DownloadRow({
       )}
       {(s.type === "failed" || s.type === "cancelled") && (
         <IconButton icon="close" label="Dismiss" onClick={() => act(api.queueDismiss(job.id))} />
+      )}
+      {reviewing && s.type === "needs_action" && (
+        <ReviewDialog job={job} review={s.review} onClose={() => setReviewing(false)} />
       )}
     </div>
   );

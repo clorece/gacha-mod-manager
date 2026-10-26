@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // Launching a game through XXMI. The first time (or after the exe moved) the user confirms
-// the exact launcher path in a dialog before GMM runs it (security rule R7).
+// the exact launcher path in a dialog before GMM runs it (security rule R7). The Dashboard and
+// the Mods Library both launch from here.
 
 import { useState } from "react";
 import { api, asCmdError, type GameInfo, type LaunchInfo } from "../api";
@@ -62,4 +63,17 @@ export function useLaunch(game: GameInfo) {
   );
 
   return { launch, busy, dialog };
+}
+
+/** "Launch" for one game (the Library's header; the Dashboard has its own in each bubble). */
+export function LaunchButton({ game, label }: { game: GameInfo; label: string }) {
+  const { launch, busy, dialog } = useLaunch(game);
+  return (
+    <>
+      <Button variant="launch" icon="play" disabled={busy} onClick={launch}>
+        {label}
+      </Button>
+      {dialog}
+    </>
+  );
 }

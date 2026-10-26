@@ -1,46 +1,79 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The install confirmation (docs/08, "Install confirmation"). It fetches the chosen file into
-// GMM's download cache and looks inside (`prepare_install`), then shows what would happen:
-// a file choice when GameBanana lists several, a version choice when the archive holds
-// several mods, blocked files, where it installs. Nothing is installed until the user
-// confirms; the confirmed install goes to the queue (`queue_install`) and the Downloads page.
+// The install confirmation (docs/08, "Install confirmation"). Nothing is downloaded while
+// it's open: it reads the mod page (usually already cached) and asks, in up to three steps,
+// which of GameBanana's files to install (several can be picked, and each one picked is
+// switched on), what to do about mods already on for the same character, and to confirm.
+// Each confirmed file goes to the queue (`queue_install`), which downloads, checks and
+// installs it in the background; the user stays where they are and follows it in Downloads,
+// where an install whose check finds something waits as "Needs action".
 
-import { useEffect, useState } from "react";
-import {
-  api,
-  asCmdError,
-  type InstallPlan,
-  type InstallProgress,
-  type ModFile,
-  type ModProfile,
-  type VariantPick,
-} from "../api";
+import { useEffect, useMemo, useState } from "react";
+import { api, asCmdError, type GameInfo, type LibraryView, type ModFile, type ModProfile, type ModRow } from "../api";
+import { imageAt } from "../catalog";
 import { bytes, day, plural } from "../format";
-import { Button, Checkbox, Dialog, Notice, ProgressBar, Radio, Switch, useToast } from "../ui";
+import { Button, Checkbox, Dialog, Notice, Radio, Switch, useToast } from "../ui";
 
-type Loading = { kind: "loading"; progress: InstallProgress | null } | { kind: "failed"; message: string };
+type Step = "files" | "conflicts" | "confirm";
+/** What to do about mods already on for the same character. */
+type Resolve = "new" | "keep" | "both";
+
+const STEP_NAMES: Record<Step, string> = { files: "Variants", conflicts: "Conflicts", confirm: "Confirm" };
+
+/** GameBanana's files GMM may install (scanned clean), newest first; an archived file only
+ *  when it was picked on the mod page. */
+export function installableFiles(profile: ModProfile, picked: number | null): ModFile[] {
+  const clean = (f: ModFile) => f.av_result === "clean";
+  const current = profile.files.files.filter(clean);
+  const archived = profile.files.archived_files.filter((f) => f.id === picked && clean(f));
+  return [...current, ...archived].sort((a, b) => b.date_added - a.date_added);
+}
+
+/** Mods that are on in the game and dress the same character (GMM's own installs, whose
+ *  category is known), one entry per mod: they are very likely to replace the same things. */
+export function sameCharacter(
+  profile: ModProfile,
+  game: GameInfo | undefined,
+  view: LibraryView | undefined,
+): ModRow[] {
+  const root = profile.summary.root_category;
+  const character = profile.summary.category;
+  if (!game || !view || !root || !character) return [];
+  if (!game.categories.some((c) => c.id === root.id && c.characters)) return [];
+  const seen = new Set<string>();
+  return view.managed.filter((m) => {
+    if (!m.enabled || m.category_id !== character.id || m.gb_mod_id === profile.summary.id) return false;
+    const key = m.group ?? `id:${m.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 export function InstallDialog({
   modId,
   initialFileId = null,
-  gameName,
+  games,
+  libraries,
   onClose,
   onQueued,
 }: {
   modId: number;
-  /** A file picked on the mod page's Files tab; GameBanana's newest clean file otherwise. */
+  /** A file picked on the mod page's Files tab (or "Add versions"); otherwise GameBanana's
+   *  newest clean file starts ticked. */
   initialFileId?: number | null;
-  /** For "where it installs" ("Zenless Zone Zero › ZZMI\Mods\GMM"). */
-  gameName: (gameId: string) => string;
+  games: GameInfo[];
+  /** For the files already installed and the mods on for the same character. */
+  libraries: Record<string, LibraryView>;
   onClose: () => void;
-  onQueued: () => void;
+  /** After the installs were queued: how many, and the mod's name. */
+  onQueued: (count: number, modName: string) => void;
 }) {
   const toast = useToast();
   const [profile, setProfile] = useState<ModProfile | null>(null);
-  const [fileId, setFileId] = useState<number | null>(initialFileId);
-  const [plan, setPlan] = useState<InstallPlan | null>(null);
-  const [status, setStatus] = useState<Loading>({ kind: "loading", progress: null });
-  const [picked, setPicked] = useState<string[]>([]);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [picked, setPicked] = useState<number[]>([]);
+  const [step, setStep] = useState<Step>("files");
+  const [resolve, setResolve] = useState<Resolve>("new");
   const [switchOn, setSwitchOn] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -48,76 +81,72 @@ export function InstallDialog({
     let live = true;
     api
       .catalogMod(modId)
-      .then((p) => live && setProfile(p))
-      .catch(() => {
-        // The header falls back to the plan's name.
-      });
-    return () => {
-      live = false;
-    };
-  }, [modId]);
-
-  // (Re)look inside whenever the file changes. `null` = GameBanana's newest clean file.
-  useEffect(() => {
-    let live = true;
-    setPlan(null);
-    setStatus({ kind: "loading", progress: null });
-    api
-      .prepareInstall(modId, fileId, (p) => live && setStatus({ kind: "loading", progress: p }))
       .then((p) => {
         if (!live) return;
-        setPlan(p);
-        // Nothing ticked yet; a single-mod archive needs no choice.
-        setPicked([]);
+        setProfile(p);
+        const files = installableFiles(p, initialFileId);
+        const start = files.find((f) => f.id === initialFileId) ?? files.find((f) => !f.archived);
+        setPicked(start ? [start.id] : []);
       })
-      .catch((e) => live && setStatus({ kind: "failed", message: asCmdError(e).message }));
+      .catch((e) => live && setFailed(asCmdError(e).message));
     return () => {
       live = false;
     };
-  }, [modId, fileId]);
+  }, [modId, initialFileId]);
 
-  // Kept while another file is being looked at, so the choice doesn't jump away.
-  const [files, setFiles] = useState<ModFile[]>([]);
-  useEffect(() => {
-    if (plan) setFiles([plan.file, ...plan.other_files].sort((a, b) => b.date_added - a.date_added));
-  }, [plan]);
-  const chosenFile = plan?.file.id ?? fileId;
-  const versions = plan?.versions ?? [];
-  const multi = versions.length > 1;
-  const choosable = versions.filter((v) => v.installed === null);
-  const blocked = versions
-    .filter((v) => !multi || picked.includes(v.name))
-    .flatMap((v) => v.blocked.map((b) => (multi ? `${v.name}: ${b}` : b)));
-  const clash = (plan?.version_conflicts.length ?? 0) > 0;
-  const unusable = plan !== null && (plan.kind === null || versions.length === 0);
-  const nothingNew = plan !== null && !unusable && choosable.length === 0;
+  const game = games.find((g) => g.gamebanana_id === profile?.summary.game_id);
+  const view = game ? libraries[game.id] : undefined;
+  const files = useMemo(() => (profile ? installableFiles(profile, initialFileId) : []), [profile, initialFileId]);
+  const clashes = useMemo(() => (profile ? sameCharacter(profile, game, view) : []), [profile, game, view]);
 
-  const toggle = (name: string, on: boolean) =>
-    setPicked((current) => (on ? [...current, name] : current.filter((n) => n !== name)));
-  const allPicked = choosable.length > 0 && choosable.every((v) => picked.includes(v.name));
+  /** Files whose whole archive is installed already (one mod, no versions to add). */
+  const installed = useMemo(() => {
+    const rows = view?.managed.filter((m) => m.gb_mod_id === modId) ?? [];
+    return new Map(
+      files.map((f) => {
+        const mine = rows.filter((r) => r.gb_file_id === f.id);
+        return [f.id, mine.length === 0 ? null : mine.some((r) => r.variant !== null) ? "versions" : "whole"] as const;
+      }),
+    );
+  }, [files, view, modId]);
 
-  let installLabel = "Install";
-  if (multi) {
-    installLabel = picked.length === 0 ? "Pick a version" : `Install ${plural(picked.length, "version")}`;
-  }
-  if (blocked.length > 0 && (!multi || picked.length > 0)) installLabel += " without blocked files";
-  const canInstall = plan !== null && !unusable && !nothingNew && (!multi || picked.length > 0) && !busy;
+  const steps: Step[] = [
+    ...(files.length > 1 ? (["files"] as const) : []),
+    ...(clashes.length > 0 && switchOn ? (["conflicts"] as const) : []),
+    "confirm",
+  ];
+  const at = steps.includes(step) ? step : steps[0];
+  const index = steps.indexOf(at);
+  const go = (d: number) => setStep(steps[Math.max(0, Math.min(steps.length - 1, index + d))]);
+
+  const toggle = (id: number, on: boolean) => setPicked((now) => (on ? [...now, id] : now.filter((x) => x !== id)));
+  const choosable = files.filter((f) => installed.get(f.id) !== "whole");
+  const allPicked = choosable.length > 0 && choosable.every((f) => picked.includes(f.id));
+  const chosen = files.filter((f) => picked.includes(f.id));
 
   const confirm = async () => {
-    if (!plan) return;
+    if (!profile || chosen.length === 0) return;
     setBusy(true);
-    const variants: VariantPick = multi ? { type: "named", names: picked } : { type: "only" };
+    const keep = clashes.length > 0 && switchOn && resolve === "keep";
+    const switchOff = clashes.length > 0 && switchOn && resolve === "new" ? clashes.map((m) => m.id) : [];
+    let queued = 0;
     try {
-      await api.queueInstall({
-        mod_id: plan.mod_id,
-        file_id: plan.file.id,
-        variants,
-        skip_blocked: blocked.length > 0,
-        start_disabled: !switchOn,
-      });
-      onQueued();
+      for (const f of chosen) {
+        await api.queueInstall({
+          mod_id: modId,
+          file_id: f.id,
+          variants: { type: "only" },
+          skip_blocked: false,
+          start_disabled: !switchOn || keep,
+          // Switched off once, after the first file installs.
+          switch_off: queued === 0 ? switchOff : [],
+        });
+        queued += 1;
+      }
+      onQueued(queued, profile.summary.name);
     } catch (e) {
       toast("bad", asCmdError(e).message);
+      if (queued > 0) onQueued(queued, profile.summary.name);
       setBusy(false);
     }
   };
@@ -127,194 +156,230 @@ export function InstallDialog({
   };
 
   const summary = profile?.summary;
-  const banner = summary?.images[0];
-  const thumb = banner?.variants.find((v) => v.size.width >= 100)?.url ?? banner?.url;
-  const byline = [
-    summary?.submitter.name && `by ${summary.submitter.name}`,
-    summary?.category?.name,
-    plan ? gameName(plan.game) : null,
-  ]
+  const thumb = imageAt(summary?.images[0], 100);
+  const byline = [summary?.submitter.name && `by ${summary.submitter.name}`, summary?.category?.name, game?.name]
     .filter(Boolean)
     .join(" · ");
+  const nothing = profile !== null && files.length === 0;
+  const unsupported = profile !== null && !game;
+  const blocked = failed !== null || nothing || unsupported;
+
+  let primary: string;
+  if (at === "confirm") primary = chosen.length > 1 ? `Install ${plural(chosen.length, "variant")}` : "Install";
+  else primary = "Next";
+  const canGo = profile !== null && !blocked && chosen.length > 0 && !busy;
 
   return (
     <Dialog
-      eyebrow={multi && versions.some((v) => v.installed !== null) ? "Add versions" : "Install"}
-      title={summary?.name ?? plan?.mod_name ?? "Looking at the mod…"}
+      eyebrow={[...installed.values()].some((v) => v !== null) ? "Add versions" : "Install"}
+      title={summary?.name ?? "Getting the mod's details…"}
       subtitle={byline || undefined}
       media={thumb ? <img className="thumb cf-thumb" src={thumb} alt="" /> : <div className="thumb cf-thumb art a2" />}
       onClose={onClose}
       footer={
         <>
-          <Button onClick={onClose}>Cancel</Button>
-          {status.kind === "failed" || unusable ? (
+          {index > 0 && !blocked ? (
+            <Button onClick={() => go(-1)}>Back</Button>
+          ) : (
+            <Button onClick={onClose}>Cancel</Button>
+          )}
+          {blocked ? (
             <Button variant="primary" onClick={viewOnGameBanana}>
               View on GameBanana
             </Button>
           ) : (
-            <Button variant="primary" icon="download" onClick={confirm} disabled={!canInstall}>
-              {nothingNew ? "Already installed" : installLabel}
+            <Button
+              variant="primary"
+              icon={at === "confirm" ? "download" : undefined}
+              onClick={at === "confirm" ? confirm : () => go(1)}
+              disabled={!canGo}
+            >
+              {primary}
             </Button>
           )}
         </>
       }
     >
-      {status.kind === "failed" && (
-        <Notice tone="bad" title="GMM can't install this file.">
-          {status.message}
+      {failed !== null && (
+        <Notice tone="bad" title="GMM couldn't read this mod from GameBanana.">
+          {failed}
+        </Notice>
+      )}
+      {nothing && (
+        <Notice tone="bad" title="There's no file GMM can install.">
+          GMM installs only files GameBanana scanned as clean, and this mod has none right now.
+        </Notice>
+      )}
+      {unsupported && !nothing && (
+        <Notice tone="bad" title="This mod is for a game GMM doesn't manage.">
+          GMM installs mods for {games.map((g) => g.name).join(" and ")}.
         </Notice>
       )}
 
-      {files.length > 1 && (
-        <>
-          <div className="cf-h-row">
-            <h3 className="cf-h">Choose a file</h3>
-            <span className="count">{files.length} files on GameBanana</span>
-          </div>
-          <div className="opt-list">
-            {files.map((f) => (
-              <Radio
-                key={f.id}
-                className="opt-row"
-                name="file"
-                checked={f.id === chosenFile}
-                disabled={!plan}
-                onChange={() => setFileId(f.id)}
-              >
-                <span className="grow">
-                  <b className="block font-extrabold">{f.description ?? f.name}</b>
-                  <span className="sub">
-                    {f.description ? `${f.name} · ` : ""}
-                    {bytes(f.size)} · {day(f.date_added)}
-                  </span>
-                </span>
-              </Radio>
-            ))}
-          </div>
-        </>
+      {!profile && failed === null && (
+        <div className="cf-loading" aria-hidden="true">
+          <span className="skel-line" />
+          <span className="skel-line short" />
+        </div>
       )}
 
-      {!plan && status.kind === "loading" && <Looking progress={status.progress} />}
-
-      {unusable && (
-        <Notice tone="bad" title={`GMM didn't find a ${plan ? gameName(plan.game) : ""} mod in this file.`}>
-          Nothing in it looks like a mod XXMI loads (no mod .ini files), so there's nothing to install.
-        </Notice>
+      {profile && !blocked && steps.length > 1 && (
+        <ol className="cf-steps" aria-label="Steps">
+          {steps.map((s, i) => (
+            <li key={s} className={i === index ? "is-current" : i < index ? "is-done" : undefined}>
+              <span className="cf-step-n">{i + 1}</span>
+              {STEP_NAMES[s]}
+            </li>
+          ))}
+        </ol>
       )}
 
-      {plan && multi && (
+      {profile && !blocked && at === "files" && (
         <>
           <div className="cf-h-row">
-            <h3 className="cf-h">Choose versions</h3>
+            <h3 className="cf-h">Choose variants</h3>
             <span className="count">
-              {picked.length} of {choosable.length} selected
+              {picked.length} of {files.length} selected
             </span>
             <span className="grow" />
-            {choosable.length > 0 && (
-              <Button variant="link" onClick={() => setPicked(allPicked ? [] : choosable.map((v) => v.name))}>
+            {choosable.length > 1 && (
+              <Button variant="link" onClick={() => setPicked(allPicked ? [] : choosable.map((f) => f.id))}>
                 {allPicked ? "Clear" : "Select all"}
               </Button>
             )}
           </div>
           <p className="sub">
-            This archive holds {versions.length} versions. GMM looked inside after fetching it into its cache (
-            {bytes(plan.archive_bytes)}); nothing is installed until you confirm.
+            This mod has {files.length} files on GameBanana. Pick every variant you want: some mods come in pieces that
+            work together, so each one you pick is switched on.
           </p>
           <div className="opt-list cf-vlist">
-            {versions.map((v) => {
-              const done = v.installed !== null;
-              const first = picked[0] === v.name;
+            {files.map((f) => {
+              const has = installed.get(f.id);
+              const on = picked.includes(f.id);
               return (
                 <Checkbox
-                  key={v.folder}
+                  key={f.id}
                   className="opt-row"
-                  checked={done || picked.includes(v.name)}
-                  disabled={done}
-                  onChange={(on) => toggle(v.name, on)}
+                  checked={has === "whole" || on}
+                  disabled={has === "whole"}
+                  onChange={(next) => toggle(f.id, next)}
                 >
                   <span className="grow">
-                    <b className="block font-extrabold">{v.name}</b>
+                    <b className="block font-extrabold">{f.description ?? f.name}</b>
                     <span className="sub">
-                      {plural(v.files, "file")} · {bytes(v.bytes)}
+                      {f.description ? `${f.name} · ` : ""}
+                      {bytes(f.size)} · {day(f.date_added)}
+                      {f.archived ? " · an older file" : ""}
                     </span>
                   </span>
-                  {first && switchOn && <span className="tag-on">On after install</span>}
-                  {done && <span className="tag-done">Installed</span>}
+                  {on && switchOn && <span className="tag-on">On after install</span>}
+                  {has === "whole" && <span className="tag-done">Installed</span>}
+                  {has === "versions" && <span className="tag-done">Some installed</span>}
                 </Checkbox>
               );
             })}
           </div>
-          {clash && (
-            <p className="hint">
-              Some of these versions replace the same things, so only one of those can be on at a time. The first one
-              you pick is switched on; switch between them later in the mod's settings.
-            </p>
-          )}
+          <p className="hint">
+            Variants that replace exactly the same things can't be on together; GMM keeps the first one on and the other
+            off. Switch between them later in the mod's settings.
+          </p>
         </>
       )}
 
-      {blocked.length > 0 && (
-        <Notice tone="warn" title={`${plural(blocked.length, "file")} won't be installed.`}>
-          GMM never installs programs, scripts or shortcuts from a mod: {blocked.join(", ")}.
-        </Notice>
+      {profile && !blocked && at === "conflicts" && (
+        <>
+          <div className="cf-h-row">
+            <h3 className="cf-h">Resolve a conflict</h3>
+          </div>
+          <p className="sub">
+            {plural(clashes.length, "mod")} for {summary?.category?.name} {clashes.length === 1 ? "is" : "are"} on
+            already. Two mods for one character usually replace the same things, and only one of them shows in game.
+          </p>
+          <div className="cf-clash">
+            {clashes.map((m) => (
+              <div className="cf-clash-row" key={m.id}>
+                {m.preview ? (
+                  <img className="thumb cf-clash-thumb" src={m.preview} alt="" loading="lazy" decoding="async" />
+                ) : (
+                  <div className="thumb cf-clash-thumb art a3" />
+                )}
+                <b className="truncate">{m.name}</b>
+                <span className="badge badge-ok">On</span>
+              </div>
+            ))}
+          </div>
+          <div className="opt-list">
+            <Radio className="opt-row" name="resolve" checked={resolve === "new"} onChange={() => setResolve("new")}>
+              <span className="grow">
+                <b className="block font-extrabold">Use {summary?.name}</b>
+                <span className="sub">
+                  Switch {clashes.length === 1 ? clashes[0].name : "those mods"} off once this one is installed.
+                </span>
+              </span>
+            </Radio>
+            <Radio className="opt-row" name="resolve" checked={resolve === "keep"} onChange={() => setResolve("keep")}>
+              <span className="grow">
+                <b className="block font-extrabold">Keep what's on</b>
+                <span className="sub">Install {summary?.name} switched off; switch it on later in the Library.</span>
+              </span>
+            </Radio>
+            <Radio className="opt-row" name="resolve" checked={resolve === "both"} onChange={() => setResolve("both")}>
+              <span className="grow">
+                <b className="block font-extrabold">Skip</b>
+                <span className="sub">Leave both on and decide later. The Library marks the conflict.</span>
+              </span>
+            </Radio>
+          </div>
+        </>
       )}
 
-      {plan && (
-        <div className="kv">
-          <div className="kv-row">
-            <span>File</span>
-            <b>
-              {plan.file.name} · {bytes(plan.file.size)}
-              {plan.from_cache ? " · already in the download cache" : ""}
-            </b>
+      {profile && !blocked && at === "confirm" && (
+        <>
+          <div className="kv">
+            <div className="kv-row">
+              <span>{chosen.length > 1 ? "Variants" : "File"}</span>
+              <b>
+                {chosen.length === 1
+                  ? `${chosen[0].name} · ${bytes(chosen[0].size)}`
+                  : `${chosen.length} files · ${bytes(chosen.reduce((n, f) => n + f.size, 0))}`}
+              </b>
+            </div>
+            {clashes.length > 0 && switchOn && (
+              <div className="kv-row">
+                <span>Conflict</span>
+                <b>
+                  {resolve === "new"
+                    ? `Switches off ${clashes.length === 1 ? clashes[0].name : plural(clashes.length, "mod")}`
+                    : resolve === "keep"
+                      ? "Installs switched off"
+                      : "Both stay on"}
+                </b>
+              </div>
+            )}
+            <div className="kv-row">
+              <span>Installs to</span>
+              <b>
+                {game?.name} › {game?.importer}\Mods\GMM
+              </b>
+            </div>
+            <div className="kv-row">
+              <span>Safety</span>
+              <b>Scanned clean by GameBanana; GMM checks every file again before installing</b>
+            </div>
           </div>
-          <div className="kv-row">
-            <span>Installs to</span>
-            <b>
-              {gameName(plan.game)} › {plan.install_to}
-            </b>
+          <div className="cf-switch">
+            <div className="grow">
+              <b>Switch it on after installing</b>
+              <div className="sub">Otherwise it's installed switched off.</div>
+            </div>
+            <Switch checked={switchOn} onChange={setSwitchOn} label="Switch it on after installing" />
           </div>
-          <div className="kv-row">
-            <span>Safety</span>
-            <b>Scanned clean by GameBanana; GMM checked every file again</b>
-          </div>
-        </div>
-      )}
-
-      {plan && !unusable && !nothingNew && (
-        <div className="cf-switch">
-          <div className="grow">
-            <b>Switch it on after installing</b>
-            <div className="sub">Otherwise it's installed switched off.</div>
-          </div>
-          <Switch checked={switchOn} onChange={setSwitchOn} label="Switch it on after installing" />
-        </div>
+          <p className="hint">
+            GMM downloads and checks it in the background, so you can keep browsing. Follow it in Downloads; if the
+            check finds something (a file that holds several versions, files GMM won't install), it waits there for you.
+          </p>
+        </>
       )}
     </Dialog>
-  );
-}
-
-function Looking({ progress }: { progress: InstallProgress | null }) {
-  let line = "Getting the mod's files from GameBanana";
-  let value: number | undefined;
-  if (progress?.type === "using_cache") line = "Found it in GMM's download cache";
-  if (progress?.type === "downloading") line = `Fetching ${bytes(progress.size)} into GMM's cache`;
-  if (progress?.type === "progress") {
-    const total = progress.total;
-    line = total
-      ? `Fetching into GMM's cache · ${Math.floor((progress.downloaded / total) * 100)}% · ${bytes(progress.downloaded)} of ${bytes(total)}`
-      : `Fetching into GMM's cache · ${bytes(progress.downloaded)}`;
-    value = total ? progress.downloaded / total : undefined;
-  }
-  if (progress?.type === "extracting") line = "Looking inside the archive";
-  return (
-    <div className="cf-looking">
-      <p className="sub">
-        GMM fetches the file into its download cache and looks inside before you choose. Nothing is installed until you
-        confirm.
-      </p>
-      <div className="dl-state st-run">{line}</div>
-      <ProgressBar value={value} label={line} />
-    </div>
   );
 }

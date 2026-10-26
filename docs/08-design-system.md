@@ -11,7 +11,8 @@ second round added the startup check, the install confirmation (versions and fil
 settings with versions, and the sticky search and filter bar. Every state was checked in both
 themes (screenshots plus an automated contrast and overlap check over 62 states). Since
 2026-10-25 the same kind of audit runs on the built app in CI (`apps/desktop/tests/ui-audit.mjs`:
-20 states in both themes, WCAG AA contrast, no overlapping text, no sideways scroll).
+22 states in both themes since 2026-10-26, WCAG AA contrast, no overlapping text, no sideways
+scroll).
 
 **In the app** (Phase 4): the tokens below, base styles, scrollbars and the `:where()`
 button base are in `apps/desktop/src/styles.css`; Nunito is bundled; the primitives are in
@@ -41,7 +42,7 @@ A fixed sidebar on the left (268 px), top to bottom:
 | Area | Contents |
 |---|---|
 | Brand | Capsule mark at 48 px; beside it a column with "Gacha Mod Manager" on one line (Nunito 900, 18 px, title gradient) tight over a small one-line "Powered by GameBanana" pill (10 px, 1 px gap), deliberately quieter than the name and mark. The text column starts 5 px below the mark's top, so the name-pill split sits just under the capsule's horizontal center line. Springy hover on the mark, off with reduced motion |
-| **General** | Dashboard · Downloads (yellow badge with the active count) · Settings |
+| **General** | Dashboard · Downloads (count bubble, below) · Settings |
 | **Mods** | **Select Game** (banner dropdown, below) · Mods Library · Mods Store |
 | **Development** | Report a Bug · Documentation |
 | Footer | Theme switch (dark / light), version |
@@ -52,6 +53,22 @@ supported game, each with its installed-mod count); picking one collapses the li
 updates the button. The choice scopes the Mods Library and Mods Store; **All games** shows
 every game's mods unfiltered (cards then carry a small game badge). The Library's header
 offers the same choice as large banner cards, so the two always agree.
+
+**Downloads count** (2026-10-26): installs queued, running or waiting for the user, as a
+26 px disc in the theme's text colour (white on dark, navy on light, so it stands out on the
+sidebar and on the selected item) with a bold ring inset 2.5 px and the number, both in the
+sidebar's base colour. Two digits widen it into a pill; its tooltip and screen-reader label
+say how many need attention.
+
+**Window** (2026-10-26): no system frame. A 32 px title bar continues the sidebar (left, with
+its edge line) and the page background (right) to the top of the window, shows no title, and
+holds Windows 11-sized caption buttons (46 px wide, thin glyphs, hover on `--hover`, Close
+hover red `#c42b1c` with a white glyph). Pressing on the bar moves the window; a double click
+maximizes or restores it. The startup check and the first-run screen get the same bar. Side
+panels open below it. While a dialog is open the bar is covered like the rest of the window.
+The window opens at 16:9: 1952 × 1098 logical pixels where the screen has room (the size the
+project owner used on a 2560 × 1440 screen), otherwise about three quarters of the screen's
+width, centred; it can't be made smaller than 960 × 600.
 
 ## Screens
 
@@ -74,19 +91,33 @@ offers the same choice as large banner cards, so the two always agree.
 ### Downloads
 - Grouped by game (banner chip, name, count), newest first within a group.
 - One row per install: thumbnail, mod name, author and file name, state line, progress bar,
-  actions. States and their colors:
+  actions. Every install downloads, is checked and installs here in the background
+  (2026-10-26); the install confirmation only collects the choices that can be made before
+  downloading. States and their colors:
 
   | State | Line | Actions |
   |---|---|---|
   | Queued | muted "Queued" | Cancel |
   | Downloading | accent "Downloading · 62% · 16.9 of 27.3 MiB" + bar | Pause, Cancel |
-  | Extracting / scanning / installing | accent + indeterminate bar | — |
-  | Failed | red reason in plain words | View on GameBanana, Dismiss (Retry when it can help) |
+  | Checking / installing | accent "Checking every file" (extraction and the policy scan), then "Installing · <folder>", indeterminate bar | — |
+  | Needs action | amber "Needs action · choose versions, unsafe files" (the row gets an amber edge) | **Review**, Cancel |
+  | Failed | red reason in plain words | View on GameBanana, Dismiss |
   | Installed | green "Installed · just now", row dims, then removes itself after ~5 s | Show in library |
-- "Clear finished" in the header.
-- There is no "needs your choice" state: every choice (file, versions, blocked files) is made
-  in the install confirmation before a row appears here. A row for a multi-version install
-  says how many versions were chosen ("2 of 8 versions chosen") and which one is installing.
+- "Clear finished" and "Install from a file" in the header.
+- **Needs action** (2026-10-26): the background check stopped the install before anything
+  was installed. Review opens a dialog ("Needs your attention", the mod's name, author and
+  file) that says why, then offers **Cancel download** (red outline) or going ahead:
+  - **Outdated file**: the file is in the mod's old files on GameBanana (names the newest).
+  - **Unsafe files**: programs, scripts or shortcuts GMM never installs, listed; going ahead
+    installs without them.
+  - **Odd files**: scan warnings, listed; they're installed with the mod.
+  - **Choose versions**: the file holds several versions (or pieces of one mod, like an
+    outfit and its weapon recolor). A checkbox list with every version ticked, files and
+    size, "N of M selected", Select all / Clear; installed versions locked with "Installed".
+    With "switch on after installing", each ticked version shows "On after install" unless
+    it replaces the same things as one ticked above it ("Off · clashes with …").
+  The button says what happens: "Install anyway", or "Install 2 versions" ("Pick a version"
+  when nothing is ticked).
 
 ### Mods Store
 - **Featured gallery** at the top: a large banner (fade from the left for text) with a tag
@@ -112,11 +143,17 @@ offers the same choice as large banner cards, so the two always agree.
   downloads, and a round Download button (a check when installed). Every Download button
   (cards and the featured banner) opens the install confirmation. On an installed mod the
   button opens its settings, or, for a mod with several versions, the confirmation in
-  "Add versions" mode.
+  "Add versions" mode. Confirming keeps the user on the Store (a toast says it went to
+  Downloads; 2026-10-26).
+- **Remembered** (2026-10-26): the search, filters, sort, loaded results, featured gallery and
+  scroll position stay as they were while the user is on other pages, for as long as the
+  window is open; a different game scope starts without a category.
 
 ### Mods Library
 - Header: title, one line ("Switch one off and XXMI skips it…"), **Update all (N)** when the
-  startup check found updates (added 2026-10-25), then the game banner cards (All games /
+  startup check found updates (added 2026-10-25), **Launch** (the yellow launch button: one
+  per Ready game in scope, "Launch ZZZ" / "Launch WuWa" under All games; added 2026-10-26,
+  so the game starts without going back to the Dashboard), then the game banner cards (All games /
   each game, with "N mods · M on").
 - Toolbar: search, Category, Characters and the **Show sensitive** chip on the left;
   **Enable all**, **Disable all** and **Select** on the right. Sticky like the store's,
@@ -155,29 +192,35 @@ cached data. The footer states the only hosts GMM talks to. Cached results keep 
 check that finds nothing should take a second or two.
 
 ### Install confirmation
-Opens from every Download button; nothing downloads until it's confirmed. One dialog with up
-to three parts:
+Opens from every Download button, at once: it reads the mod page (usually already cached)
+and **downloads nothing** (2026-10-26; until then it fetched the archive first to look
+inside). Up to three steps, with a step strip ("1 Variants · 2 Conflicts · 3 Confirm") when
+there is more than one, and Back:
 
-- **Choose a file**, when GameBanana lists several (e.g. Homewear Belle's three zips, each
-  with its uploader's description and date): a radio list, the newest clean file first.
-- **Choose versions**, when the archive holds several mods (e.g. Fixed Yae Sakura Sword
-  Pack, 8 weapon versions): a checkbox list (it scrolls past about 5 rows) with files and
-  size per version, "N of M selected" and Select all / Clear. The first version picked gets
-  an "On after install" tag. A note explains that versions replacing the same thing can't be
-  on together. To know the versions GMM has to look inside the archive: it fetches it into
-  the download cache first (the dialog says so) and installs nothing until confirmed. In
-  **Add versions** mode (the mod is already installed) the versions you have show as
-  locked, dashed rows tagged "Installed".
-- **One version**: just the details and the confirmation.
+1. **Choose variants**, when GameBanana lists several clean files (e.g. Homewear Belle's
+   three zips, each with its uploader's description and date): a checkbox list, newest
+   first, the newest current file ticked (or the one picked on the mod page's Files tab).
+   Several can be picked: some mods come in pieces that work together. Each ticked file
+   shows "On after install" while "switch it on" is on; a file already installed whole is
+   locked ("Installed"), one with versions installed shows "Some installed" (Add versions).
+   A hint says variants that replace exactly the same things can't be on together.
+2. **Resolve a conflict**, when GMM-installed mods for the same character are on (a skins
+   category whose subcategories are characters, the same character): those mods with their
+   previews, then a choice: **Use <this mod>** (they're switched off once it's installed),
+   **Keep what's on** (it installs switched off) or **Skip** (both stay on; the Library
+   marks the conflict). Not shown when it installs switched off.
+3. **Confirm**: the file(s) and size, the conflict decision, where it installs ("Zenless
+   Zone Zero › ZZMI\Mods\GMM"), the safety line (GameBanana's scan plus GMM's check before
+   installing), **Switch it on after installing**, and a note that GMM downloads and checks
+   it in the background and waits in Downloads if the check finds something.
 
-Always shown: the file and size, where it installs ("Zenless Zone Zero › ZZMI\Mods\GMM"),
-the safety line (GameBanana's scan plus GMM's own), and **Switch it on after installing**.
-The button says what happens ("Install", "Install 2 versions", disabled as "Pick a version"
-when nothing is chosen). A file GMM can't install (password-protected or split into several
-parts, [09](09-archive-formats.md)) shows a red notice instead, with View on GameBanana;
-RAR itself is supported since Phase 5. Blocked files (executables, scripts) are listed
-in the same dialog with the option to install without them. Confirming starts the download
-and goes to the Downloads page.
+The button says what happens ("Next", "Install", "Install 2 variants"). Confirming queues one
+install per file, closes the dialog and leaves the user where they were, with a toast ("…
+added to Downloads"). Choices that need the archive (several versions inside one file,
+blocked files, an outdated file) are made in Downloads once the check has looked inside
+(Needs action, above). A mod with no clean file, or for a game GMM doesn't manage, shows a
+red notice with View on GameBanana. Files GMM can't extract (password-protected or split,
+[09](09-archive-formats.md)) fail in Downloads with the reason.
 
 ### Mod settings
 A panel that slides in from the right (480 px) from a library card's settings button:
@@ -313,7 +356,10 @@ All colors are CSS custom properties on the app root; `.t-dark` and `.t-light` s
   `color-scheme` so native controls (search clear button, date pickers) follow it.
 - **Elevation**: one shadow token (`--shadow`), used on hover, menus and open bubbles.
 - **Motion**: 200–450 ms, springy overshoot only on the logo and the dashboard bubble; all
-  transitions and animations off under `prefers-reduced-motion`.
+  transitions and animations off under `prefers-reduced-motion`. Since 2026-10-26 a page
+  fades in (180 ms, opacity only) when the user switches to it, previews fade in (250 ms)
+  once loaded and decoded, and loading shimmers slide a highlight with a transform, so they
+  don't repaint every frame.
 - **Icons**: 2 px stroke, round caps, 14–22 px, drawn to one style (Lucide-like; if a library
   is adopted it must pass the npm license policy).
 - **Accessibility**: real buttons and inputs, 44 px minimum targets, visible focus ring

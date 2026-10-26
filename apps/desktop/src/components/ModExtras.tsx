@@ -30,7 +30,7 @@ export function UpdateSection({
     setBusy(true);
     try {
       await api.queueChangeFile(gbModId, fileId);
-      toast("ok", `${what} queued. Each version keeps its folder and its on/off state.`);
+      toast("ok", `${what} added to Downloads. Each version keeps its folder and its on/off state.`);
       onQueued();
     } catch (e) {
       toast("bad", asCmdError(e).message);

@@ -3,9 +3,13 @@
 // Development, and the theme switch with the version at the bottom.
 
 import type { ReactNode } from "react";
+import type { AppRelease } from "../api";
 import logo from "../assets/gmm-logo.svg";
+import { plural } from "../format";
 import type { Scope } from "../games";
-import { Badge, Icon, type IconName } from "../ui";
+import { isActive, useJobs } from "../queue";
+import { Badge, Icon, type IconName, useToast } from "../ui";
+import { APP_VERSION, openRelease, versionLabel } from "../version";
 import { GamePicker, type PickerGame } from "./GamePicker";
 
 export type Page = "dashboard" | "downloads" | "settings" | "library" | "store" | "bug" | "docs" | "styleguide";
@@ -36,6 +40,29 @@ function NavItem({
   );
 }
 
+/** The Downloads count (installs queued, running or waiting for the user): a disc in the
+ *  theme's text colour with an inset ring and the number in its base colour, so it stands
+ *  out in both themes and on the selected item. Reads the queue itself, so progress redraws
+ *  only this. */
+function DownloadsCount() {
+  const active = useJobs().filter(isActive);
+  const count = active.length;
+  const needsAction = active.filter((j) => j.state.type === "needs_action").length;
+  if (count === 0) return null;
+  const label = [
+    plural(count, "download"),
+    needsAction > 0 ? `${needsAction} ${needsAction === 1 ? "needs" : "need"} your attention` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return (
+    <span className={`count-bubble${count > 9 ? " is-wide" : ""}`} title={label}>
+      <span className="sr-only">{label}</span>
+      <span aria-hidden="true">{count > 99 ? "99+" : count}</span>
+    </span>
+  );
+}
+
 export function Sidebar({
   page,
   onGo,
@@ -44,7 +71,7 @@ export function Sidebar({
   onScope,
   theme,
   onToggleTheme,
-  activeDownloads,
+  appUpdate,
 }: {
   page: Page;
   onGo: (page: Page) => void;
@@ -53,9 +80,10 @@ export function Sidebar({
   onScope: (scope: Scope) => void;
   theme: "dark" | "light";
   onToggleTheme: () => void;
-  /** Installs queued or running, shown on the Downloads item. */
-  activeDownloads: number;
+  /** A newer GMM on GitHub: the version line becomes a button to its release page. */
+  appUpdate: AppRelease | null;
 }) {
+  const toast = useToast();
   const other = theme === "dark" ? "light" : "dark";
   return (
     <aside className="side" aria-label="Navigation">
@@ -77,11 +105,7 @@ export function Sidebar({
         </NavItem>
         <NavItem page="downloads" current={page} icon="download" onGo={onGo}>
           Downloads
-          {activeDownloads > 0 && (
-            <Badge tone="yellow" title={`${activeDownloads} in the queue`}>
-              {activeDownloads}
-            </Badge>
-          )}
+          <DownloadsCount />
         </NavItem>
         <NavItem page="settings" current={page} icon="sliders" onGo={onGo}>
           Settings
@@ -116,7 +140,19 @@ export function Sidebar({
           <Icon name={theme === "dark" ? "moon" : "sun"} size={16} />
           {theme === "dark" ? "Dark" : "Light"}
         </button>
-        <span>v{__APP_VERSION__}</span>
+        {appUpdate ? (
+          <button
+            type="button"
+            className="update-pill"
+            title={`GMM ${versionLabel(appUpdate.version)} is out; you have ${APP_VERSION}`}
+            onClick={() => openRelease(appUpdate.version, (m) => toast("bad", m))}
+          >
+            <Icon name="download" size={13} stroke={2.6} />
+            {versionLabel(appUpdate.version)}
+          </button>
+        ) : (
+          <span>v{APP_VERSION}</span>
+        )}
       </div>
     </aside>
   );

@@ -8,14 +8,22 @@
 import { useCallback, useEffect, useState } from "react";
 import readme from "../../../../README.md?raw";
 import notices from "../../../../THIRD-PARTY-NOTICES.md?raw";
-import { api, asCmdError, type CacheStorage, type Settings as SettingsData } from "../api";
+import { type AppRelease, api, asCmdError, type CacheStorage, type Settings as SettingsData } from "../api";
 import type { AppData } from "../data";
 import { bytes, plural } from "../format";
 import { setupLabel, sourceLabel } from "../games";
 import { Markdown, section } from "../markdown";
 import { usePrefs } from "../prefs";
 import { Badge, Button, Dialog, Segmented, Spinner, Switch, useToast } from "../ui";
+import { APP_VERSION, openRelease, versionLabel } from "../version";
 import { StorageBreakdown } from "./Storage";
+
+/** Settings › About's update check. */
+type UpdateState =
+  | { state: "idle" }
+  | { state: "checking" }
+  | { state: "done"; release: AppRelease | null }
+  | { state: "failed"; message: string };
 
 export function Settings({ data }: { data: AppData }) {
   const [breakdown, setBreakdown] = useState(false);
@@ -25,6 +33,14 @@ export function Settings({ data }: { data: AppData }) {
 
 function SettingsCards({ data, onBreakdown }: { data: AppData; onBreakdown: () => void }) {
   const toast = useToast();
+  const [appUpdate, setAppUpdate] = useState<UpdateState>({ state: "idle" });
+  const checkUpdate = () => {
+    setAppUpdate({ state: "checking" });
+    api
+      .appUpdateCheck()
+      .then((release) => setAppUpdate({ state: "done", release }))
+      .catch((e) => setAppUpdate({ state: "failed", message: asCmdError(e).message }));
+  };
   const { prefs, update } = usePrefs();
   const [saved, setSaved] = useState<SettingsData | null>(null);
   const [cache, setCache] = useState<CacheStorage | null>(null);
@@ -311,7 +327,39 @@ function SettingsCards({ data, onBreakdown }: { data: AppData; onBreakdown: () =
           <div className="kv">
             <div className="kv-row">
               <span>Version</span>
-              <b>Gacha Mod Manager {__APP_VERSION__}</b>
+              <b>Gacha Mod Manager {APP_VERSION}</b>
+            </div>
+            <div className="kv-row">
+              <span>Updates</span>
+              <span className="about-update">
+                <b>
+                  {appUpdate.state === "idle"
+                    ? "GMM looks for a newer version on GitHub each time it starts."
+                    : appUpdate.state === "checking"
+                      ? "Looking on GitHub…"
+                      : appUpdate.state === "failed"
+                        ? `Couldn't check: ${appUpdate.message}`
+                        : appUpdate.release
+                          ? `GMM ${versionLabel(appUpdate.release.version)} is out.`
+                          : "You have the newest version."}
+                </b>
+                {appUpdate.state === "done" && appUpdate.release ? (
+                  <Button
+                    variant="primary"
+                    icon="download"
+                    onClick={() => {
+                      const release = appUpdate.state === "done" ? appUpdate.release : null;
+                      if (release) openRelease(release.version, (m) => toast("bad", m));
+                    }}
+                  >
+                    Get the update
+                  </Button>
+                ) : (
+                  <Button onClick={checkUpdate} disabled={appUpdate.state === "checking"}>
+                    Check for updates
+                  </Button>
+                )}
+              </span>
             </div>
             <div className="kv-row">
               <span>License</span>

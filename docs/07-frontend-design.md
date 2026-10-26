@@ -19,8 +19,11 @@ right. Details in [08](08-design-system.md#navigation).
   2026-10-26 the open bubble of a Ready game can apply one of its profiles before launching
   (the same apply as the Library's Profiles panel, which keeps saving and sharing).
 - **Downloads** is a page (grouped by game, with a finished state that clears itself), not a
-  tray; the sidebar badge counts active installs. Choices never wait there: they're made in
-  the install confirmation first.
+  tray; the sidebar's count bubble counts installs queued, running or waiting. Since
+  2026-10-26 every install downloads and is checked there in the background, and one whose
+  check found something waits as "Needs action" (versions to choose, unsafe or outdated
+  files) until the user reviews it; the choices that need no download are made in the
+  install confirmation first.
 - **Startup check**: a screen while GMM starts (app update, new mods per game, updates for
   installed mods), skippable. See [08](08-design-system.md#startup-check).
 - Keyboard navigable, visible focus rings, all images with alt text (the mod name).
@@ -173,19 +176,23 @@ on hosts GMM doesn't load show a quiet placeholder.
 | Obsolete / withheld | `_bIsObsolete`, `_bIsWithheld`, `_bIsTrashed` → banner, install disabled |
 | Updates tab | `Mod/{id}/Updates` (verified): title, version, date, changelog entries (`text`, `cat`), file ids |
 
-**Choosing what to install** happens in the install confirmation, which every Download and
-Install button opens ([08](08-design-system.md#install-confirmation)); nothing is installed
-before it's confirmed. To show versions it fetches the file into the download cache first
-(GameBanana can't list an archive's contents), so the confirmed install starts from the cache:
-1. **File** (GameBanana level): when the mod has several files, a radio list with each file's
-   description, size and date; the newest clean file is pre-selected. Files with an AV result
+**Choosing what to install** starts in the install confirmation, which every Download and
+Install button opens ([08](08-design-system.md#install-confirmation)); nothing is downloaded
+or installed before it's confirmed (since 2026-10-26). GameBanana can't list an archive's
+contents, so what needs the archive is decided after the background check, in Downloads:
+1. **Variants** (GameBanana level, in the confirmation): when the mod has several files, a
+   checklist with each file's description, size and date; the newest clean file is ticked,
+   and several can be ticked (each is its own install, switched on). Files with an AV result
    other than `clean` can't be chosen. The Files tab on the mod page shows the same list,
    archived files included.
-2. **Versions** (archive level): when the archive holds several full mods, a scrolling
-   checklist of them (folder name, files, size), after GMM has fetched the archive into its
-   cache to look inside. Multi-select is allowed; the first one picked is switched on, and
-   versions that replace the same things can't be on together.
-3. Already installed → the button opens the mod's settings (or "Add versions" for a mod with
+2. **Conflict** (in the confirmation): GMM-installed mods on for the same character: switch
+   them off, install this one switched off, or keep both on.
+3. **Versions** (archive level, in Downloads): when the archive holds several full mods, the
+   install waits as "Needs action" after GMM has downloaded and checked it; Review shows a
+   checklist of them (folder name, files, size), all ticked. Every picked version is
+   switched on except one that replaces the same things as one picked before it. Blocked
+   files and an outdated (archived) file are shown there too, with Cancel download.
+4. Already installed → the button opens the mod's settings (or "Add versions" for a mod with
    several), with Update / Reinstall / Uninstall there.
 
 ## Mods Library (installed mods)

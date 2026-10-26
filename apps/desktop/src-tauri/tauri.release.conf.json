@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "active": true,
+    "targets": ["msi"],
+    "resources": {
+      "../../../target/release/gmm-extract.exe": "gmm-extract.exe",
+      "../../../THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md",
+      "../../../LICENSE-MIT": "LICENSE-MIT",
+      "../../../LICENSE-APACHE": "LICENSE-APACHE"
+    },
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },
+      "wix": {
+        "language": "en-US",
+        "upgradeCode": "2A22FBD4-5190-4E52-A086-214FD39431B6"
+      }
+    }
+  }
+}

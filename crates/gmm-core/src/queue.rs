@@ -2,7 +2,9 @@
 
 //! The install queue behind the Downloads page (docs/08, "Downloads"): installs run one at a
 //! time in the order they were confirmed, each with a state the page shows, and each can be
-//! paused, resumed or cancelled through its [`StopSignal`]. This is the bookkeeping only;
+//! paused, resumed or cancelled through its [`StopSignal`]. An install whose background
+//! check found something ([`crate::review`]) waits in [`JobState::NeedsAction`] until the
+//! user goes ahead ([`InstallQueue::proceed`]) or cancels. This is the bookkeeping only;
 //! the app runs the installs (one worker taking [`InstallQueue::next`]).
 
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -10,7 +12,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 
-use crate::install::{InstallOptions, InstalledFolder};
+use crate::install::{InstallOptions, InstalledFolder, VariantChoice};
+use crate::plan::Review;
 use crate::stop::StopSignal;
 
 pub type JobId = u64;
@@ -36,6 +39,11 @@ pub enum JobState {
         until: i64,
     },
     Paused,
+    /// The background check found something the user has to look at (versions to choose,
+    /// blocked files, an outdated file). Nothing is installed until they go ahead.
+    NeedsAction {
+        review: Review,
+    },
     Done {
         installed: Vec<InstalledFolder>,
     },
@@ -85,6 +93,12 @@ pub struct JobRequest {
     pub file_id: Option<u64>,
     pub options: InstallOptions,
     pub action: JobAction,
+    /// The user looked at the background check's findings and went ahead: install without
+    /// stopping again.
+    pub reviewed: bool,
+    /// Mods (library row ids) to switch off once this one is installed and on: the other
+    /// side of a conflict the user resolved in the install confirmation.
+    pub switch_off: Vec<i64>,
 }
 
 /// One row on the Downloads page.
@@ -103,6 +117,8 @@ pub struct Job {
     pub image: Option<String>,
     /// How many versions were chosen (0 when the archive holds one mod).
     pub versions: usize,
+    /// Switched on once installed ("Switch it on after installing").
+    pub switch_on: bool,
     pub state: JobState,
     /// Unix seconds.
     pub queued_at: i64,
@@ -169,10 +185,7 @@ impl InstallQueue {
         let mut inner = self.lock();
         inner.next_id += 1;
         let id = inner.next_id;
-        let versions = match &request.options.variants {
-            crate::install::VariantChoice::Named(names) => names.len(),
-            _ => 0,
-        };
+        let versions = version_count(&request.options.variants);
         inner.entries.push(Entry {
             job: Job {
                 id,
@@ -185,6 +198,7 @@ impl InstallQueue {
                 file_size: label.file_size,
                 image: label.image,
                 versions,
+                switch_on: !request.options.start_disabled,
                 state: JobState::Queued,
                 queued_at: now(),
                 finished_at: None,
@@ -240,6 +254,31 @@ impl InstallQueue {
     pub fn set_file_name(&self, id: JobId, name: &str) {
         if let Some(e) = self.lock().entries.iter_mut().find(|e| e.job.id == id) {
             e.job.file_name = Some(name.to_owned());
+        }
+    }
+
+    /// Stops a job after its background check: it waits for the user ([`Self::proceed`] or
+    /// [`Self::cancel`]).
+    pub fn hold(&self, id: JobId, review: Review) {
+        self.set_state(id, JobState::NeedsAction { review });
+    }
+
+    /// Goes ahead with a job that needs action, as reviewed: with `variants` when the user
+    /// chose versions, without blocked files. Returns false when it isn't waiting.
+    pub fn proceed(&self, id: JobId, variants: Option<VariantChoice>) -> bool {
+        let mut inner = self.lock();
+        match inner.entries.iter_mut().find(|e| e.job.id == id) {
+            Some(e) if matches!(e.job.state, JobState::NeedsAction { .. }) => {
+                if let Some(variants) = variants {
+                    e.job.versions = version_count(&variants);
+                    e.request.options.variants = variants;
+                }
+                e.request.options.skip_blocked = true;
+                e.request.reviewed = true;
+                e.job.state = JobState::Queued;
+                true
+            }
+            _ => false,
         }
     }
 
@@ -322,6 +361,13 @@ impl InstallQueue {
     }
 }
 
+fn version_count(variants: &VariantChoice) -> usize {
+    match variants {
+        VariantChoice::Named(names) => names.len(),
+        _ => 0,
+    }
+}
+
 fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -340,6 +386,8 @@ mod tests {
             file_id: None,
             options: InstallOptions::default(),
             action: JobAction::Install,
+            reviewed: false,
+            switch_off: Vec::new(),
         }
     }
 
@@ -415,5 +463,53 @@ mod tests {
         r.options.variants = crate::install::VariantChoice::Named(vec!["A".into(), "B".into()]);
         q.push(r, JobLabel::named("Pack"));
         assert_eq!(q.snapshot()[0].versions, 2);
+    }
+
+    #[test]
+    fn needs_action_waits_until_the_user_goes_ahead() {
+        let q = InstallQueue::new();
+        let a = q.push(request(1), JobLabel::named("Pack"));
+        let b = q.push(request(2), JobLabel::named("Other"));
+        let first = q.next().unwrap();
+        assert!(!first.request.reviewed);
+        q.hold(
+            a,
+            Review {
+                issues: vec![crate::plan::CheckIssue::ChooseVersions { count: 2 }],
+                versions: Vec::new(),
+                version_conflicts: Vec::new(),
+            },
+        );
+        // It isn't running or finished: the next install goes ahead, and it still counts.
+        assert_eq!(q.next().unwrap().id, b);
+        assert_eq!(q.active(), 2);
+        assert!(!q.pause(a), "nothing to pause while it waits");
+        assert!(
+            !q.proceed(b, None),
+            "only a job that needs action can go ahead"
+        );
+
+        q.set_state(b, JobState::Done { installed: vec![] });
+        assert!(q.proceed(a, Some(VariantChoice::Named(vec!["Red".into()]))));
+        assert_eq!(q.snapshot()[0].versions, 1);
+        let again = q.next().unwrap();
+        assert_eq!(again.id, a);
+        assert!(again.request.reviewed && again.request.options.skip_blocked);
+        assert_eq!(
+            again.request.options.variants,
+            VariantChoice::Named(vec!["Red".into()])
+        );
+
+        // Cancelling one that waits finishes it at once.
+        q.hold(
+            a,
+            Review {
+                issues: Vec::new(),
+                versions: Vec::new(),
+                version_conflicts: Vec::new(),
+            },
+        );
+        assert!(q.cancel(a));
+        assert_eq!(q.snapshot()[0].state, JobState::Cancelled);
     }
 }

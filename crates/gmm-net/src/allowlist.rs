@@ -17,8 +17,22 @@ const EXACT_HOSTS: &[&str] = &[
 /// Download mirrors are `filecache<digits>.gamebanana.com` (observed: `filecache42`).
 const NUMBERED_HOSTS: &[(&str, &str)] = &[("filecache", "gamebanana.com")];
 
+/// The one GitHub address GMM reads: its own releases list, for the app update check
+/// (security rule R2, amended 2026-10-26). Nothing else on GitHub, and nothing is downloaded.
+pub const GITHUB_RELEASES_HOST: &str = "api.github.com";
+pub const GITHUB_RELEASES_PATH: &str = "/repos/clorece/gacha-mod-manager/releases";
+
+/// What a client is for. Each kind of client reaches only its own hosts, so the GameBanana
+/// clients can't reach GitHub and the update check can't reach anything but the releases list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Scope {
+    GameBanana,
+    GitHubReleases,
+}
+
 #[derive(Debug, Clone)]
 pub struct Allowlist {
+    scope: Scope,
     /// Test builds only: allow plain HTTP to 127.0.0.1 (mock servers).
     loopback_http: bool,
     /// Refuse every URL ([`Allowlist::deny_all`]).
@@ -26,11 +40,30 @@ pub struct Allowlist {
 }
 
 impl Allowlist {
-    /// The only allowlist release builds can construct.
+    /// GameBanana's hosts: the allowlist of every catalogue, image and download client.
     pub fn production() -> Self {
         Self {
+            scope: Scope::GameBanana,
             loopback_http: false,
             deny_all: false,
+        }
+    }
+
+    /// GMM's own releases list on GitHub, and nothing else: the app update check's client.
+    pub fn github_releases() -> Self {
+        Self {
+            scope: Scope::GitHubReleases,
+            loopback_http: false,
+            deny_all: false,
+        }
+    }
+
+    /// The same rules for GMM's releases list. A deny-all list stays deny-all (the IPC fuzz
+    /// harness builds every client from one list).
+    pub fn for_github_releases(&self) -> Self {
+        Self {
+            scope: Scope::GitHubReleases,
+            ..self.clone()
         }
     }
 
@@ -39,6 +72,7 @@ impl Allowlist {
     /// so it is safe in any build.
     pub fn deny_all() -> Self {
         Self {
+            scope: Scope::GameBanana,
             loopback_http: false,
             deny_all: true,
         }
@@ -48,6 +82,7 @@ impl Allowlist {
     #[cfg(feature = "test-util")]
     pub fn with_loopback_for_tests() -> Self {
         Self {
+            scope: Scope::GameBanana,
             loopback_http: true,
             deny_all: false,
         }
@@ -76,11 +111,17 @@ impl Allowlist {
         };
         let host = host.to_ascii_lowercase();
         let host = host.strip_suffix('.').unwrap_or(&host);
-        if EXACT_HOSTS.contains(&host) || NUMBERED_HOSTS.iter().any(|r| matches_numbered(host, r)) {
-            Ok(())
-        } else {
-            Err(denied())
-        }
+        let allowed = match self.scope {
+            Scope::GameBanana => {
+                EXACT_HOSTS.contains(&host)
+                    || NUMBERED_HOSTS.iter().any(|r| matches_numbered(host, r))
+            }
+            // The exact path; a query (`per_page`) is fine.
+            Scope::GitHubReleases => {
+                host == GITHUB_RELEASES_HOST && url.path() == GITHUB_RELEASES_PATH
+            }
+        };
+        if allowed { Ok(()) } else { Err(denied()) }
     }
 }
 
@@ -147,6 +188,37 @@ mod tests {
         );
         assert!(!ok("file:///C:/Windows/win.ini"));
         assert!(!ok("ftp://gamebanana.com/x"));
+    }
+
+    #[test]
+    fn github_releases_reach_only_gmms_releases_list() {
+        let gh = |s: &str| {
+            Allowlist::github_releases()
+                .check(&Url::parse(s).unwrap())
+                .is_ok()
+        };
+        assert!(gh(
+            "https://api.github.com/repos/clorece/gacha-mod-manager/releases?per_page=20"
+        ));
+        assert!(!gh("https://api.github.com/repos/clorece/gacha-mod-manager/releases/1"));
+        assert!(!gh("https://api.github.com/repos/other/gacha-mod-manager/releases"));
+        assert!(!gh("https://github.com/clorece/gacha-mod-manager/releases"));
+        assert!(!gh("http://api.github.com/repos/clorece/gacha-mod-manager/releases"));
+        assert!(!gh("https://gamebanana.com/apiv11/Mod/1/ProfilePage"), "no GameBanana");
+        assert!(
+            !ok("https://api.github.com/repos/clorece/gacha-mod-manager/releases"),
+            "the GameBanana clients can't reach GitHub"
+        );
+        let denied = Allowlist::deny_all().for_github_releases();
+        assert!(
+            denied
+                .check(
+                    &Url::parse("https://api.github.com/repos/clorece/gacha-mod-manager/releases")
+                        .unwrap()
+                )
+                .is_err(),
+            "deny-all stays deny-all"
+        );
     }
 
     #[test]

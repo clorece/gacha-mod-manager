@@ -41,6 +41,8 @@
   --scrim-art: rgba(8, 12, 26, 0.66);
   --spring: cubic-bezier(0.34, 1.8, 0.64, 1);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --bar-h: 32px;
+  --side-w: 268px;
 }
 
 .t-dark {
@@ -665,11 +667,12 @@ dialog.modal[open] {
   animation: pop 0.2s var(--ease-out);
 }
 dialog.drawer[open] {
-  margin: 0 0 0 auto;
+  /* Below the title bar, so the caption buttons stay in view. */
+  margin: var(--bar-h) 0 0 auto;
   width: 480px;
   max-width: 100vw;
-  height: 100vh;
-  max-height: 100vh;
+  height: calc(100vh - var(--bar-h));
+  max-height: calc(100vh - var(--bar-h));
   display: flex;
   flex-direction: column;
   border-width: 0 0 0 1px;
@@ -754,6 +757,13 @@ dialog.drawer[open] {
   border: 1px solid var(--line);
   border-radius: 14px;
   overflow: hidden;
+}
+.about-update {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px 14px;
 }
 .kv-row {
   display: flex;
@@ -970,19 +980,91 @@ dialog.drawer[open] {
   color: #fff;
 }
 
-/* ---- Shell: sidebar and main area (08, "Navigation") ---- */
+/* ---- Shell: title bar, sidebar and main area (08, "Navigation") ---- */
 
-.app {
+.window {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   overflow: hidden;
 }
+/* The window has no system frame: this strip continues the sidebar and the page to the top
+   edge, with no title, and holds the caption buttons (Windows 11 sizes). */
+.titlebar {
+  position: relative;
+  z-index: 70;
+  flex: none;
+  display: flex;
+  height: var(--bar-h);
+  background: var(--ground);
+  user-select: none;
+}
+.titlebar.with-side {
+  background: linear-gradient(to right, var(--side) var(--side-w), var(--ground) var(--side-w));
+}
+/* The sidebar's edge runs up through the strip. */
+.titlebar.with-side::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--side-w) - 1px);
+  width: 1px;
+  background: var(--line);
+  pointer-events: none;
+}
+.titlebar-drag {
+  flex: 1;
+}
+.caption {
+  display: flex;
+}
+.cap {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: var(--bar-h);
+  border: 0;
+  background: transparent;
+  color: var(--text2);
+  transition: background 0.12s;
+}
+.cap svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+}
+.cap:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.cap:active {
+  background: var(--line);
+}
+.cap-close:hover,
+.cap-close:active {
+  background: #c42b1c;
+  color: #fff;
+}
+.cap:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.app {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
 .side {
-  flex: 0 0 268px;
+  flex: 0 0 var(--side-w);
   display: flex;
   flex-direction: column;
   gap: 6px;
-  height: 100vh;
+  height: 100%;
   overflow-y: auto;
   padding: 20px 16px;
   background: var(--side);
@@ -1074,19 +1156,37 @@ dialog.drawer[open] {
 .nav-item .badge {
   margin-left: auto;
 }
-.nav-count {
+/* The Downloads count (Sidebar's CountBubble): a disc in the theme's text colour, so it
+   stands out on either theme and on the selected item, with an inset ring and the number in
+   the theme's base colour. */
+.count-bubble {
+  position: relative;
+  flex: none;
   margin-left: auto;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 7px;
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
   border-radius: 999px;
-  background: var(--yellow);
-  color: var(--ink-on-yellow);
+  background: var(--text);
+  color: var(--side);
   font-size: 12px;
   font-weight: 900;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.count-bubble::before {
+  content: "";
+  position: absolute;
+  inset: 2.5px;
+  border: 2px solid var(--side);
+  border-radius: inherit;
+  pointer-events: none;
+}
+.count-bubble.is-wide {
+  padding: 0 8px;
+  font-size: 11px;
 }
 .side-foot {
   margin-top: auto;
@@ -1110,19 +1210,45 @@ dialog.drawer[open] {
   color: var(--text2);
   font-size: 13px;
 }
+/* A newer GMM on GitHub, in place of the version line. */
+.update-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink-on-yellow);
+  font-size: 12px;
+  font-weight: 900;
+}
+.update-pill:hover {
+  filter: brightness(1.06);
+}
 .theme-btn:hover {
   background: var(--hover);
 }
 .main {
   flex: 1;
   min-width: 0;
-  height: 100vh;
+  height: 100%;
   overflow-y: auto;
   /* The Store's virtualized grid places rows itself; scroll anchoring would fight it. */
   overflow-anchor: none;
   padding: 28px 36px 48px;
 }
 /* The GameBanana notice (NetworkNotice) sits above the page heading. */
+/* Each page fades in when the user switches to it (opacity only: nothing moves). */
+.page-in {
+  animation: page-in 0.18s var(--ease-out);
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+  }
+}
 .main > .notice:first-child {
   margin-bottom: 18px;
 }
@@ -1705,6 +1831,101 @@ dialog.drawer[open] {
   flex-direction: column;
   gap: 8px;
 }
+.cf-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 0;
+}
+/* Variants › Conflicts › Confirm */
+.cf-steps {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 800;
+}
+.cf-steps li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 999px;
+  background: var(--raised);
+}
+.cf-step-n {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--text2);
+  font-size: 11px;
+  font-weight: 900;
+}
+.cf-steps li.is-current {
+  background: var(--btn);
+  color: #fff;
+}
+.cf-steps li.is-current .cf-step-n {
+  background: #fff;
+  color: var(--btn);
+}
+.cf-steps li.is-done .cf-step-n {
+  background: var(--ok);
+  color: var(--on-ok);
+}
+.cf-clash {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cf-clash-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--raised);
+}
+.cf-clash-row b {
+  flex: 1;
+  font-weight: 800;
+}
+.cf-clash-thumb {
+  flex: none;
+  width: 52px;
+  height: 36px;
+  border-radius: 9px;
+  object-fit: cover;
+}
+.tag-off {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  color: var(--text2);
+  font-size: 11px;
+  font-weight: 900;
+}
+/* The review of an install that needs action (Downloads). */
+.rv-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  max-height: 120px;
+  overflow-y: auto;
+  color: var(--text2);
+  font-size: 12.5px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
 
 /* ---- Phase 6 panels: Mod settings extras, profiles, adopt ---- */
 
@@ -1826,6 +2047,13 @@ dialog.drawer[open] {
 .st-wait {
   color: var(--muted);
 }
+.st-warn {
+  color: var(--warn);
+}
+/* Waiting for the user: the row is a button-like target to open the review. */
+.dl.is-action {
+  border-color: color-mix(in srgb, var(--warn) 55%, var(--line));
+}
 /* Finished rows change their background; nothing with text is dimmed (08, contrast rules). */
 .dl.is-done {
   background: var(--raised);
@@ -1838,7 +2066,8 @@ dialog.drawer[open] {
 
 .su {
   position: relative;
-  min-height: 100vh;
+  flex: 1;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1999,10 +2228,6 @@ dialog.drawer[open] {
 .su-ic-wait {
   border: 2px solid var(--line);
 }
-.su-ic-skip {
-  border: 2px solid var(--line);
-  color: var(--muted);
-}
 .su-ic-run {
   border: 2.5px solid var(--line);
   border-top-color: var(--accent);
@@ -2028,6 +2253,26 @@ dialog.drawer[open] {
 .pref-row .sub {
   display: block;
   font-size: 12.5px;
+}
+/* A newer GMM on GitHub: what it is and the two ways on. */
+.su-update {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line));
+  background: color-mix(in srgb, var(--warn) 8%, var(--card));
+}
+.su-update p {
+  margin: 0;
+  color: var(--text2);
+  font-size: 13px;
+}
+.su-update-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 .su-foot {
   display: flex;
@@ -2141,7 +2386,13 @@ dialog.drawer[open] {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: filter 0.2s;
+  opacity: 0;
+  transition:
+    opacity 0.25s var(--ease-out),
+    filter 0.2s;
+}
+.preview-img.is-loaded {
+  opacity: 1;
 }
 .slide-main .preview-img {
   object-fit: contain;
@@ -2455,13 +2706,27 @@ dialog.drawer[open] {
   width: 30px;
   height: 10px;
   border-radius: 6px;
-  background: linear-gradient(90deg, var(--line), var(--hover), var(--line));
-  background-size: 200% 100%;
+}
+/* Loading placeholders: a highlight slides across on the compositor (a transform), so a
+   screen full of them doesn't repaint every frame. */
+.shimmer,
+.skel-line {
+  position: relative;
+  overflow: hidden;
+  background: var(--line);
+}
+.shimmer::after,
+.skel-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--hover), transparent);
+  transform: translateX(-100%);
   animation: shimmer 1.2s linear infinite;
 }
 @keyframes shimmer {
   to {
-    background-position: -200% 0;
+    transform: translateX(100%);
   }
 }
 .dl-btn {
@@ -2505,9 +2770,6 @@ dialog.drawer[open] {
   height: 12px;
   width: 80%;
   border-radius: 6px;
-  background: linear-gradient(90deg, var(--line), var(--hover), var(--line));
-  background-size: 200% 100%;
-  animation: shimmer 1.2s linear infinite;
 }
 .skel-line.short {
   width: 45%;
@@ -3027,8 +3289,12 @@ dialog.drawer[open] {
 
 /* ---- Library, third checkpoint (08, "Mods Library") ---- */
 
+/* Cards far off screen are skipped (not laid out or painted) until they scroll near, so a
+   long library stays quick to scroll and to switch on and off. */
 .lib-card {
   position: relative;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 330px;
 }
 .lib-card.is-selected {
   outline: 3px solid var(--accent);

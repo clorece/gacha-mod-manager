@@ -1,0 +1,121 @@
+name: Release
+
+# Builds the Windows installer (MSI) when a version tag is pushed (`v0.1.0-beta`), and as a
+# dry run from the Actions tab. Docs: docs/05-roadmap.md, Phase 7.
+#
+# Signing switches on once the repository variable SIGNPATH_ORGANIZATION_ID and the secret
+# SIGNPATH_API_TOKEN exist (SignPath Foundation's free open-source signing): the programs
+# (gmm-desktop.exe, gmm-extract.exe) are signed before they're packaged, then the MSI. Until
+# then the installer is unsigned and Smart App Control blocks it.
+#
+# A tag push makes a draft GitHub release with the MSI and its SHA-256; publishing it stays a
+# person's decision.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  msi:
+    name: Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable
+      - name: Versions agree (Cargo, package.json, installer, tag)
+        id: version
+        run: |
+          tag=""
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then tag="${GITHUB_REF_NAME}"; fi
+          echo "version=$(node scripts/check-release-version.mjs $tag)" >> "$GITHUB_OUTPUT"
+      - uses: Swatinem/rust-cache@v2
+      - run: pnpm install --frozen-lockfile
+        working-directory: apps/desktop
+      # Builds the RAR helper, the frontend and gmm-desktop.exe (no installer yet).
+      - run: pnpm tauri build --no-bundle
+        working-directory: apps/desktop
+
+      - name: Collect the programs to sign
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        run: mkdir -p unsigned && cp target/release/gmm-desktop.exe target/release/gmm-extract.exe unsigned/
+      - id: unsigned-exes
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-exes
+          path: unsigned/
+      - name: Sign the programs
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: gacha-mod-manager
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: exes
+          github-artifact-id: ${{ steps.unsigned-exes.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+      - name: Use the signed programs
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        run: cp signed/gmm-desktop.exe signed/gmm-extract.exe target/release/
+
+      # The installer settings (helper, licenses, WiX) live in tauri.release.conf.json so
+      # ordinary builds and tests don't need the release helper.
+      - run: pnpm tauri bundle --bundles msi --config src-tauri/tauri.release.conf.json
+        working-directory: apps/desktop
+      - name: Name the installer
+        run: |
+          mkdir -p out
+          cp target/release/bundle/msi/*.msi "out/GMM-${{ steps.version.outputs.version }}-x64.msi"
+
+      - id: unsigned-msi
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-msi
+          path: out/*.msi
+      - name: Sign the installer
+        if: vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: gacha-mod-manager
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: msi
+          github-artifact-id: ${{ steps.unsigned-msi.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: out
+
+      - name: Checksums
+        run: cd out && sha256sum *.msi > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: out/
+
+      - name: Draft release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          notes="docs/releases/v${version}.md"
+          [ -f "$notes" ] || notes=/dev/null
+          pre=""; case "$version" in *-*) pre="--prerelease";; esac
+          gh release create "${GITHUB_REF_NAME}" out/* --draft $pre \
+            --title "Gacha Mod Manager ${version/-/ }" --notes-file "$notes"

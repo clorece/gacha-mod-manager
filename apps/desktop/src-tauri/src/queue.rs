@@ -10,8 +10,8 @@ use std::time::{Duration, Instant};
 
 use gmm_catalog::{CatalogSource, ModFile, ModProfile};
 use gmm_core::{
-    CoreError, DeleteForever, FetchEvent, InstallEvent, InstallOptions, InstallRequest, Job,
-    JobAction, JobId, JobLabel, JobRequest, JobState, NextJob, StopReason, StopSignal,
+    CoreError, DeleteForever, FetchEvent, InstallEvent, InstallOptions, Job, JobAction, JobId,
+    JobLabel, JobRequest, JobState, NextJob, Review, StopReason, StopSignal,
 };
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State};
@@ -19,7 +19,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::AppState;
 use crate::commands::{game_by_id, mods_target};
 use crate::error::CmdResult;
-use crate::views::{InstallArgs, ProgressThrottle, rewrite_summary};
+use crate::views::{InstallArgs, ProgressThrottle, VariantPick, rewrite_summary};
 
 /// Who gets the list when it changes.
 #[derive(Default)]
@@ -66,6 +66,13 @@ pub fn spawn_worker(app: AppHandle) {
 /// How many times one install waits out a GameBanana slow-down before it fails.
 const SLOW_DOWN_RETRIES: u32 = 4;
 
+/// How a job ended up after the worker ran it.
+enum Outcome {
+    Installed(Vec<gmm_core::InstalledFolder>),
+    /// The background check found something; the job waits for the user.
+    Held(Review),
+}
+
 async fn run(state: &AppState, job: NextJob) {
     let mut waited = 0;
     let outcome = loop {
@@ -84,7 +91,11 @@ async fn run(state: &AppState, job: NextJob) {
         }
     };
     let final_state = match outcome {
-        Ok(installed) => JobState::Done { installed },
+        Ok(Outcome::Held(review)) => {
+            state.queue.hold(job.id, review);
+            return;
+        }
+        Ok(Outcome::Installed(installed)) => JobState::Done { installed },
         Err(CoreError::Stopped(StopReason::Paused)) => JobState::Paused,
         Err(CoreError::Stopped(StopReason::Cancelled)) => JobState::Cancelled,
         Err(e) => {
@@ -152,14 +163,12 @@ fn track(state: &AppState, id: JobId) -> impl FnMut(InstallEvent) + '_ {
     }
 }
 
-async fn install(
-    state: &AppState,
-    job: &NextJob,
-) -> Result<Vec<gmm_core::InstalledFolder>, CoreError> {
+async fn install(state: &AppState, job: &NextJob) -> Result<Outcome, CoreError> {
     let game = game_by_id(&job.request.game).map_err(|e| CoreError::Io(e.message().to_owned()))?;
     let target = mods_target(state, game)
         .await
         .map_err(|e| CoreError::Io(e.message().to_owned()))?;
+    let mut on_event = track(state, job.id);
     if job.request.action == JobAction::ChangeFile {
         let report = gmm_core::change_file(
             &state.gb,
@@ -172,56 +181,84 @@ async fn install(
             job.request.file_id,
             &DeleteForever,
             &job.stop,
-            track(state, job.id),
+            on_event,
         )
         .await?;
-        return Ok(report
-            .changed
-            .into_iter()
-            .map(|f| gmm_core::InstalledFolder {
-                id: f.id,
-                folder_name: f.folder_name,
-                variant: None,
-                files: f.files,
-                bytes: f.bytes,
-                skipped: f.skipped,
-                warnings: Vec::new(),
-            })
-            .collect());
+        return Ok(Outcome::Installed(
+            report
+                .changed
+                .into_iter()
+                .map(|f| gmm_core::InstalledFolder {
+                    id: f.id,
+                    folder_name: f.folder_name,
+                    variant: None,
+                    files: f.files,
+                    bytes: f.bytes,
+                    skipped: f.skipped,
+                    warnings: Vec::new(),
+                })
+                .collect(),
+        ));
     }
-    let request = InstallRequest {
-        mod_id: job.request.mod_id,
-        file_id: job.request.file_id,
-        options: job.request.options.clone(),
-    };
-    let report = gmm_core::install(
+
+    // Download (or the cached copy), extract and scan: the background check.
+    let prepared = gmm_core::prepare(
         &state.gb,
         &state.net,
         &state.db,
         &target.ws,
-        target.mods,
         game,
-        &request,
+        job.request.mod_id,
+        job.request.file_id,
         &job.stop,
-        track(state, job.id),
+        &mut on_event,
     )
     .await?;
-    // Versions that replace the same things can't all be on: the first one picked stays on
-    // and the ones clashing with it are switched off (docs/08, "Install confirmation").
-    if !job.request.options.start_disabled && report.installed.len() > 1 {
-        gmm_core::switch_version(
+    let options = &job.request.options;
+    let result = async {
+        job.stop.check()?;
+        if !job.request.reviewed
+            && let Some(review) = gmm_core::review(&state.db, game, &prepared, options).await?
+        {
+            return Ok(Outcome::Held(review));
+        }
+        let report = gmm_core::install_prepared(
             &state.db,
             &target.ws,
             target.mods,
             game,
-            report.installed[0].id,
+            &prepared,
+            options,
+            &mut on_event,
         )
         .await?;
+        if !options.start_disabled {
+            // Every picked version stays on unless it replaces the same things as one that
+            // is on (docs/08, "Install confirmation").
+            let ids: Vec<i64> = report.installed.iter().map(|f| f.id).collect();
+            if ids.len() > 1 {
+                gmm_core::settle_versions(&state.db, &target.ws, target.mods, game, &ids).await?;
+            }
+            // The other side of a conflict the user resolved in the confirmation. A mod that
+            // was removed meanwhile is skipped.
+            for &id in &job.request.switch_off {
+                if let Err(e) =
+                    gmm_core::set_enabled(&state.db, &target.ws, target.mods, game, id, false).await
+                {
+                    crate::error::record("install", &format!("switching off mod {id}: {e}"));
+                }
+            }
+        }
+        Ok(Outcome::Installed(report.installed))
     }
-    Ok(report.installed)
+    .await;
+    prepared.discard(&target.ws);
+    result
 }
 
 /// Adds a confirmed install to the queue (after the install confirmation). Returns its id.
+/// The download, the check and the install run in the background; the row on the Downloads
+/// page shows where it is, and stops at "Needs action" if the check finds something.
 #[tauri::command]
 pub async fn queue_install(state: State<'_, AppState>, args: InstallArgs) -> CmdResult<JobId> {
     let profile = state.gb.mod_profile(args.mod_id).await?;
@@ -237,6 +274,20 @@ pub async fn queue_install(state: State<'_, AppState>, args: InstallArgs) -> Cmd
             .find(|f| f.id == id),
         None => profile.files.default_choice(),
     };
+    // Only mods of this game that GMM installed can be switched off by the install.
+    let mut switch_off = Vec::with_capacity(args.switch_off.len());
+    for id in args.switch_off {
+        match state.db.installed_mod(id).await? {
+            Some(m) if m.game_id == game.id() => switch_off.push(id),
+            _ => {
+                return Err(CoreError::NoSuchMod {
+                    id,
+                    game: game.game.name.clone(),
+                }
+                .into());
+            }
+        }
+    }
     let label = job_label(&state, &profile, file);
     let id = state.queue.push(
         JobRequest {
@@ -249,12 +300,28 @@ pub async fn queue_install(state: State<'_, AppState>, args: InstallArgs) -> Cmd
                 start_disabled: args.start_disabled,
             },
             action: JobAction::Install,
+            reviewed: false,
+            switch_off,
         },
         label,
     );
     state.wake.notify_one();
     broadcast(&state);
     Ok(id)
+}
+
+/// Goes ahead with an install that needs action, after the user looked at the check's
+/// findings: with the versions they chose (when the archive holds several), without the
+/// blocked files. False when that install isn't waiting (or no version was chosen).
+#[tauri::command]
+pub fn queue_proceed(state: State<'_, AppState>, id: JobId, variants: Option<VariantPick>) -> bool {
+    if matches!(&variants, Some(VariantPick::Named { names }) if names.is_empty()) {
+        return false;
+    }
+    let done = state.queue.proceed(id, variants.map(Into::into));
+    state.wake.notify_one();
+    broadcast(&state);
+    done
 }
 
 fn job_label(state: &AppState, profile: &ModProfile, file: Option<&ModFile>) -> JobLabel {
@@ -298,6 +365,8 @@ pub async fn queue_change_file(
             file_id,
             options: InstallOptions::default(),
             action: JobAction::ChangeFile,
+            reviewed: false,
+            switch_off: Vec::new(),
         },
         label,
     );

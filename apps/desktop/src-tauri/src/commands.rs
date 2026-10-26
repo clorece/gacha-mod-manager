@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use gmm_adapters::{GameManifest, Registry};
 use gmm_catalog::{CatalogSource, Category, ModProfile, ModUpdate, Page, SearchQuery};
 use gmm_core::{
-    Browse, ClearedCache, ConflictReport, DeleteForever, FeaturedMod, InstallOptions, InstallPlan,
+    Browse, ClearedCache, ConflictReport, DeleteForever, FeaturedMod, InstallOptions,
     InstallRequest, MAX_BROWSE_STREAMS, Machine, ModsTarget, SetupHints, StopSignal, ToggleOutcome,
     cache_storage, clear_downloads, confirm_exe, conflicts_after_install, conflicts_for,
     conflicts_for_unmanaged, game_storage, library as core_library, listed_unmanaged,
@@ -232,41 +232,6 @@ pub async fn catalog_categories(
     };
     rewrite_categories(&state.images, &mut categories);
     Ok(categories)
-}
-
-/// Step one of the install confirmation: fetches the file into the download cache (or finds
-/// it there), looks inside and returns what the dialog shows: the versions, their blocked
-/// files, which are already installed, which clash, where it installs. Nothing is installed;
-/// the confirmed choice goes to `queue_install`, which reuses the cached archive.
-#[tauri::command]
-pub async fn prepare_install(
-    state: State<'_, AppState>,
-    mod_id: u64,
-    file_id: Option<u64>,
-    on_progress: Channel<InstallProgress>,
-) -> CmdResult<InstallPlan> {
-    let game = gmm_core::game_for_mod(&state.gb.mod_profile(mod_id).await?)?;
-    let target = mods_target(&state, game).await?;
-    let mut throttle = ProgressThrottle::default();
-    let prepared = gmm_core::prepare(
-        &state.gb,
-        &state.net,
-        &state.db,
-        &target.ws,
-        game,
-        mod_id,
-        file_id,
-        &StopSignal::new(),
-        |event| {
-            if throttle.pass(&event) {
-                drop(on_progress.send(event.into()));
-            }
-        },
-    )
-    .await?;
-    let plan = gmm_core::install_plan(&state.db, game, &prepared).await;
-    prepared.discard(&target.ws);
-    Ok(plan?)
 }
 
 /// The earlier files of an installed mod that are still in the download cache, newest first:

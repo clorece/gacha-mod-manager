@@ -7,10 +7,11 @@ use gmm_fsguard::{Guard, ScopedPath};
 use md5::Md5;
 use reqwest::header::{CONTENT_RANGE, RANGE};
 use sha2::{Digest, Sha256};
+use tokio::time::sleep;
 use url::Url;
 
 use crate::allowlist::redact;
-use crate::client::{Client, request_error};
+use crate::client::{Client, backoff, is_transient, request_error};
 use crate::error::NetError;
 
 #[derive(Debug, Clone)]
@@ -67,13 +68,42 @@ impl Client {
     /// `on_progress` is called before the first byte and after every chunk; returning
     /// `ControlFlow::Break(())` pauses: the partial file is kept, and calling `download` again
     /// with the same request resumes it with an HTTP range request. Network errors keep the
-    /// partial file too. Size or checksum failures delete it.
+    /// partial file too, and a dropped connection (reset or closed mid-download) is resumed
+    /// by itself, up to the client's retry count. Size or checksum failures delete it.
     pub async fn download(
         &self,
         guard: &Guard,
         req: &DownloadRequest,
         mut on_progress: impl FnMut(Progress) -> ControlFlow<()>,
     ) -> Result<DownloadOutcome, NetError> {
+        let mut attempt = 0;
+        loop {
+            let mut dropped = false;
+            match self
+                .download_once(guard, req, &mut on_progress, &mut dropped)
+                .await
+            {
+                Err(_) if dropped && attempt < self.config.max_retries => {
+                    sleep(backoff(attempt).min(self.config.max_backoff)).await;
+                    attempt += 1;
+                }
+                other => return other,
+            }
+        }
+    }
+
+    /// One try; sets `dropped` when it failed because the connection went away.
+    async fn download_once(
+        &self,
+        guard: &Guard,
+        req: &DownloadRequest,
+        on_progress: &mut impl FnMut(Progress) -> ControlFlow<()>,
+        dropped: &mut bool,
+    ) -> Result<DownloadOutcome, NetError> {
+        let mut lost = |e: reqwest::Error| {
+            *dropped = is_transient(&e);
+            request_error(&req.url, e)
+        };
         self.config.allowlist.check(&req.url)?;
         if guard.exists(&req.dest)? {
             return Err(NetError::DestinationExists);
@@ -100,10 +130,7 @@ impl Client {
         if have > 0 {
             request = request.header(RANGE, format!("bytes={have}-"));
         }
-        let mut resp = request
-            .send()
-            .await
-            .map_err(|e| request_error(&req.url, e))?;
+        let mut resp = request.send().await.map_err(&mut lost)?;
         let status = resp.status().as_u16();
         if let Some(slow_down) = self.slowdown(status, resp.headers()) {
             // The partial file stays; the next attempt resumes it.
@@ -153,7 +180,7 @@ impl Client {
         {
             return Err(NetError::Paused);
         }
-        while let Some(chunk) = resp.chunk().await.map_err(|e| request_error(&req.url, e))? {
+        while let Some(chunk) = resp.chunk().await.map_err(&mut lost)? {
             have += chunk.len() as u64;
             if have > limit {
                 drop(file);

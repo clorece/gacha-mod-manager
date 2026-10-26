@@ -1,71 +1,84 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// The install confirmation's version picker ("Add versions" when some are installed): the
-// installed versions are locked, a pick goes to the queue by name, blocked files are listed,
-// and the file choice reloads the plan.
+// The install confirmation: it never downloads; it asks for the variants (GameBanana's files,
+// several at once), then about mods on for the same character, then confirms, and queues one
+// install per file picked.
 
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { calls } from "../test/fakeBridge";
+import * as fx from "../test/fixtures";
 import { renderApp } from "../test/render";
 import { InstallDialog } from "./InstallDialog";
 
-const gameName = (id: string) => (id === "zzz" ? "Zenless Zone Zero" : id);
+function primary(dialog: HTMLElement): HTMLElement {
+  const button = within(dialog)
+    .getAllByRole("button")
+    .find((b) => b.className.includes("btn-primary"));
+  if (!button) throw new Error("no primary button");
+  return button;
+}
+
+const queued = () => calls.filter((c) => c.cmd === "queue_install").map((c) => c.args?.args);
 
 describe("InstallDialog", () => {
-  it("locks installed versions and queues only the new pick", async () => {
+  it("asks for variants first and queues every one picked, switched on", async () => {
     const onQueued = vi.fn();
     renderApp(
-      <InstallDialog
-        modId={553203}
-        initialFileId={1314110}
-        gameName={gameName}
-        onClose={() => {}}
-        onQueued={onQueued}
-      />,
+      <InstallDialog modId={553203} games={fx.games} libraries={fx.libraries} onClose={() => {}} onQueued={onQueued} />,
     );
     const dialog = await screen.findByRole("dialog");
-    await within(dialog).findByText("Choose versions");
+    await within(dialog).findByText("Choose variants");
+    // Some of the newest file's versions are installed already.
     expect(within(dialog).getByText("Add versions")).toBeTruthy();
-    expect(within(dialog).getByText("0 of 2 selected")).toBeTruthy();
-    expect(within(dialog).getAllByText("Installed")).toHaveLength(3);
-
-    const blue = within(dialog).getByRole("checkbox", { name: /Blue Blade/ });
-    expect((blue as HTMLInputElement).disabled).toBe(true);
-
-    fireEvent.click(within(dialog).getByRole("checkbox", { name: /Void Blade/ }));
+    expect(within(dialog).getByText("Some installed")).toBeTruthy();
     expect(within(dialog).getByText("1 of 2 selected")).toBeTruthy();
-    expect(within(dialog).getByText("On after install")).toBeTruthy();
 
-    const install = within(dialog)
-      .getAllByRole("button")
-      .find((b) => b.className.includes("btn-primary"));
-    if (!install) throw new Error("no primary button");
-    fireEvent.click(install);
-    await waitFor(() => expect(onQueued).toHaveBeenCalled());
-    const queued = calls.find((c) => c.cmd === "queue_install");
-    expect(queued?.args?.args).toMatchObject({
-      mod_id: 553203,
-      file_id: 1314110,
-      variants: { type: "named", names: ["Void Blade"] },
-    });
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: /sample_swords_lite\.7z/ }));
+    expect(within(dialog).getAllByText("On after install")).toHaveLength(2);
+
+    fireEvent.click(primary(dialog));
+    await within(dialog).findByText("Switch it on after installing");
+    fireEvent.click(primary(dialog));
+    await waitFor(() => expect(onQueued).toHaveBeenCalledWith(2, "Sample Sword Pack"));
+    expect(queued()).toEqual([
+      expect.objectContaining({ file_id: 1314110, start_disabled: false, variants: { type: "only" } }),
+      expect.objectContaining({ file_id: 1314111, start_disabled: false }),
+    ]);
+    expect(calls.some((c) => c.cmd.startsWith("prepare"))).toBe(false);
   });
 
-  it("lists files that won't be installed once a version with them is picked", async () => {
-    renderApp(<InstallDialog modId={553203} gameName={gameName} onClose={() => {}} onQueued={() => {}} />);
-    const dialog = await screen.findByRole("dialog");
-    await within(dialog).findByText("Choose versions");
-    fireEvent.click(within(dialog).getByRole("checkbox", { name: /Spirit Blade/ }));
-    expect(within(dialog).getByText("1 file won't be installed.")).toBeTruthy();
-    expect(within(dialog).getByText(/tools\/setup\.exe/)).toBeTruthy();
-  });
-
-  it("offers GameBanana's other files and looks inside the one picked", async () => {
-    renderApp(<InstallDialog modId={553203} gameName={gameName} onClose={() => {}} onQueued={() => {}} />);
-    const dialog = await screen.findByRole("dialog");
-    await within(dialog).findByText("Choose a file");
-    fireEvent.click(within(dialog).getByRole("radio", { name: /sample_swords_lite\.7z/ }));
-    await waitFor(() =>
-      expect(calls.some((c) => c.cmd === "prepare_install" && c.args?.fileId === 1314111)).toBe(true),
+  it("resolves a conflict with a mod on for the same character", async () => {
+    renderApp(
+      <InstallDialog modId={700101} games={fx.games} libraries={fx.libraries} onClose={() => {}} onQueued={() => {}} />,
     );
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByText("Resolve a conflict");
+    expect(within(dialog).getByText("Casual Outfit")).toBeTruthy();
+
+    // Switch the one that's on off once this one is installed.
+    fireEvent.click(primary(dialog));
+    await within(dialog).findByText("Switches off Casual Outfit");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Back" }));
+
+    // Or keep it, and install this one switched off.
+    fireEvent.click(within(dialog).getByRole("radio", { name: /Keep what's on/ }));
+    fireEvent.click(primary(dialog));
+    await within(dialog).findByText("Installs switched off");
+    fireEvent.click(primary(dialog));
+    await waitFor(() => expect(queued()).toHaveLength(1));
+    expect(queued()[0]).toMatchObject({ mod_id: 700101, file_id: 1500101, start_disabled: true, switch_off: [] });
+  });
+
+  it("switches off the other side when the new mod wins", async () => {
+    renderApp(
+      <InstallDialog modId={700101} games={fx.games} libraries={fx.libraries} onClose={() => {}} onQueued={() => {}} />,
+    );
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByText("Resolve a conflict");
+    fireEvent.click(primary(dialog));
+    await within(dialog).findByText("Switches off Casual Outfit");
+    fireEvent.click(primary(dialog));
+    await waitFor(() => expect(queued()).toHaveLength(1));
+    expect(queued()[0]).toMatchObject({ start_disabled: false, switch_off: [1] });
   });
 });
