@@ -226,6 +226,7 @@ const click = (role, name) => async (page) => {
 /** Each state: a name and the steps from a freshly opened app. */
 const STATES = [
   ["Dashboard", []],
+  ["Dashboard, game open", [click("button", /^Zenless Zone Zero: show/)]],
   ["Setup guide", [click("button", "Open setup guide")]],
   ["Downloads", [nav(/^Downloads/)]],
   ["Settings", [nav("Settings")]],

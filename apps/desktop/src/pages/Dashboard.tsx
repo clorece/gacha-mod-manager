@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
-// Dashboard (docs/08): a bubble per game that enlarges to reveal Launch, then recently
-// installed mods and each game's setup. A game that isn't Ready gets its setup card here
-// instead of a Launch button.
+// Dashboard (docs/08): a bubble per game that enlarges to reveal Launch and the game's
+// profiles (Phase 6), then recently installed mods and each game's setup. A game that isn't
+// Ready gets its setup card here instead of a Launch button.
 
-import { useState } from "react";
-import type { GameInfo, GameStatus } from "../api";
+import { useEffect, useId, useState } from "react";
+import { api, asCmdError, type GameInfo, type GameStatus, type ProfileInfo } from "../api";
 import { useLaunch } from "../components/Launch";
 import { Preview } from "../components/Preview";
 import { SetupCard } from "../components/SetupCard";
 import { type AppData, modCounts } from "../data";
 import { ago, bytes, day, plural } from "../format";
 import { bannerClass, launchRoute, setupLabel, sourceLabel } from "../games";
-import { Button, Chip, Icon, Notice } from "../ui";
+import { Button, Chip, Icon, Notice, useToast } from "../ui";
 
 /** Placeholder art for a mod without a preview (Downloads rows): one of six stripes, by id. */
 export function artClass(id: number): string {
@@ -65,6 +65,7 @@ export function Dashboard({ data }: { data: AppData }) {
                 counts={modCounts(libraries[g.id])}
                 open={open === g.id}
                 onToggle={() => setOpen((o) => (o === g.id ? null : g.id))}
+                onApplied={() => data.refreshLibrary(g.id)}
               />
             )
           );
@@ -151,12 +152,14 @@ function GameBubble({
   counts,
   open,
   onToggle,
+  onApplied,
 }: {
   game: GameInfo;
   status: GameStatus;
   counts: { total: number; on: number };
   open: boolean;
   onToggle: () => void;
+  onApplied: () => Promise<void>;
 }) {
   const { launch, busy, dialog } = useLaunch(game);
   const state = setupLabel(status.state);
@@ -199,6 +202,7 @@ function GameBubble({
                 <small>
                   {counts.on} of {plural(counts.total, "mod")} on · {launchRoute(status)}
                 </small>
+                <ProfilePicker game={game} onApplied={onApplied} />
               </>
             ) : (
               <small>{status.summary} The steps are below.</small>
@@ -207,6 +211,69 @@ function GameBubble({
         )}
       </div>
       {dialog}
+    </div>
+  );
+}
+
+/** The game's profiles in the open bubble: pick one and apply it before launching. Saving,
+ * sharing and the rest stay in the Library's Profiles panel. */
+function ProfilePicker({ game, onApplied }: { game: GameInfo; onApplied: () => Promise<void> }) {
+  const toast = useToast();
+  const id = useId();
+  const [list, setList] = useState<ProfileInfo[] | null>(null);
+  const [pick, setPick] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    api
+      .profiles(game.id)
+      .then((l) => live && setList(l))
+      .catch(() => live && setList([]));
+    return () => {
+      live = false;
+    };
+  }, [game.id]);
+
+  if (list === null) return null;
+  if (list.length === 0) {
+    return <small className="bubble-profiles-none">No profiles yet · save one in the Mods Library</small>;
+  }
+
+  const apply = async () => {
+    const p = list.find((x) => String(x.id) === pick);
+    if (!p) return;
+    setBusy(true);
+    try {
+      const done = await api.profileApply(game.id, p.id);
+      const gone =
+        done.missing.length > 0 ? ` ${plural(done.missing.length, "mod")} not in the Mods folder any more.` : "";
+      toast(
+        done.missing.length > 0 ? "warn" : "ok",
+        `“${p.name}” applied: ${done.switched_on.length} switched on, ${done.switched_off.length} switched off.${gone}`,
+      );
+      await onApplied();
+    } catch (e) {
+      toast("bad", asCmdError(e).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="bubble-profiles">
+      <label htmlFor={id}>Profile</label>
+      <select id={id} className="bubble-select" value={pick} onChange={(e) => setPick(e.target.value)}>
+        <option value="">Keep the mods as they are</option>
+        {list.map((p) => (
+          <option key={p.id} value={String(p.id)}>
+            {p.name} ({plural(p.mods, "mod")} on)
+          </option>
+        ))}
+      </select>
+      <Button size="sm" disabled={busy || pick === ""} onClick={apply}>
+        Apply
+      </Button>
     </div>
   );
 }

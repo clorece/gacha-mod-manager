@@ -11,8 +11,10 @@ Development happens on Windows (primary target). Linux follows later from the sa
 
 **Done:** the backend (Phases 0–2), the app foundations (Phase 3) and the design (Phase 4),
 2026-10-23 to 25. Phase 5 (screens) is built and tested (2026-10-25); only its exit check,
-which needs a person at the real setup, is left. Phase 6 (power features) started alongside
-it on 2026-10-25; Report a Bug landed 2026-10-26 (below).
+which needs a person at the real setup, is left. Phase 6 (power features) is done
+(2026-10-25 to 26, below); 1-click install links moved to "Later" in the roadmap, since
+they need GameBanana to add GMM. A standalone dev build exists for hands-on testing
+(`target\release\gmm-desktop.exe`, built 2026-10-26).
 Every feature works from the `gmm` command line: browse GameBanana, install (download, safe
 extraction, policy scan, variants), switch mods on and off (keeping their saved in-game
 toggles), uninstall for good, conflicts, storage, launch through XXMI. The Phase 2 exit check
@@ -46,10 +48,10 @@ design canvas is in the code: tokens for both themes, bundled Nunito, hand-built
 | `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, a command per CLI action plus the install confirmation, queue, versions, startup check, featured mods, card stats and the confirmed openers (ids only), Report a Bug (error log, pre-filled issue; errors, panics and webview errors recorded), the queue worker, the `gmmimg` protocol, the description address rewrite, navigation guard; the React UI is in `apps/desktop/src` |
 | `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm install-file`, `gmm list`, `gmm enable/disable/uninstall`, `gmm update`, `gmm rollback`, `gmm keys`, `gmm adopt`, `gmm profile …`, `gmm conflicts`, `gmm storage` (`--clear-downloads`, `--clear-images`), `gmm launch`, `gmm detect`, `gmm status`, `gmm config`, `gmm log` (`--clear`), `gmm report-bug` |
 
-On the dev machine, WuWa is `Ready` (Steam install; its Steam copy runs with XXMI's Game
-Launch on Direct). ZZZ (HoYoPlay install) was `Ready` until XXMI's "Game Folder" for it
-changed to `D:\HoYoverse\ZenlessZoneZero Game` while the game is at `C:\HoYoverse\...`
-(seen 2026-10-25 evening); GMM reports it as "game folder in XXMI is wrong" with the fix.
+On the dev machine, both games are `Ready` (2026-10-26): WuWa (Steam install; its Steam
+copy runs with XXMI's Game Launch on Direct) and ZZZ (HoYoPlay install). ZZZ's XXMI "Game
+Folder" had pointed at a missing `D:\HoYoverse\...`; GMM reported "game folder in XXMI is
+wrong" with the fix, and following its steps made it `Ready` again.
 
 **Design** (Phase 4): the canvas (23 artboards, every screen dark and light, signed off
 2026-10-25) is written up in [08-design-system.md](08-design-system.md); file formats and the
@@ -57,11 +59,12 @@ RAR plan in [09-archive-formats.md](09-archive-formats.md).
 
 **Waiting on you:** a look at the third review checkpoint in the app (the Library, Mod
 settings, Settings with Storage, Documentation) and an edit of the six player guides in
-[guides/](guides/); ZZZ's "Game Folder" in XXMI (above); the Phase 5 exit check by hand
+[guides/](guides/); the Phase 5 exit check by hand
 (switching mods and versions from the app, a real install from the Store seen in game, a
 real file drop and the "Install from a file" dialog, the browser openers' native
-confirmations, including "Open on GitHub…" on Report a Bug; listed in the roadmap). A look
-at the Report a Bug page and the issue it opens (2026-10-26). Decided 2026-10-25: the banners are official key art (bundled
+confirmations, including "Open on GitHub…" on Report a Bug; listed in the roadmap), and
+Phase 6's features by hand (profiles from the Library and the Dashboard, update and roll
+back, adopt, Report a Bug), all with the dev build (`target\release\gmm-desktop.exe`). Decided 2026-10-25: the banners are official key art (bundled
 with a notice), GMM keeps saved in-game toggles across every switch (R3 amended), deletes are
 permanent (R8 amended), the name stays "Gacha Mod Manager", the setup guide is text only, and
 the rest of Phase 5 follows the decisions listed in the roadmap.
@@ -102,7 +105,7 @@ install queue waits and carries on. Background reads share the API budget, ident
 requests are merged, and the startup update check accepts answers up to 6 h old.
 Description images from GameBanana's own file hosts are shown now.
 
-**Phase 6** (started 2026-10-25): update and roll back (folder names and on/off states
+**Phase 6** (done 2026-10-26): update and roll back (folder names and on/off states
 kept, previous files from the cache), profiles with share codes, key bindings, adopting
 hand-installed mods, and installing from a local archive (drop on the window or a file
 dialog). Each works from the `gmm` command line and in the app (Mod settings panel,
@@ -115,7 +118,8 @@ browser after a native confirmation; GMM never connects to GitHub. Below it, GMM
 error log (`%APPDATA%\GMM\logs\errors.log`: errors only, rotated at 256 KiB, the home
 folder written as `~`), with Open log folder and Clear log, for attaching by hand. `gmm
 log` and `gmm report-bug` do the same from the command line; the egress harness checks
-both make no connection.
+both make no connection. **Profiles on the Dashboard** (2026-10-26): a Ready game's open
+bubble has a Profile picker and Apply beside Launch (same apply as the Library).
 
 **First review checkpoint** (2026-10-25): the game banners use official key art (cropped
 2:1, one file per game for every banner size); a first-run screen asks for the theme and
@@ -163,8 +167,8 @@ network that refuses everything; nothing outside GMM's folders may change); and 
 contrast and overlap audit (`tests/ui-audit.mjs`, Playwright, 20 states in both themes, no
 findings).
 
-**Next:** the Phase 5 exit check (by hand), then the rest of Phase 6: profiles on the
-Dashboard, and deep links if GameBanana adds GMM. See the roadmap.
+**Next:** the hands-on checks with the dev build (Phase 5's exit check plus Phase 6's
+features), then Phase 7 (release). See the roadmap.
 
 ## Docs
 

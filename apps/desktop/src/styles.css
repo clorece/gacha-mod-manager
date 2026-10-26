@@ -1391,6 +1391,43 @@ dialog.drawer[open] {
   font-size: 12.5px;
   font-weight: 800;
 }
+.bubble-profiles {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.bubble-profiles label,
+.bubble-actions .bubble-profiles-none {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--scrim-art);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+.bubble-select {
+  min-width: 0;
+  max-width: 260px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 12px;
+  background: var(--scrim-art);
+  color: #fff;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+.bubble-select option {
+  background: var(--card);
+  color: var(--text);
+}
+.bubble-select:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
 .ghost-bubble {
   flex: 0 1 200px;
   min-height: 300px;

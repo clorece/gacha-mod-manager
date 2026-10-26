@@ -63,6 +63,11 @@ offers the same choice as large banner cards, so the two always agree.
   **Launch** button (candy yellow, the one yellow button in the app) with a one-line detail
   ("2 of 3 mods on · ZZMI through HoYoPlay"). Clicking again shrinks it. One bubble open at
   a time. A dashed "More games later" bubble holds the place for the next adapter.
+  Since 2026-10-26 (Phase 6) a Ready game's open bubble also has a **Profile** row under
+  Launch: a "Profile" pill, a select on the art scrim (white text, translucent white
+  border; "Keep the mods as they are" first, then each profile with its mod count) and a
+  small Apply button. Without profiles the row is one pill: "No profiles yet · save one in
+  the Mods Library".
 - Below: "Recently installed" and "Setup" panels. A game that isn't Ready shows its setup
   card here (states and steps from `gmm-xxmi`) instead of a Launch button.
 

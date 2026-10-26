@@ -18,7 +18,8 @@ designed sidebar shell with the startup check, a first-run preferences screen, t
 and filters, a scrolling grid) with a mod page for every mod, the Mods Library (previews,
 filters, versions, select mode, profiles) with per-mod settings, Downloads (the install
 queue), the install confirmation, Settings (with a storage breakdown) and player guides on
-the Documentation page. Power features have started: update and roll back, profiles, key
+the Documentation page. Power features are done: update and roll back, profiles (also on
+the Dashboard), key
 bindings, adopting hand-installed mods, installing from a local archive, and Report a Bug
 (a pre-filled GitHub issue you check and submit yourself, plus a local error log with your
 home folder hidden; GMM sends nothing). The screens

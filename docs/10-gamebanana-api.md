@@ -32,7 +32,7 @@ What *does* need GameBanana:
   manager integrations in `_aModManagerIntegrations`; it is empty for every ZZZ and WuWa mod
   checked (729726, 553203, 688491, 731970). A staff post from 2018 describes them integrating
   mod managers that start from a custom URL scheme. So GMM can only get those buttons if
-  GameBanana adds it; deep links (Phase 6) wait on that.
+  GameBanana adds it; deep links (deferred from Phase 6 to "Later" on 2026-10-26) wait on that.
 - **Using their name** in the lockup ("Powered by GameBanana") is descriptive; it stays
   unless they ask otherwise.
 

@@ -15,7 +15,9 @@ Game, Mods Library, Mods Store; Development: Report a Bug, Documentation) and th
 right. Details in [08](08-design-system.md#navigation).
 
 - **Launch** lives on the Dashboard's game bubbles, enabled only in `Ready`, with the "mods
-  only load through XXMI" line beside it. First launch confirms the exe path (R7).
+  only load through XXMI" line beside it. First launch confirms the exe path (R7). Since
+  2026-10-26 the open bubble of a Ready game can apply one of its profiles before launching
+  (the same apply as the Library's Profiles panel, which keeps saving and sharing).
 - **Downloads** is a page (grouped by game, with a finished state that clears itself), not a
   tray; the sidebar badge counts active installs. Choices never wait there: they're made in
   the install confirmation first.

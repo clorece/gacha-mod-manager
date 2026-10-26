@@ -13,7 +13,7 @@ does is the failure we design out.
 | T3 | **Malicious catalogue content** | XSS in a mod description that then calls IPC | Sanitization, strict CSP, IPC takes ids not paths |
 | T4 | **Download tampering / redirect abuse** | Redirect to another host, swapped file | Host allowlist after every redirect, size caps, GB AV status + MD5, local SHA-256 |
 | T5 | **Executing the wrong program** | A planted "XXMI Launcher.exe" in a user-writable folder | Launch only the exe inside a confirmed XXMI root; first launch needs user confirmation; show the path |
-| T6 | **Deep-link abuse** (Phase 6) | `gmm://install?url=https://evil/` | Deep links carry GB ids only, plus a confirmation dialog |
+| T6 | **Deep-link abuse** (deferred to "Later" in the roadmap, 2026-10-26) | `gmm://install?url=https://evil/` | Deep links carry GB ids only, plus a confirmation dialog |
 | T7 | **Supply chain** | Malicious crate/npm package | Lockfiles, `cargo-deny`, minimal deps, license + advisory checks |
 | T8 | **Update channel compromise** | Fake GMM update | Signed Tauri updates, keys offline, GitHub Releases only |
 | T9 | **Data loss** | Deleting the wrong mods | Nothing is deleted without an itemized confirmation (stronger for hand-installed mods); unmanaged mods are never auto-deleted; deletes are permanent by the user's choice (R8) |
@@ -296,7 +296,7 @@ does is the failure we design out.
 | 5 | Contrast and overlap audit (✅ 2026-10-25, `apps/desktop/tests/ui-audit.mjs`, Playwright + Chromium in CI): 20 states in both themes (every page, dialogs, panels, first run) with the fake bridge; WCAG AA contrast composited through translucent layers (text on artwork skipped), no overlapping text after clipping, no sideways scroll. A self-check plants one problem of each kind first and fails if any goes unreported | Readability in both themes |
 | 5 | Shell openers (✅ `gmm-xxmi/src/launch.rs` unit tests): `open_page` refuses `file:`, `javascript:`, `ms-settings:`, Windows paths, host-less addresses, spaces, quotes, control characters and over-long addresses; `open_folder` refuses relative paths, files and missing folders | R7 |
 | 6 | Error log and bug report tests (✅ 2026-10-26, `gmm-core/src/errlog.rs`, `report.rs`): the home folder and account name are removed in every path spelling while a mod named like the user stays; entries stay one capped line; the log rotates and clears; the issue address starts with the fixed form, round-trips the body, is cut to fit `MAX_PAGE_URL` and passes `check_page_url` | R1, R7 |
-| 6 | Hostile deep-link URLs | T6 |
+| Later | Hostile deep-link URLs (with deep links, deferred 2026-10-26) | T6 |
 | 7 | Release checks: feature-flag assertion (R6), update signature verification, installer contents review | T7/T8 |
 
 `just audit-privacy` runs the egress and file-access harnesses locally against a release build

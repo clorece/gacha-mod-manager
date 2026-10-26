@@ -17,6 +17,7 @@ the code they guard ([04](04-security.md)). When a phase finishes, every doc get
 | 2 — Backend features | 2026-10-24 | `gmm-db`, `gmm-core` (install pipeline, library, toggle, uninstall (to the Recycle Bin then; permanent since 2026-10-25), conflicts, storage, launch through XXMI), `gmm-migoto`; the adapter conformance suite and the egress / file-access privacy harnesses. Exit check passed in game with Casual Velina (GameBanana 688491) |
 | 4 — Design | 2026-10-25 | The design canvas (23 artboards, dark and light; signed off) written up in [08](08-design-system.md), file formats in [09](09-archive-formats.md); in the app: the tokens and base styles for both themes in `styles.css`, Nunito bundled (OFL-1.1 exception, `THIRD-PARTY-NOTICES.md`), hand-built primitives in `src/ui` (button, icon button, switch, checkbox, radio, segmented control, dropdown, chip / badge, notice, dialog, side panel, toast, progress bar, spinner, icons), a dev-only style guide page, and the shell restyled to the sidebar (Select Game, Dashboard with bubbles and Launch, Mods Library with switches, conflicts and a first Mod settings panel, the launch dialog) |
 | 3 — App foundations | 2026-10-24 | `apps/desktop`: Tauri 2 shell over `gmm-core` with 22 commands (ids only), generated TypeScript types, the `gmmimg` image protocol, locked-down capability / CSP / navigation guard, a first shell (game rail, state pill, setup card, mod list, Launch with XXMI); frontend CI (typecheck, lint, `pnpm audit`, npm license check). Verified in a release build on the dev machine |
+| 6 — Power features | 2026-10-26 | Update and roll back, profiles (Library panel and Dashboard), saved in-game toggles kept across every switch, permanent deletes, key bindings, adopting hand-installed mods, installing from a local archive, Report a Bug (pre-filled GitHub issue, local error log). Deep links deferred to "Later". Hands-on checks go with Phase 5's exit check |
 
 Cleanup pass (2026-10-24, after Phase 3): unused functions and a dependency removed; the NSFW
 filter, "which game is this mod for", launch planning and post-install conflict checks moved
@@ -226,7 +227,7 @@ real install from the Store switched on and seen in game, a file dropped on the 
 "Install from a file", and the browser openers' native confirmations. Then this phase is
 done.
 
-## Phase 6 — Power features (in progress)
+## Phase 6 — Power features ✅ (2026-10-26)
 
 Started 2026-10-25 at your request, alongside the Phase 5 screens (all built since the third
 checkpoint). Each feature is built backend first (`gmm-core`, a `gmm` command, an app
@@ -287,14 +288,27 @@ command) and shown in its screen.
       preview of what GitHub gets, the log newest first with Open log folder and Clear log;
       the WIP page and sidebar tag are gone). Checked in a `tauri dev` window: the preview
       and log showed `~\Downloads\...` for a path under the home folder
-- [ ] 1-click install deep links (`gmm://`): needs GameBanana to add GMM as a mod-manager
-      integration for ZZZ/WuWa (none listed today, [10](10-gamebanana-api.md)); then T6
 - [x] Version groups and switching in the Library, Update badges on Library cards
       (2026-10-25, third checkpoint)
-- [ ] Profiles on the Dashboard (apply a profile from a game's bubble; today they live in
-      the Library's Profiles panel)
+- [x] **Profiles on the Dashboard** (2026-10-26): a Ready game's open bubble shows a Profile
+      picker ("Keep the mods as they are" or a saved profile with its mod count) and Apply
+      beside Launch; applying calls the same `profile_apply` as the Library, says what was
+      switched (and how many mods are gone from the Mods folder), and reloads that game's
+      library. A game without profiles says to save one in the Mods Library; a game that
+      isn't Ready shows none. Saving, renaming, sharing and importing stay in the Library's
+      Profiles panel
+- 1-click install deep links (`gmm://`): **deferred 2026-10-26** to "Later" (below); they
+  need GameBanana to add GMM as a mod-manager integration first
+
+**Phase 6 done 2026-10-26** (Report a Bug and profiles on the Dashboard were the last two).
+Its hands-on part goes with the Phase 5 exit check: a profile applied from the Dashboard
+and from the Library, an update and a roll back, Report a Bug's "Open on GitHub…".
 
 ## Phase 7 — Release
+
+Starts after the hands-on checks (Phase 5's exit check and Phase 6's, above), done with the
+dev build: `corepack pnpm tauri build --no-bundle` in `apps/desktop` gives
+`target\release\gmm-desktop.exe` with `gmm-extract.exe` beside it (built 2026-10-26).
 
 - [ ] Name chosen and cleared; logo and app icon
 - [ ] Windows installer (NSIS/MSI via Tauri), code signing, signed auto-updates from GitHub
@@ -319,6 +333,13 @@ then Star Rail (SRMI), Genshin (GIMI), HI3 (HIMI). HoYoPlay detection already se
 Star Rail and HI3 install paths. Each game goes through the adapter checklist in
 [03](03-game-adapters.md). Later detection sources: the Kuro launcher (native WuWa), and a real
 Epic install to confirm the Epic reader (fixture-tested only).
+
+## Later
+
+- [ ] 1-click install deep links (`gmm://`), deferred from Phase 6 on 2026-10-26: needs
+      GameBanana to add GMM as a mod-manager integration for ZZZ/WuWa (none listed today,
+      [10](10-gamebanana-api.md)). Then: register the scheme in the installer, accept
+      GameBanana ids only, the usual install confirmation, and the hostile-link tests (T6)
 
 ## Known gaps
 

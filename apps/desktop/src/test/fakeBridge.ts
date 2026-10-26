@@ -144,7 +144,9 @@ export async function fakeInvoke(cmd: string, args: Args = {}): Promise<unknown>
     case "rollback_files":
       return [];
     case "profiles":
-      return fx.profiles;
+      return a.game === "zzz" ? fx.profiles : [];
+    case "profile_apply":
+      return { switched_on: ["Beach outfit"], switched_off: ["Casual Velina"], missing: [] };
     case "network_status":
       return { cooldown_secs: null, showing_saved: false };
     case "launch_plan":

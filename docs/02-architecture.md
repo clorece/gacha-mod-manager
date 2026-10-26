@@ -399,7 +399,7 @@ and `network_status`. Phase 6 adds `queue_change_file` (queue), `rollback_files`
     `data.ts` loads games, setup states and every game's library once for all pages;
     `queue.ts` keeps the install queue (`queue_watch`), refreshes a game's library when one
     of its installs finishes and dismisses installed rows after 5 s.
-  - `pages/`: `Startup` (the startup check), `Dashboard` (bubbles, Launch, recently
+  - `pages/`: `Startup` (the startup check), `Dashboard` (bubbles, Launch, a profile picker, recently
     installed, setup), `Downloads` (the queue by game, with Pause / Resume / Cancel),
     `Library` (game cards, Update all, filters, version groups as one card, select mode,
     conflict prompt), `Store` and `ModPage`, `Settings` (preferences, XXMI, games, caches,
