@@ -13,6 +13,7 @@ mod local;
 mod open;
 mod profiles;
 mod queue;
+mod report;
 mod startup;
 mod views;
 
@@ -49,6 +50,8 @@ pub struct AppState {
     /// Wakes the worker when an install is queued or resumed.
     pub wake: tokio::sync::Notify,
     pub watchers: queue::Watchers,
+    /// Errors kept for bug reports (`report.rs`).
+    pub errors: Arc<gmm_core::ErrorLog>,
 }
 
 impl AppState {
@@ -83,6 +86,7 @@ impl AppState {
             false,
         );
         let images = Arc::new(ImageCache::open(&dirs.cache, image_net)?);
+        let errors = Arc::new(dirs.error_log()?);
         Ok(Self {
             db,
             net,
@@ -95,6 +99,7 @@ impl AppState {
             queue: InstallQueue::new(),
             wake: tokio::sync::Notify::new(),
             watchers: queue::Watchers::default(),
+            errors,
         })
     }
 }
@@ -176,6 +181,12 @@ fn handler<R: Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync
         commands::clear_download_cache,
         commands::clear_http_cache,
         commands::clear_image_cache,
+        report::error_log,
+        report::clear_error_log,
+        report::open_log_folder,
+        report::log_ui_error,
+        report::bug_report_draft,
+        report::open_bug_report,
         commands::network_status,
         commands::launch_plan,
         commands::launch,
@@ -201,6 +212,22 @@ fn handler<R: Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync
 }
 
 fn main() {
+    // A panic goes to the error log too (where and what, nothing else), then on as usual.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let what = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| (*s).to_owned())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "a panic".to_owned());
+        let at = info
+            .location()
+            .map(|l| format!(" at {}:{}", l.file(), l.line()))
+            .unwrap_or_default();
+        error::record("panic", &format!("{what}{at}"));
+        default_hook(info);
+    }));
     let result = tauri::Builder::default()
         .plugin(navigation_guard())
         // Only called from Rust (folder pickers); the webview has no dialog permissions.
@@ -225,6 +252,7 @@ fn main() {
         )
         .setup(|app| {
             let state = tauri::async_runtime::block_on(AppState::open())?;
+            error::install_log(state.errors.clone());
             app.manage(state);
             queue::spawn_worker(app.handle().clone());
             Ok(())

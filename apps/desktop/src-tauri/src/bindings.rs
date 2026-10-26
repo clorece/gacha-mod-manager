@@ -56,6 +56,8 @@ fn render() -> String {
         gmm_core::ProfileImported, gmm_core::MatchReason, gmm_core::AdoptCandidate,
         gmm_core::Adopted, gmm_core::FileChangeReport, gmm_core::ChangedFolder,
         gmm_core::LocalPlan,
+        // Report a Bug (gmm-core, Phase 6).
+        gmm_core::LogEntry, gmm_core::BugReport,
     ];
     let mut out = String::from(
         "// SPDX-License-Identifier: MIT OR Apache-2.0\n\

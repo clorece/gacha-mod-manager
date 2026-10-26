@@ -10,6 +10,7 @@ mod install;
 mod launch;
 mod library;
 mod profile;
+mod report;
 mod setup;
 mod toggle;
 mod update;
@@ -54,6 +55,27 @@ enum Command {
         /// `gmm config add-folder` are always checked.
         #[arg(long = "folder", value_parser = setup::parse_folder)]
         folders: Vec<(String, PathBuf)>,
+    },
+    /// GMM's local error log (errors only; your home folder shows as `~`).
+    Log {
+        /// Delete the log for good.
+        #[arg(long)]
+        clear: bool,
+        /// How many of the newest entries to show.
+        #[arg(long, default_value_t = 50)]
+        last: usize,
+    },
+    /// Print a link to a pre-filled GitHub issue (what you write, versions and setup states;
+    /// never a path). Nothing is sent: open the link, check it and submit it on GitHub.
+    ReportBug {
+        /// The issue's title.
+        #[arg(long)]
+        title: String,
+        /// What happened, what you expected, and the steps.
+        #[arg(long, default_value = "")]
+        text: String,
+        #[command(flatten)]
+        setup: SetupArgs,
     },
     /// Check each game's mod setup and say what to do next. Read-only.
     Status {
@@ -380,6 +402,10 @@ fn main() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("error: {e}");
+            // Kept for bug reports (`gmm log`); best effort.
+            if let Ok(log) = gmm_core::AppDirs::system().and_then(|d| d.error_log()) {
+                log.record("cli", &e.to_string());
+            }
             ExitCode::FAILURE
         }
     }
@@ -390,6 +416,9 @@ type AnyError = Box<dyn std::error::Error>;
 async fn run(cli: Cli) -> Result<(), AnyError> {
     if let Command::Games = cli.command {
         return games(cli.json);
+    }
+    if let Command::Log { clear, last } = cli.command {
+        return report::log(clear, last, cli.json);
     }
     let db = config::open_db().await?;
     let result = run_with_db(cli, &db).await;
@@ -415,6 +444,10 @@ async fn run_with_db(cli: Cli, db: &Db) -> Result<(), AnyError> {
             setup::run_status(cli.json, game, xxmi, &folders)
         }
         Command::Config(cmd) => config::run(db, cmd, cli.json).await,
+        Command::ReportBug { title, text, setup } => {
+            report::report_bug(db, &title, &text, setup.hints(), cli.json).await
+        }
+        Command::Log { .. } => unreachable!("handled before the database opens"),
         Command::Catalog(cmd) => catalog(&gb, cmd, cli.json, cli.show_nsfw).await,
         Command::Fetch { mod_id, file } => fetch::run(&gb, &net, db, mod_id, file, cli.json).await,
         Command::Install {

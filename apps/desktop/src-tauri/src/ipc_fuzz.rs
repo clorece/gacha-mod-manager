@@ -17,8 +17,9 @@
 //!
 //! Left out, each because a valid call opens something on the user's desktop: the folder
 //! and archive pickers and `open_xxmi_releases` (native dialogs; they take no arguments),
-//! `clear_xxmi_folder` (it would point GMM back at the real XXMI); `launch`, `pick_game_folder`
-//! and `open_mod_page` only get arguments that must be refused before anything opens.
+//! `open_log_folder` (the file manager) and `clear_xxmi_folder` (it would point GMM back at
+//! the real XXMI); `launch`, `pick_game_folder`, `open_mod_page` and `open_bug_report` only
+//! get arguments that must be refused before anything opens.
 
 // The harness builds and inspects its fake world directly; GMM itself still goes through
 // gmm-fsguard.
@@ -225,6 +226,20 @@ fn specs() -> Vec<Spec> {
         s("clear_http_cache", json!({}), &[]),
         s("clear_image_cache", json!({}), &[]),
         s("network_status", json!({}), &[]),
+        s("error_log", json!({"limit": 10}), &[("limit", Page)]),
+        s("clear_error_log", json!({}), &[]),
+        s(
+            "log_ui_error",
+            json!({"message": "x"}),
+            &[("message", Text)],
+        ),
+        s(
+            "bug_report_draft",
+            json!({"title": "x", "description": "y"}),
+            &[("title", Text), ("description", Text)],
+        ),
+        // A valid call opens the confirmation dialog: only shapes that are refused first.
+        s("open_bug_report", json!({"title": 1}), &[]),
         s("launch_plan", json!({"game": "nope"}), &[("game", Game)]),
         s(
             "launch",
@@ -300,6 +315,7 @@ const LEFT_OUT: &[&str] = &[
     "pick_archive",
     "open_xxmi_releases",
     "clear_xxmi_folder",
+    "open_log_folder",
 ];
 
 /// JSON values of the wrong type for anything.

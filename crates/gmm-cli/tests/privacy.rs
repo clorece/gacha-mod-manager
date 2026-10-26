@@ -386,6 +386,20 @@ fn egress_and_file_access() {
         ("profile-list", vec!["profile", "list", "zzz"]),
         ("profile-export", vec!["profile", "export", "zzz", "Test"]),
         ("launch", vec!["launch", "zzz"]),
+        // Bug reports only build a link; the log holds launch's refusal by now.
+        (
+            "report-bug",
+            vec![
+                "report-bug",
+                "--title",
+                "t",
+                "--xxmi",
+                &xxmi,
+                "--folder",
+                &folder,
+            ],
+        ),
+        ("log", vec!["log"]),
         ("config-remove", vec!["config", "remove-folder", &folder]),
         ("config-clear", vec!["config", "clear-xxmi"]),
     ];

@@ -48,6 +48,11 @@ impl AppDirs {
                 .join("cache"),
         })
     }
+
+    /// The error log in `<data>/logs/`, cleaning the user's home folder out of every line.
+    pub fn error_log(&self) -> Result<crate::ErrorLog, CoreError> {
+        crate::ErrorLog::open(&self.data, dirs::home_dir().as_deref())
+    }
 }
 
 /// The guard and roots one operation works with: GMM's cache (always) and an XXMI `Mods/`

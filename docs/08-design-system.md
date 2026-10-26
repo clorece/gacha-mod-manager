@@ -43,7 +43,7 @@ A fixed sidebar on the left (268 px), top to bottom:
 | Brand | Capsule mark at 48 px; beside it a column with "Gacha Mod Manager" on one line (Nunito 900, 18 px, title gradient) tight over a small one-line "Powered by GameBanana" pill (10 px, 1 px gap), deliberately quieter than the name and mark. The text column starts 5 px below the mark's top, so the name-pill split sits just under the capsule's horizontal center line. Springy hover on the mark, off with reduced motion |
 | **General** | Dashboard · Downloads (yellow badge with the active count) · Settings |
 | **Mods** | **Select Game** (banner dropdown, below) · Mods Library · Mods Store |
-| **Development** | Report a Bug (`WIP` tag, not in the first beta) · Documentation |
+| **Development** | Report a Bug · Documentation |
 | Footer | Theme switch (dark / light), version |
 
 **Select Game** is a banner button: the selected game's banner with a bottom fade, a small
@@ -254,11 +254,16 @@ then the selection bar and a sortable table. The bar colors are `--viz-1..8`, th
 reference categorical palette per theme (validated against `--card`: dark passes every
 check; light has three slots under 3:1, so the legend and table always show).
 
-### Report a Bug (in development)
-The page exists in the sidebar with a `WIP` tag. It shows the mark, an "In development"
-chip, one paragraph on what it will do (describe the problem, optionally attach an error or
-crash log, see everything before it's sent), and a greyed preview of the form. Not in the
-first beta.
+### Report a Bug
+Designed as a work-in-progress page (the mark, an "In development" chip, a greyed form);
+built in Phase 6 (2026-10-26) without the `WIP` tag. A page header, then cards up to
+920 px wide: **Your report** (Title and "What happened?" fields: 14 px radius, `--raised`
+fill, `--line` border, an accent focus ring; "Open on GitHub…" as the primary button with a
+note beside it), **What GitHub will get** (the issue title in bold over the body in a
+monospace block on `--raised`, at most 320 px tall), and **Error log** (Open log folder and
+Clear log in the header row, then a bordered list: time in `--muted`, the source as a quiet
+badge, the message wrapping anywhere; "No errors logged." when empty). Details in
+[07](07-frontend-design.md).
 
 ### Documentation
 A grid of guide cards: Getting started, How mods load, Fixing setup problems, Installing

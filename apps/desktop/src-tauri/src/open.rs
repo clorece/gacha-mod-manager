@@ -37,7 +37,18 @@ async fn confirm_page<R: Runtime>(app: &AppHandle<R>, url: &str, what: &str) -> 
 
 /// Confirms, then opens. Returns false when the user said no.
 async fn open_page<R: Runtime>(app: &AppHandle<R>, url: &str, what: &str) -> CmdResult<bool> {
-    if !confirm_page(app, url, what).await {
+    open_page_as(app, url, url, what).await
+}
+
+/// The same, showing `shown` instead of the address: for a long address GMM built itself
+/// from a fixed base (the bug report's pre-filled issue), where the base is what matters.
+pub(crate) async fn open_page_as<R: Runtime>(
+    app: &AppHandle<R>,
+    url: &str,
+    shown: &str,
+    what: &str,
+) -> CmdResult<bool> {
+    if !confirm_page(app, shown, what).await {
         return Ok(false);
     }
     gmm_xxmi::open_page(url).map_err(CmdError::other)?;

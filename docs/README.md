@@ -7,12 +7,12 @@ Impact and Honkai Impact 3rd, so each of those is one adapter away.
 
 Development happens on Windows (primary target). Linux follows later from the same codebase.
 
-## Where we are (2026-10-25)
+## Where we are (2026-10-26)
 
 **Done:** the backend (Phases 0–2), the app foundations (Phase 3) and the design (Phase 4),
 2026-10-23 to 25. Phase 5 (screens) is built and tested (2026-10-25); only its exit check,
 which needs a person at the real setup, is left. Phase 6 (power features) started alongside
-it on 2026-10-25 (below).
+it on 2026-10-25; Report a Bug landed 2026-10-26 (below).
 Every feature works from the `gmm` command line: browse GameBanana, install (download, safe
 extraction, policy scan, variants), switch mods on and off (keeping their saved in-game
 toggles), uninstall for good, conflicts, storage, launch through XXMI. The Phase 2 exit check
@@ -42,9 +42,9 @@ design canvas is in the code: tokens for both themes, bundled Nunito, hand-built
 | `gmm-xxmi` | Reads XXMI's setup (allowlisted config fields only) and works out each game's setup state |
 | `gmm-migoto` | Reads 3DMigoto mod `.ini` files: override hashes, what they replace, namespaces, key bindings |
 | `gmm-db` | SQLite database (`%APPDATA%\GMM\gmm.db`): settings and preferences, manual game folders, installed mods (with categories, sensitive flag and preview address), last played, profiles, saved in-game toggles, download cache, GameBanana response cache |
-| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`, in one go or in two steps with an install plan; one download per file at a time), the install queue and stop signal, versions (grouping, switching), the update check, the featured gallery (trending, backfilled), Store pages merged from several lists (characters, games), the library (list with disk state, unmanaged mods, enable/disable keeping saved in-game toggles, open folder, uninstall for good with the cached archives), update and roll back, profiles, key bindings, adopting hand-installed mods, installing from a local archive, conflict detection, storage accounting, launching through XXMI (with exe confirmation, recording "last played"), app folders, the image cache behind `gmmimg` (with Clear) |
-| `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, a command per CLI action plus the install confirmation, queue, versions, startup check, featured mods, card stats and the confirmed openers (ids only), the queue worker, the `gmmimg` protocol, the description address rewrite, navigation guard; the React UI is in `apps/desktop/src` |
-| `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm install-file`, `gmm list`, `gmm enable/disable/uninstall`, `gmm update`, `gmm rollback`, `gmm keys`, `gmm adopt`, `gmm profile …`, `gmm conflicts`, `gmm storage` (`--clear-downloads`, `--clear-images`), `gmm launch`, `gmm detect`, `gmm status`, `gmm config` |
+| `gmm-core` | Features built from the crates above: the install pipeline (fetch → extract/scan/classify → stage → rename into `Mods/GMM/`, in one go or in two steps with an install plan; one download per file at a time), the install queue and stop signal, versions (grouping, switching), the update check, the featured gallery (trending, backfilled), Store pages merged from several lists (characters, games), the library (list with disk state, unmanaged mods, enable/disable keeping saved in-game toggles, open folder, uninstall for good with the cached archives), update and roll back, profiles, key bindings, adopting hand-installed mods, installing from a local archive, conflict detection, storage accounting, launching through XXMI (with exe confirmation, recording "last played"), app folders, the image cache behind `gmmimg` (with Clear), the local error log (redacted, rotated) and the bug report's pre-filled issue address |
+| `gmm-desktop` (`apps/desktop/src-tauri`) | The app: Tauri shell, a command per CLI action plus the install confirmation, queue, versions, startup check, featured mods, card stats and the confirmed openers (ids only), Report a Bug (error log, pre-filled issue; errors, panics and webview errors recorded), the queue worker, the `gmmimg` protocol, the description address rewrite, navigation guard; the React UI is in `apps/desktop/src` |
+| `gmm-cli` | `gmm games`, `gmm catalog …`, `gmm fetch`, `gmm install`, `gmm install-file`, `gmm list`, `gmm enable/disable/uninstall`, `gmm update`, `gmm rollback`, `gmm keys`, `gmm adopt`, `gmm profile …`, `gmm conflicts`, `gmm storage` (`--clear-downloads`, `--clear-images`), `gmm launch`, `gmm detect`, `gmm status`, `gmm config`, `gmm log` (`--clear`), `gmm report-bug` |
 
 On the dev machine, WuWa is `Ready` (Steam install; its Steam copy runs with XXMI's Game
 Launch on Direct). ZZZ (HoYoPlay install) was `Ready` until XXMI's "Game Folder" for it
@@ -60,7 +60,8 @@ settings, Settings with Storage, Documentation) and an edit of the six player gu
 [guides/](guides/); ZZZ's "Game Folder" in XXMI (above); the Phase 5 exit check by hand
 (switching mods and versions from the app, a real install from the Store seen in game, a
 real file drop and the "Install from a file" dialog, the browser openers' native
-confirmations; listed in the roadmap). Decided 2026-10-25: the banners are official key art (bundled
+confirmations, including "Open on GitHub…" on Report a Bug; listed in the roadmap). A look
+at the Report a Bug page and the issue it opens (2026-10-26). Decided 2026-10-25: the banners are official key art (bundled
 with a notice), GMM keeps saved in-game toggles across every switch (R3 amended), deletes are
 permanent (R8 amended), the name stays "Gacha Mod Manager", the setup guide is text only, and
 the rest of Phase 5 follows the decisions listed in the roadmap.
@@ -107,6 +108,14 @@ hand-installed mods, and installing from a local archive (drop on the window or 
 dialog). Each works from the `gmm` command line and in the app (Mod settings panel,
 Profiles panel, Downloads); update, roll back, key bindings, profiles and adopt suggestions
 were tried in the real window against the real XXMI setup (and cleaned up afterwards).
+**Report a Bug** (2026-10-26) replaced the WIP page: the user writes a title and what
+happened, sees exactly what the GitHub issue will say (their text, GMM's and XXMI's
+versions, each game's setup state, never a path), and opens the pre-filled issue in the
+browser after a native confirmation; GMM never connects to GitHub. Below it, GMM's local
+error log (`%APPDATA%\GMM\logs\errors.log`: errors only, rotated at 256 KiB, the home
+folder written as `~`), with Open log folder and Clear log, for attaching by hand. `gmm
+log` and `gmm report-bug` do the same from the command line; the egress harness checks
+both make no connection.
 
 **First review checkpoint** (2026-10-25): the game banners use official key art (cropped
 2:1, one file per game for every banner size); a first-run screen asks for the theme and
@@ -154,9 +163,8 @@ network that refuses everything; nothing outside GMM's folders may change); and 
 contrast and overlap audit (`tests/ui-audit.mjs`, Playwright, 20 states in both themes, no
 findings).
 
-**Next:** the Phase 5 exit check (by hand), then Phase 6's Report a Bug (GitHub issue link
-plus a local log), profiles on the Dashboard, and deep links if GameBanana adds GMM. See
-the roadmap.
+**Next:** the Phase 5 exit check (by hand), then the rest of Phase 6: profiles on the
+Dashboard, and deep links if GameBanana adds GMM. See the roadmap.
 
 ## Docs
 

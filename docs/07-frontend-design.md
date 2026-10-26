@@ -285,6 +285,14 @@ the user reviews GMM's local error log in the app and attaches it themselves. GM
 never connects to GitHub (R2 unchanged), and no account or token is involved. GMM keeps a
 small local log for this (errors only, rotated, no paths that identify the user).
 
+Built 2026-10-26 (`pages/ReportBug.tsx`): three cards. **Your report**: a title (required,
+120 characters) and "What happened?", with "Open on GitHub…" (native confirmation, then the
+browser). **What GitHub will get**: a live preview of the issue as Rust writes it
+(`bug_report_draft`, debounced), with a warning when the description was shortened to fit
+the link. **Error log**: the newest 50 entries, newest first (local time, source, message),
+with Open log folder and Clear log. The webview only sends what was typed; Rust adds the
+setup lines and builds the address.
+
 ## Frontend quality bar
 
 - Each screen has loading, empty and error states designed, not just the happy path.

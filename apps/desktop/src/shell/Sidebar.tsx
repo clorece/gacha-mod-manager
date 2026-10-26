@@ -99,7 +99,6 @@ export function Sidebar({
         <div className="nav-head kicker">Development</div>
         <NavItem page="bug" current={page} icon="bug" onGo={onGo}>
           Report a Bug
-          <Badge tone="quiet">WIP</Badge>
         </NavItem>
         <NavItem page="docs" current={page} icon="book" onGo={onGo}>
           Documentation

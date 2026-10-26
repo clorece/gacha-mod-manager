@@ -192,7 +192,7 @@ edited by the owner); the contrast and overlap audit runs with Playwright on Lin
       Installing safely, Conflicts, Privacy), bundled at build time and rendered by
       `markdown.tsx` (React elements, never HTML; links between guides open in the app,
       other addresses show as text). Drafted by Claude for the owner to edit. Report a Bug
-      stays the WIP page
+      stayed the WIP page (built in Phase 6)
 
 **Tests**
 - [x] Vitest component tests and fixture-based snapshots (2026-10-25): `pnpm test`, 73
@@ -269,10 +269,24 @@ command) and shown in its screen.
       install-file`; app: a file dropped on the window reaches Rust (R5), or "Install from a
       file" on Downloads opens a native dialog; the local install confirmation (game,
       versions, blocked files)
-- [ ] Report a Bug (decided 2026-10-25): a pre-filled GitHub issue opened through the
-      confirmed browser opener (the one link added), plus a small local error log (errors
-      only, rotated, no identifying paths) the user reviews in the app and attaches
-      themselves; GMM never connects to GitHub, so R2 is unchanged
+- [x] **Report a Bug** (decided 2026-10-25, built 2026-10-26): a pre-filled GitHub issue
+      opened through the confirmed browser opener (the one link added), plus a small local
+      error log the user reviews in the app and attaches themselves; GMM never connects to
+      GitHub, so R2 is unchanged. `gmm_core::ErrorLog` (`errlog.rs`): errors only, one line
+      each, in `<data>/logs/errors.log`, rotated to `errors.1.log` past 256 KiB, the home
+      folder written as `~` and the account name inside other paths as `<user>`; fed by
+      the app's command errors (not the questions it asks: versions, blocked files,
+      conflicts, setup states), failed queue installs, panics, unhandled webview errors
+      (`log_ui_error`, capped at 300 characters and 50 per run) and failed `gmm` commands.
+      `gmm_core::bug_report` (`report.rs`) writes the issue: the user's text, GMM's and
+      XXMI's versions and each game's setup state (no paths), cut to fit the opener's
+      2,048-character limit (the report says so). `gmm log` (`--clear`), `gmm report-bug`
+      (prints the link); app: `error_log`, `clear_error_log`, `open_log_folder`,
+      `log_ui_error`, `bug_report_draft`, `open_bug_report` (native confirmation showing
+      the issue form's address), and the Report a Bug page (title, description, a live
+      preview of what GitHub gets, the log newest first with Open log folder and Clear log;
+      the WIP page and sidebar tag are gone). Checked in a `tauri dev` window: the preview
+      and log showed `~\Downloads\...` for a path under the home folder
 - [ ] 1-click install deep links (`gmm://`): needs GameBanana to add GMM as a mod-manager
       integration for ZZZ/WuWa (none listed today, [10](10-gamebanana-api.md)); then T6
 - [x] Version groups and switching in the Library, Update badges on Library cards
@@ -326,7 +340,8 @@ Epic install to confirm the Epic reader (fixture-tested only).
   appears there only for files that weren't fetched first.
 - Description images on third-party hosts (imgur and others) are never shown (R2);
   GameBanana's own image and file hosts are.
-- The browser openers (`open_mod_page`, `open_link`, `open_xxmi_releases`) need a click
+- The browser openers (`open_mod_page`, `open_link`, `open_xxmi_releases`,
+  `open_bug_report`) need a click
   in their native dialog, so they haven't been driven end to end yet; their address checks
   have unit tests. The same goes for a real file drop and the "Install from a file" dialog:
   the local install pipeline is tested in `gmm-core`, not yet through the window.

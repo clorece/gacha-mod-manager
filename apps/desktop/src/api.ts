@@ -7,6 +7,7 @@ import { Channel, invoke } from "@tauri-apps/api/core";
 import type {
   AdoptCandidate,
   Adopted,
+  BugReport,
   CardStats,
   CatalogPage,
   CatalogQuery,
@@ -28,6 +29,7 @@ import type {
   LaunchInfo,
   LibraryView,
   LocalPlan,
+  LogEntry,
   ModKey,
   ModProfile,
   ModUpdate,
@@ -168,6 +170,17 @@ export const api = {
   /** A link from rewritten description HTML (`#gmm-link:<key>`). */
   openLink: (key: string) => invoke<boolean>("open_link", { key }),
   openModFolder: (game: string, key: ModKey) => invoke<null>("open_mod_folder", { game, key }),
+
+  /** The local error log, newest last (at most 500 entries). */
+  errorLog: (limit: number) => invoke<LogEntry[]>("error_log", { limit }),
+  clearErrorLog: () => invoke<number>("clear_error_log"),
+  openLogFolder: () => invoke<null>("open_log_folder"),
+  /** An unhandled webview error, for the log (cut short in Rust). */
+  logUiError: (message: string) => invoke<null>("log_ui_error", { message }),
+  /** What the pre-filled issue will say; Rust writes the text and the address. */
+  bugReportDraft: (title: string, description: string) => invoke<BugReport>("bug_report_draft", { title, description }),
+  /** Asks in a native dialog, then opens the issue in the browser; false when cancelled. */
+  openBugReport: (title: string, description: string) => invoke<boolean>("open_bug_report", { title, description }),
 
   launchPlan: (game: string) => invoke<LaunchInfo>("launch_plan", { game }),
   launch: (game: string, confirm: boolean) => invoke<Launched>("launch", { game, confirm }),

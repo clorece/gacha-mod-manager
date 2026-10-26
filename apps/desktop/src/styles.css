@@ -2843,53 +2843,105 @@ dialog.drawer[open] {
   padding: 0.35em 0.6em;
 }
 
-/* ---- Work-in-progress pages ---- */
+/* ---- Report a Bug (07, "Report a Bug") ---- */
 
-.wip-wrap {
-  max-width: 720px;
-  margin: 20px auto 0;
-  text-align: center;
+.report {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 920px;
 }
-.wip-logo {
-  width: 96px;
-  height: 96px;
-  filter: var(--glow);
+.report .panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.wip-wrap h1 {
-  margin: 12px 0 10px;
-  font-size: 30px;
-  font-weight: 900;
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 800;
 }
-.wip-wrap p {
-  max-width: 520px;
-  margin: 16px auto 22px;
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1.55;
-}
-.wip-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  background: rgba(255, 176, 32, 0.15);
-  color: var(--warn);
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-}
-.fake-field {
-  display: block;
+.field-input {
   width: 100%;
-  margin-top: 10px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  border: 1px dashed var(--line);
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
   background: var(--raised);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.45;
+  resize: vertical;
+}
+.field-input::placeholder {
+  color: var(--muted);
+}
+.field-input:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.report-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--raised);
+}
+.report-preview pre {
+  max-height: 320px;
+  margin: 0;
+  overflow: auto;
+  color: var(--text2);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.empty-line {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+.log-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 420px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  list-style: none;
+}
+.log-row {
+  display: grid;
+  grid-template-columns: 150px auto 1fr;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+}
+.log-row + .log-row {
+  border-top: 1px solid var(--line);
+}
+.log-time {
   color: var(--muted);
   font-weight: 700;
-  text-align: left;
+  white-space: nowrap;
+}
+.log-msg {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* ---- Style guide (dev only) ---- */

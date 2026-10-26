@@ -22,6 +22,7 @@
 mod adopt;
 mod analyze;
 mod conflicts;
+mod errlog;
 mod error;
 mod fetch;
 mod images;
@@ -34,6 +35,7 @@ mod names;
 mod plan;
 mod profiles;
 mod queue;
+mod report;
 mod setup;
 mod stop;
 mod storage;
@@ -50,6 +52,7 @@ pub use conflicts::{
     Conflict, ConflictReport, ModRef, conflicts, conflicts_after_install, conflicts_for,
     conflicts_for_unmanaged,
 };
+pub use errlog::{ErrorLog, LogEntry, MAX_LOG_BYTES, utc};
 pub use error::CoreError;
 pub use fetch::{FetchEvent, FetchedArchive, MAX_DOWNLOAD_BYTES, choose_file, fetch_archive};
 pub use images::{CachedImage, IMAGE_HOST, ImageCache, MAX_IMAGE_CACHE_BYTES, clear_image_cache};
@@ -79,6 +82,7 @@ pub use profiles::{
     save_profile,
 };
 pub use queue::{InstallQueue, Job, JobAction, JobId, JobLabel, JobRequest, JobState, NextJob};
+pub use report::{BugReport, ISSUES_URL, MAX_TITLE_CHARS, bug_report, system_details};
 pub use setup::{Machine, ModsTarget, SetupHints, game_for_mod, saved_setup};
 pub use stop::{StopReason, StopSignal};
 pub use storage::{

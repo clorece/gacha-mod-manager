@@ -646,3 +646,23 @@ export type LocalPlan = { game: string, name: string, file_name: string, archive
  * The mod kind, or `None` when nothing in the archive is a mod for this game.
  */
 kind: string | null, versions: Array<VersionPlan>, version_conflicts: Array<VersionConflict>, install_to: string, };
+
+export type LogEntry = { 
+/**
+ * UTC, like `2026-10-25T21:03:11Z`.
+ */
+time: string, 
+/**
+ * Where it happened: `app`, `install`, `ui`, `panic`, `cli`.
+ */
+source: string, message: string, };
+
+export type BugReport = { title: string, body: string, 
+/**
+ * The address that opens the pre-filled issue.
+ */
+url: string, 
+/**
+ * The description was cut to fit the address.
+ */
+shortened: boolean, };

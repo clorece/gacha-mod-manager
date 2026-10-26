@@ -87,9 +87,21 @@ async fn run(state: &AppState, job: NextJob) {
         Ok(installed) => JobState::Done { installed },
         Err(CoreError::Stopped(StopReason::Paused)) => JobState::Paused,
         Err(CoreError::Stopped(StopReason::Cancelled)) => JobState::Cancelled,
-        Err(e) => JobState::Failed {
-            message: e.to_string(),
-        },
+        Err(e) => {
+            crate::error::record(
+                "install",
+                &format!(
+                    "GameBanana mod {} file {}: {e}",
+                    job.request.mod_id,
+                    job.request
+                        .file_id
+                        .map_or_else(|| "(newest)".to_owned(), |f| f.to_string())
+                ),
+            );
+            JobState::Failed {
+                message: e.to_string(),
+            }
+        }
     };
     state.queue.set_state(job.id, final_state);
 }

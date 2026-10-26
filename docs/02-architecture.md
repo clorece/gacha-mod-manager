@@ -70,7 +70,8 @@ gacha-mod-manager/
 │  ├─ gmm-db/                 # ✅ SQLite + migrations: settings, installed mods, caches
 │  ├─ gmm-cli/                # ✅ `gmm` binary
 │  ├─ gmm-core/               # ✅ install pipeline, library (list, toggle, uninstall),
-│  │                          #    conflicts, storage, launch, app folders, image cache
+│  │                          #    conflicts, storage, launch, app folders, image cache,
+│  │                          #    error log and bug report (errlog.rs, report.rs)
 │  └─ gmm-migoto/             # ✅ 3DMigoto .ini parser: overrides, hashes, namespaces, keybinds
 ├─ docs/                      # these docs (docs/research/ is local only)
 ├─ CLAUDE.md                  # working agreements (doc updates per phase, commits, code rules)
@@ -403,7 +404,8 @@ and `network_status`. Phase 6 adds `queue_change_file` (queue), `rollback_files`
     `Library` (game cards, Update all, filters, version groups as one card, select mode,
     conflict prompt), `Store` and `ModPage`, `Settings` (preferences, XXMI, games, caches,
     About) with `Storage` (the breakdown), `Docs` (the guides from `docs/guides/`, bundled
-    as `?raw` imports), `Placeholders` (Report a Bug), `StyleGuide` (dev builds only,
+    as `?raw` imports), `ReportBug` (the issue form, its preview and the error log),
+    `StyleGuide` (dev builds only,
     dropped from release builds by `import.meta.env.DEV`).
   - `markdown.tsx`: a small Markdown renderer for files bundled at build time (guides,
     README sections, THIRD-PARTY-NOTICES.md) that builds React elements, never HTML.
@@ -534,7 +536,7 @@ queries the raw response cache can't answer.
 |---|---|
 | Config + DB | `%APPDATA%\GMM\` |
 | Caches (downloads, images, HTTP), `d3dx_user.ini` backups | `%LOCALAPPDATA%\GMM\cache\` |
-| Logs (local only, home path redacted) | `%LOCALAPPDATA%\GMM\logs\` |
+| Error log (local only, home folder redacted; `errors.log`, `errors.1.log`) | `%APPDATA%\GMM\logs\` |
 
 On Linux these map to the XDG equivalents (`dirs`, through `gmm_core::AppDirs`, in both the
 CLI and the app).

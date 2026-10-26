@@ -92,6 +92,13 @@ pub const MAX_PAGE_URL: usize = 2048;
 /// user agreed. Only `https://` and `http://` addresses, without spaces, quotes or control
 /// characters, up to [`MAX_PAGE_URL`] long.
 pub fn open_page(url: &str) -> Result<(), String> {
+    check_page_url(url)?;
+    platform::shell_open(Shell::Page, url.as_ref())
+}
+
+/// What [`open_page`] accepts, without opening anything (bug report addresses are checked
+/// against it when they're built).
+pub fn check_page_url(url: &str) -> Result<(), String> {
     let lower = url.get(..8).unwrap_or(url).to_ascii_lowercase();
     let scheme_ok = lower.starts_with("https://") || lower.starts_with("http://");
     let host_ok = url
@@ -106,7 +113,7 @@ pub fn open_page(url: &str) -> Result<(), String> {
     {
         return Err("only plain web addresses can be opened".to_owned());
     }
-    platform::shell_open(Shell::Page, url.as_ref())
+    Ok(())
 }
 
 /// Opens a folder in the file manager. Refuses anything but an absolute path to an existing

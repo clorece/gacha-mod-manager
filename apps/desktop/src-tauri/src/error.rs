@@ -3,7 +3,9 @@
 //! Errors as the webview sees them: a `kind` the UI can branch on, a sentence to show, and
 //! for the errors that ask the user something, the data to ask with.
 
-use gmm_core::{Conflict, CoreError};
+use std::sync::{Arc, OnceLock};
+
+use gmm_core::{Conflict, CoreError, ErrorLog};
 use serde::Serialize;
 use ts_rs::TS;
 
@@ -33,11 +35,27 @@ pub enum CmdError {
 
 pub type CmdResult<T> = Result<T, CmdError>;
 
+/// The app's error log (Report a Bug), once `main` set it up. Tests don't, so their
+/// refusals stay out of any log.
+static LOG: OnceLock<Arc<ErrorLog>> = OnceLock::new();
+
+pub fn install_log(log: Arc<ErrorLog>) {
+    let _ = LOG.set(log);
+}
+
+/// Writes an error to the log (redacted there). Errors that ask the user something
+/// (versions, blocked files, conflicts) and setup states aren't errors and aren't logged.
+pub fn record(source: &str, message: &str) {
+    if let Some(log) = LOG.get() {
+        log.record(source, message);
+    }
+}
+
 impl CmdError {
     pub fn other(message: impl Into<String>) -> Self {
-        Self::Other {
-            message: message.into(),
-        }
+        let message = message.into();
+        record("app", &message);
+        Self::Other { message }
     }
 
     pub fn message(&self) -> &str {
@@ -58,7 +76,7 @@ impl From<CoreError> for CmdError {
             CoreError::ChooseVariant(variants) => Self::ChooseVariant { message, variants },
             CoreError::Blocked(files) => Self::Blocked { message, files },
             CoreError::NotReady { .. } => Self::NotReady { message },
-            _ => Self::Other { message },
+            _ => Self::other(message),
         }
     }
 }

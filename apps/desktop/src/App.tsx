@@ -18,7 +18,7 @@ import { Docs } from "./pages/Docs";
 import { Downloads } from "./pages/Downloads";
 import { Library } from "./pages/Library";
 import { ModPage } from "./pages/ModPage";
-import { ReportBug } from "./pages/Placeholders";
+import { ReportBug } from "./pages/ReportBug";
 import { Settings } from "./pages/Settings";
 import { Startup } from "./pages/Startup";
 import { Store } from "./pages/Store";
