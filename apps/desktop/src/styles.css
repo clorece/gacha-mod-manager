@@ -2672,6 +2672,18 @@ dialog.drawer[open] {
   font-size: 13px;
   font-weight: 700;
 }
+/* The title takes the lines it needs; the stats row keeps to the card's bottom. */
+.store-card .mod-title {
+  min-height: 0;
+}
+.card-date {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 800;
+}
 .av {
   flex: none;
   width: 22px;
@@ -3186,61 +3198,40 @@ dialog.drawer[open] {
   align-items: center;
   gap: 12px;
 }
-.report-preview {
+/* The log file the report attaches, with Change… beside it. */
+.report-field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.report-field legend {
+  margin-bottom: 6px;
+  padding: 0;
+}
+.report-log {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--raised);
-}
-.report-preview pre {
-  max-height: 320px;
-  margin: 0;
-  overflow: auto;
   color: var(--text2);
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: 12.5px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
-.empty-line {
-  margin: 0;
-  color: var(--muted);
-  font-weight: 800;
-}
-.log-list {
+.report-log-text {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  max-height: 420px;
-  margin: 0;
-  padding: 0;
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  list-style: none;
-}
-.log-row {
-  display: grid;
-  grid-template-columns: 150px auto 1fr;
-  align-items: baseline;
-  gap: 10px;
-  padding: 9px 12px;
-  font-size: 13px;
-}
-.log-row + .log-row {
-  border-top: 1px solid var(--line);
-}
-.log-time {
-  color: var(--muted);
-  font-weight: 700;
-  white-space: nowrap;
-}
-.log-msg {
+  gap: 2px;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.report-log-text b {
+  color: var(--text);
+}
+.report-log-text .sub {
+  font-weight: 700;
 }
 
 /* ---- Style guide (dev only) ---- */

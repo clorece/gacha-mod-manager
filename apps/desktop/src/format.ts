@@ -35,6 +35,20 @@ export function ago(unixSeconds: number, now = Date.now() / 1000): string {
   return day(unixSeconds);
 }
 
+/** Card dates, short enough to share a row: `just now`, `5m ago`, `3h ago`, `4d ago`,
+ *  `3w ago`, `5mo ago`, `2y ago`. */
+export function shortAgo(unixSeconds: number, now = Date.now() / 1000): string {
+  const s = Math.max(0, now - unixSeconds);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  const days = Math.floor(s / 86400);
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+}
+
 /** Card counters: `950`, `1.2k`, `48k`, `3.1M`. */
 export function compact(n: number): string {
   if (n < 1000) return String(n);

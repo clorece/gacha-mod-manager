@@ -5,7 +5,8 @@
 //! builds the address, which the app opens after a native confirmation and the CLI prints.
 //!
 //! The issue holds what the user wrote, a few lines about the setup (versions and setup
-//! states, never a path) and a note on attaching the error log. Browsers and GMM's opener
+//! states, never a path) and, when there is one, which log file to attach: a link can't carry
+//! files, so the user drags it in on GitHub (the app shows its folder). Browsers and GMM's opener
 //! cap addresses ([`gmm_xxmi::MAX_PAGE_URL`]), so a long description is shortened to fit and
 //! the report says so; the user can paste the rest on GitHub.
 
@@ -59,7 +60,7 @@ pub fn system_details(statuses: &[GameStatus]) -> String {
     lines.join("\n")
 }
 
-fn body(description: &str, details: &str, shortened: bool) -> String {
+fn body(description: &str, details: &str, log: Option<&str>, shortened: bool) -> String {
     let description = description.trim();
     let what = if description.is_empty() {
         "(Describe what happened, what you expected, and the steps to get there.)"
@@ -71,12 +72,13 @@ fn body(description: &str, details: &str, shortened: bool) -> String {
     } else {
         ""
     };
-    format!(
-        "### What happened\n\n{what}{cut}\n\n### Setup\n\n{details}\n\n### Error log\n\n\
-         If GMM's error log shows the problem, attach `errors.log` here (Report a Bug › Open \
-         log folder in GMM). Read it first: it lists errors only, with your home folder \
-         replaced by `~`."
-    )
+    let log = log.map_or(String::new(), |name| {
+        format!(
+            "\n\n### Error log\n\nAttach `{name}` from GMM's log folder here (drag it into this \
+             box). It lists errors only, with your home folder replaced by `~`."
+        )
+    });
+    format!("### What happened\n\n{what}{cut}\n\n### Setup\n\n{details}{log}")
 }
 
 fn address(title: &str, body: &str) -> String {
@@ -88,8 +90,9 @@ fn address(title: &str, body: &str) -> String {
     .unwrap_or_else(|_| ISSUES_URL.to_owned())
 }
 
-/// The report for `title` and `description`, shortened until its address fits.
-pub fn bug_report(title: &str, description: &str, details: &str) -> BugReport {
+/// The report for `title` and `description`, shortened until its address fits. `log` names
+/// the log file to attach, if any.
+pub fn bug_report(title: &str, description: &str, details: &str, log: Option<&str>) -> BugReport {
     let title: String = title
         .chars()
         .map(|c| if c.is_control() { ' ' } else { c })
@@ -99,7 +102,7 @@ pub fn bug_report(title: &str, description: &str, details: &str) -> BugReport {
         "" => "Bug: ".to_owned(),
         t => t.to_owned(),
     };
-    let full = body(description, details, false);
+    let full = body(description, details, log, false);
     let url = address(&title, &full);
     if url.len() <= gmm_xxmi::MAX_PAGE_URL {
         return BugReport {
@@ -115,7 +118,7 @@ pub fn bug_report(title: &str, description: &str, details: &str) -> BugReport {
     while lo < hi {
         let mid = (lo + hi).div_ceil(2);
         let text: String = chars[..mid].iter().collect();
-        if address(&title, &body(&format!("{text}…"), details, true)).len()
+        if address(&title, &body(&format!("{text}…"), details, log, true)).len()
             <= gmm_xxmi::MAX_PAGE_URL
         {
             lo = mid;
@@ -124,7 +127,7 @@ pub fn bug_report(title: &str, description: &str, details: &str) -> BugReport {
         }
     }
     let text: String = chars[..lo].iter().collect();
-    let body = body(&format!("{text}…"), details, true);
+    let body = body(&format!("{text}…"), details, log, true);
     BugReport {
         url: address(&title, &body),
         title,
@@ -144,6 +147,7 @@ mod tests {
             "Install fails",
             "It says the archive is damaged.",
             "- GMM 0.1.0",
+            Some("errors.log"),
         );
         assert!(!r.shortened);
         assert!(r.url.starts_with(
@@ -155,12 +159,13 @@ mod tests {
         assert_eq!(body, r.body);
         assert!(r.body.contains("It says the archive is damaged."));
         assert!(r.body.contains("- GMM 0.1.0"));
+        assert!(r.body.contains("Attach `errors.log`"));
     }
 
     #[test]
     fn shortens_long_descriptions_to_fit_the_opener() {
         let long = "ä mod failed ".repeat(400);
-        let r = bug_report(&"t".repeat(500), &long, "- GMM 0.1.0");
+        let r = bug_report(&"t".repeat(500), &long, "- GMM 0.1.0", Some("errors.log"));
         assert!(r.shortened);
         assert_eq!(r.title.chars().count(), MAX_TITLE_CHARS);
         assert!(r.url.len() <= gmm_xxmi::MAX_PAGE_URL, "{}", r.url.len());
@@ -174,8 +179,9 @@ mod tests {
 
     #[test]
     fn an_empty_report_still_opens_the_form() {
-        let r = bug_report(" \n", "", "- GMM 0.1.0");
+        let r = bug_report(" \n", "", "- GMM 0.1.0", None);
         assert_eq!(r.title, "Bug: ");
         assert!(r.body.contains("Describe what happened"));
+        assert!(!r.body.contains("Error log"), "no log, nothing to attach");
     }
 }

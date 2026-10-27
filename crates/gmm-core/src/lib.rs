@@ -57,7 +57,7 @@ pub use conflicts::{
     Conflict, ConflictReport, ModRef, conflicts, conflicts_after_install, conflicts_for,
     conflicts_for_unmanaged,
 };
-pub use errlog::{ErrorLog, LogEntry, MAX_LOG_BYTES, utc};
+pub use errlog::{ErrorLog, LogEntry, LogFile, MAX_LOG_BYTES, utc};
 pub use error::CoreError;
 pub use fetch::{FetchEvent, FetchedArchive, MAX_DOWNLOAD_BYTES, choose_file, fetch_archive};
 pub use images::{CachedImage, IMAGE_HOST, ImageCache, MAX_IMAGE_CACHE_BYTES, clear_image_cache};

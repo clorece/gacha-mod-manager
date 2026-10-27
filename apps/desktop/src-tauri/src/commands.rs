@@ -372,6 +372,7 @@ pub async fn library(state: State<'_, AppState>, game: String) -> CmdResult<Libr
             gb_mod_id: m.row.gb_mod_id,
             gb_file_id: m.row.gb_file_id,
             version: m.row.version,
+            file_date: m.row.file_date,
             size_bytes: m.row.size_bytes,
             installed_at: m.row.installed_at,
             root_category: m.row.listing.root_category,

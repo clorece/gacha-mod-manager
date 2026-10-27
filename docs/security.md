@@ -23,7 +23,7 @@ rules below are enforced in code and CI, and the test harnesses prove them.
 - **R1 — No telemetry.** No analytics, no crash uploader. The only log is local
   (`logs/errors.log`): errors only, rotated at 256 KiB, with the home folder written as `~`.
   Report a Bug only opens a pre-filled GitHub issue in the browser, after a confirmation; GMM
-  sends nothing itself.
+  sends nothing itself, and the user drags the log file in by hand.
 - **R2 — Network allowlist.** Only `gmm-net` opens connections (clippy bans other HTTP
   clients and sockets). Every request and redirect must be HTTPS to `gamebanana.com`,
   `files.gamebanana.com`, `images.gamebanana.com` or `filecache<N>.gamebanana.com`, plus
@@ -58,7 +58,8 @@ rules below are enforced in code and CI, and the test harnesses prove them.
 - **R7 — Minimal process launching.** GMM starts two programs, each from one place, with fixed
   arguments: XXMI Launcher (`--nogui --xxmi <IMP>`, from `gmm-xxmi/src/launch.rs`) and its own
   RAR helper (from `gmm-archive/src/helper.rs`). It also asks the OS to open a web page
-  (`http(s)` only, shown in a confirmation first) or a mod folder. Nothing from a mod is ever
+  (`http(s)` only, shown in a confirmation first), a mod folder, or GMM's log folder (after a
+  bug report opens, to attach the log). Nothing from a mod is ever
   run. `unsafe` code is allowed in three reviewed files only; CI checks both.
 - **R8 — Confirmed, permanent deletes.** Every delete (uninstall, select-mode delete, clearing
   caches, folders an update replaces) goes through `Guard::delete` and needs a confirmation
@@ -72,7 +73,8 @@ rules below are enforced in code and CI, and the test harnesses prove them.
 - Every entry is checked before anything is written (two passes). Refused: absolute paths,
   `..`, drive letters, reserved Windows names, `:` streams, links, special files, and names
   that clash on a case-insensitive disk.
-- Limits: 4 GiB total, 20,000 entries, a 200:1 compression ratio above 16 MiB, paths up to 240
+- Limits: 4 GiB total, 20,000 entries, a 200:1 compression ratio above 128 MiB (mostly blank textures
+  compress far better than 200:1), paths up to 240
   characters, 16 levels deep. Real bytes are counted, so archives that lie about sizes are
   caught.
 - **Policy scan:**

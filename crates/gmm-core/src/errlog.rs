@@ -38,6 +38,17 @@ pub struct LogEntry {
     pub message: String,
 }
 
+/// A file in the log folder, as Report a Bug offers it for attaching.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct LogFile {
+    /// Its name inside the log folder.
+    pub name: String,
+    pub size: u64,
+    /// Last written (Unix seconds).
+    pub modified: i64,
+}
+
 /// See the module docs. Cheap to share; writes are serialized.
 #[derive(Debug)]
 pub struct ErrorLog {
@@ -123,9 +134,53 @@ impl ErrorLog {
         count
     }
 
-    /// The `logs` folder, for "Open log folder".
+    /// The `logs` folder, to show in the file manager.
     pub fn folder(&self) -> Result<PathBuf, CoreError> {
         Ok(self.guard.os_path_of_dir(&self.dir)?)
+    }
+
+    /// The most recently written file in the log folder, if there is one.
+    pub fn newest_file(&self) -> Option<LogFile> {
+        self.guard
+            .read_dir(&self.dir)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|e| !e.is_dir && !e.is_symlink)
+            .filter_map(|e| self.file(&e.name).ok())
+            .max_by_key(|f| (f.modified, f.name == LOG_FILE))
+    }
+
+    /// `name` in the log folder, when it's a file there.
+    pub fn file(&self, name: &str) -> Result<LogFile, CoreError> {
+        if name.contains(['/', '\\']) {
+            return Err(CoreError::NotALog);
+        }
+        let meta = self.guard.metadata(&self.dir.join(name)?)?;
+        if !meta.is_file() {
+            return Err(CoreError::NotALog);
+        }
+        let modified = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
+        Ok(LogFile {
+            name: name.to_owned(),
+            size: meta.len(),
+            modified,
+        })
+    }
+
+    /// The file a file picker returned, which must sit directly in the log folder.
+    pub fn file_at(&self, picked: &Path) -> Result<LogFile, CoreError> {
+        let scoped = self
+            .guard
+            .scope_absolute(picked)
+            .map_err(|_| CoreError::NotALog)?;
+        if scoped.parent().as_ref() != Some(&self.dir) {
+            return Err(CoreError::NotALog);
+        }
+        self.file(scoped.file_name().ok_or(CoreError::NotALog)?)
     }
 
     /// Cleans text the same way lines are cleaned (for bug report drafts).
@@ -336,5 +391,43 @@ mod tests {
         assert!(log.clear() > 100);
         assert!(log.entries(10).is_empty());
         assert_eq!(log.folder().unwrap(), std::fs::canonicalize(&logs).unwrap());
+    }
+
+    #[test]
+    fn picks_log_files_from_the_log_folder_only() {
+        let (dir, log) = log(r"C:\Users\x1");
+        assert_eq!(log.newest_file(), None);
+        log.record("app", "boom");
+        let newest = log.newest_file().unwrap();
+        assert_eq!(newest.name, LOG_FILE);
+        assert!(newest.size > 0 && newest.modified > 0);
+
+        let logs = dir.path().join("logs");
+        std::fs::write(logs.join("older.log"), "x").unwrap();
+        assert_eq!(
+            log.file_at(&logs.join("older.log")).unwrap().name,
+            "older.log"
+        );
+        // Outside the folder, in a subfolder, a folder, missing, or a path in a name.
+        std::fs::write(dir.path().join("gmm.db"), "x").unwrap();
+        std::fs::create_dir(logs.join("sub")).unwrap();
+        std::fs::write(logs.join("sub").join("a.log"), "x").unwrap();
+        for bad in [
+            dir.path().join("gmm.db"),
+            logs.join("sub").join("a.log"),
+            logs.join("sub"),
+            logs.join("missing.log"),
+            std::env::temp_dir(),
+        ] {
+            assert!(
+                matches!(
+                    log.file_at(&bad),
+                    Err(CoreError::NotALog | CoreError::Fs(_))
+                ),
+                "{}",
+                bad.display()
+            );
+        }
+        assert!(matches!(log.file(r"..\gmm.db"), Err(CoreError::NotALog)));
     }
 }

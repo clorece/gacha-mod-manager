@@ -36,7 +36,11 @@ folder: string, enabled: boolean, disk: DiskState, variant: string | null, gb_mo
 /**
  * Folders with the same group are versions of one mod (same GameBanana mod and file).
  */
-group: string | null, version: string | null, size_bytes: number, installed_at: number, 
+group: string | null, version: string | null, 
+/**
+ * GameBanana's upload date of the installed file (Unix seconds).
+ */
+file_date: number | null, size_bytes: number, installed_at: number, 
 /**
  * GameBanana's root category at install, e.g. "Character Skins".
  */
@@ -641,25 +645,15 @@ export type LocalPlan = { game: string, name: string, file_name: string, archive
  */
 kind: string | null, versions: Array<VersionPlan>, version_conflicts: Array<VersionConflict>, install_to: string, };
 
-export type LogEntry = { 
+export type LogFile = { 
 /**
- * UTC, like `2026-10-25T21:03:11Z`.
+ * Its name inside the log folder.
  */
-time: string, 
+name: string, size: number, 
 /**
- * Where it happened: `app`, `install`, `ui`, `panic`, `cli`.
+ * Last written (Unix seconds).
  */
-source: string, message: string, };
-
-export type BugReport = { title: string, body: string, 
-/**
- * The address that opens the pre-filled issue.
- */
-url: string, 
-/**
- * The description was cut to fit the address.
- */
-shortened: boolean, };
+modified: number, };
 
 export type AppRelease = { 
 /**

@@ -8,7 +8,6 @@ import type {
   AdoptCandidate,
   Adopted,
   AppRelease,
-  BugReport,
   CardStats,
   CatalogPage,
   CatalogQuery,
@@ -29,7 +28,7 @@ import type {
   LaunchInfo,
   LibraryView,
   LocalPlan,
-  LogEntry,
+  LogFile,
   ModKey,
   ModProfile,
   ModUpdate,
@@ -171,15 +170,14 @@ export const api = {
   openLink: (key: string) => invoke<boolean>("open_link", { key }),
   openModFolder: (game: string, key: ModKey) => invoke<null>("open_mod_folder", { game, key }),
 
-  /** The local error log, newest last (at most 500 entries). */
-  errorLog: (limit: number) => invoke<LogEntry[]>("error_log", { limit }),
-  clearErrorLog: () => invoke<number>("clear_error_log"),
-  openLogFolder: () => invoke<null>("open_log_folder"),
+  /** The log file a bug report attaches: the one picked, else the newest; null when none. */
+  reportLog: () => invoke<LogFile | null>("report_log"),
+  /** A file dialog in the log folder; the picked log, or null when cancelled. */
+  pickReportLog: () => invoke<LogFile | null>("pick_report_log"),
   /** An unhandled webview error, for the log (cut short in Rust). */
   logUiError: (message: string) => invoke<null>("log_ui_error", { message }),
-  /** What the pre-filled issue will say; Rust writes the text and the address. */
-  bugReportDraft: (title: string, description: string) => invoke<BugReport>("bug_report_draft", { title, description }),
-  /** Asks in a native dialog, then opens the issue in the browser; false when cancelled. */
+  /** Asks in a native dialog, opens the issue in the browser, then shows the log folder;
+   *  false when cancelled. */
   openBugReport: (title: string, description: string) => invoke<boolean>("open_bug_report", { title, description }),
 
   launchPlan: (game: string) => invoke<LaunchInfo>("launch_plan", { game }),

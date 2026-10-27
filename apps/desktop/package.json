@@ -1,7 +1,7 @@
 {
   "name": "gmm-desktop",
   "private": true,
-  "version": "0.0.1-beta",
+  "version": "0.0.2-beta",
   "license": "MIT OR Apache-2.0",
   "type": "module",
   "scripts": {

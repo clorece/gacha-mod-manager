@@ -51,7 +51,13 @@ pub async fn report_bug(
         .map(|g| machine.status(g))
         .collect();
     let details = log.redact(&gmm_core::system_details(&statuses));
-    let report = gmm_core::bug_report(title, &log.redact(text), &details);
+    let newest = log.newest_file();
+    let report = gmm_core::bug_report(
+        title,
+        &log.redact(text),
+        &details,
+        newest.as_ref().map(|f| f.name.as_str()),
+    );
     if json {
         println!("{}", serde_json::to_string_pretty(&report)?);
         return Ok(());

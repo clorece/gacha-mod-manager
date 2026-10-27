@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { modCounts } from "./data";
-import { ago, bytes, compact, plural } from "./format";
+import { ago, bytes, compact, plural, shortAgo } from "./format";
 import { libraries, NOW } from "./test/fixtures";
 
 describe("format", () => {
@@ -24,6 +24,17 @@ describe("format", () => {
     expect(ago(NOW - 3 * 3600, NOW)).toBe("3 h ago");
     expect(ago(NOW - 86_400, NOW)).toBe("yesterday");
     expect(ago(NOW - 10 * 86_400, NOW)).toMatch(/2026/);
+  });
+
+  it("says how long ago, short, for cards", () => {
+    const d = 86_400;
+    expect(shortAgo(NOW - 30, NOW)).toBe("just now");
+    expect(shortAgo(NOW - 5 * 60, NOW)).toBe("5m ago");
+    expect(shortAgo(NOW - 3 * 3600, NOW)).toBe("3h ago");
+    expect(shortAgo(NOW - 4 * d, NOW)).toBe("4d ago");
+    expect(shortAgo(NOW - 20 * d, NOW)).toBe("2w ago");
+    expect(shortAgo(NOW - 150 * d, NOW)).toBe("5mo ago");
+    expect(shortAgo(NOW - 800 * d, NOW)).toBe("2y ago");
   });
 });
 

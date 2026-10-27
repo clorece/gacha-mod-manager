@@ -23,7 +23,9 @@ impl Default for Limits {
             max_total_bytes: 4 * 1024 * 1024 * 1024,
             max_entries: 20_000,
             max_ratio: 200,
-            ratio_floor_bytes: 16 * 1024 * 1024,
+            // Mostly blank FX/mask textures (8192² BC7 is 64 MiB plus a header) can compress
+            // past 300:1 and must still install.
+            ratio_floor_bytes: 128 * 1024 * 1024,
             max_path_len: 240,
             max_depth: 16,
         }

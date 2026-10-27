@@ -58,6 +58,8 @@ export type LibraryItem = {
   hand: boolean;
   /** "Installed 24 Oct 2026" or "Added by hand". */
   added: string;
+  /** GameBanana's upload date of the newest installed file, when known. */
+  updated: number | null;
   size: number | null;
   version: string | null;
   folder: string;
@@ -111,6 +113,10 @@ function managedItem(game: GameInfo, rows: ModRow[]): LibraryItem {
     problem: current.disk === "missing" ? "Folder missing" : current.disk === "ambiguous" ? "Two copies" : null,
     hand: false,
     added: `Installed ${day(Math.min(...rows.map((r) => r.installed_at)))}`,
+    updated: rows.reduce<number | null>(
+      (n, r) => (r.file_date !== null && (n === null || r.file_date > n) ? r.file_date : n),
+      null,
+    ),
     size: rows.reduce((n, r) => n + r.size_bytes, 0),
     version: current.version,
     folder: `GMM/${current.folder}`,
@@ -147,6 +153,7 @@ export function libraryItems(data: AppData, games: GameInfo[]): LibraryItem[] {
         problem: null,
         hand: true,
         added: "Added by hand",
+        updated: null,
         size: null,
         version: null,
         folder: u.path,
@@ -731,6 +738,11 @@ function ModCard({
         <div className="mod-foot">
           <div className="lib-meta">
             <span>{item.added}</span>
+            {item.updated !== null && (
+              <span title="When the creator uploaded the installed file to GameBanana">
+                Updated {day(item.updated)}
+              </span>
+            )}
             {item.size !== null && <span>{bytes(item.size)}</span>}
           </div>
           <span className="spacer" />

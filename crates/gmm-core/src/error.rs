@@ -36,6 +36,8 @@ pub enum CoreError {
     NoAppDirs,
     #[error("file error: {0}")]
     Io(String),
+    #[error("choose a log file from GMM's log folder")]
+    NotALog,
 
     #[error("{0}")]
     BadProfile(String),

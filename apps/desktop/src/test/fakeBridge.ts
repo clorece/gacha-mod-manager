@@ -13,14 +13,12 @@ export const calls: { cmd: string; args: Args }[] = [];
 
 let prefs: Preferences = { ...fx.preferences };
 let libraries = structuredClone(fx.libraries);
-let errorLog = [...fx.errorLog];
 
 /** Back to the fixtures (between tests); `overrides` changes the preferences. */
 export function resetBridge(overrides: Partial<Preferences> = {}): void {
   calls.length = 0;
   prefs = { ...fx.preferences, ...overrides };
   libraries = structuredClone(fx.libraries);
-  errorLog = [...fx.errorLog];
 }
 
 function fail(message: string): never {
@@ -165,18 +163,12 @@ export async function fakeInvoke(cmd: string, args: Args = {}): Promise<unknown>
       return { archives: 6, bytes: 180_000_000 };
     case "clear_http_cache":
       return 120;
-    case "error_log":
-      return errorLog.slice(-(a.limit as number));
-    case "clear_error_log": {
-      const n = errorLog.length;
-      errorLog = [];
-      return n;
-    }
-    case "open_log_folder":
+    case "report_log":
+      return fx.reportLog;
+    case "pick_report_log":
+      return fx.pickedLog;
     case "log_ui_error":
       return null;
-    case "bug_report_draft":
-      return fx.bugReport(a.title, a.description);
     case "open_bug_report":
       return true;
     case "window_is_maximized":

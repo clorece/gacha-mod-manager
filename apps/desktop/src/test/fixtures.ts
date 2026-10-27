@@ -14,7 +14,7 @@ import type {
   Job,
   KeyBindings,
   LibraryView,
-  LogEntry,
+  LogFile,
   ModFile,
   ModProfile,
   ModRow,
@@ -131,6 +131,7 @@ const row = (r: Partial<ModRow> & Pick<ModRow, "id" | "name">): ModRow => ({
   gb_file_id: 1_400_000 + r.id,
   group: null,
   version: "1.0",
+  file_date: NOW - (r.id + 30) * DAY,
   size_bytes: 24_000_000,
   installed_at: NOW - r.id * DAY,
   root_category: "Character Skins",
@@ -494,33 +495,7 @@ export function uninstallPreview(keys: { type: string; id?: number; path?: strin
   }));
 }
 
-export const errorLog: LogEntry[] = [
-  {
-    time: "2026-10-25T09:12:00Z",
-    source: "install",
-    message: "GameBanana mod 700300 file 1: the archive is damaged",
-  },
-  {
-    time: "2026-10-25T10:40:00Z",
-    source: "app",
-    message: "can't read ~AppDataRoamingXXMI LauncherXXMI Launcher Config.json",
-  },
-];
-
-/** Shaped like `gmm_core::bug_report`'s answer (the real text comes from Rust). */
-export function bugReport(title: string, description: string) {
-  const body = `### What happened
-
-${description.trim() || "(Describe what happened.)"}
-
-### Setup
-
-- GMM 0.1.0 on windows (x86_64)
-- Zenless Zone Zero: ready`;
-  return {
-    title: title.trim() || "Bug: ",
-    body,
-    url: `https://github.com/clorece/gacha-mod-manager/issues/new?title=${encodeURIComponent(title)}`,
-    shortened: description.length > 1500,
-  };
-}
+/** The newest log file, which a bug report attaches unless another is picked. */
+export const reportLog: LogFile = { name: "errors.log", size: 3_400, modified: NOW - 2 * 3600 };
+/** What the log picker returns in tests. */
+export const pickedLog: LogFile = { name: "errors.1.log", size: 262_000, modified: NOW - 9 * DAY };

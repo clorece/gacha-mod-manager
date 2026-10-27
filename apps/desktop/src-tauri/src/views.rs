@@ -93,6 +93,8 @@ pub struct ModRow {
     /// Folders with the same group are versions of one mod (same GameBanana mod and file).
     pub group: Option<String>,
     pub version: Option<String>,
+    /// GameBanana's upload date of the installed file (Unix seconds).
+    pub file_date: Option<i64>,
     pub size_bytes: u64,
     pub installed_at: i64,
     /// GameBanana's root category at install, e.g. "Character Skins".

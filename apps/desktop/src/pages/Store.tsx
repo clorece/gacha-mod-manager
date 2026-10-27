@@ -23,7 +23,7 @@ import {
 import { isSensitive, type Owned, periodLabel, SORTS } from "../catalog";
 import { Preview } from "../components/Preview";
 import type { AppData } from "../data";
-import { compact } from "../format";
+import { compact, day, shortAgo } from "../format";
 import { ALL, type Scope } from "../games";
 import { usePrefs } from "../prefs";
 import { useRemembered } from "../remember";
@@ -37,8 +37,9 @@ const MAX_CHARACTERS = 6;
 const MAX_FILL_PAGES = 12;
 const CARD_MIN = 232;
 const GAP = 18;
-/** Card body under the 16:10 preview: title, author, stats row, padding. */
-const CARD_BODY = 146;
+/** Card body under the 16:10 preview: title (up to two lines), author, date, stats row,
+ *  padding. Rows are measured once drawn; this is the first guess. */
+const CARD_BODY = 166;
 /** Most download counts asked for at once (`catalog_stats` takes up to 60). */
 const STATS_BATCH = 60;
 
@@ -704,6 +705,8 @@ const StoreCard = memo(function StoreCard({
 }) {
   const sensitive = isSensitive(mod);
   const label = mod.category?.name ?? mod.root_category?.name;
+  // Like the "Recently updated" sort: GameBanana's update date, else its last edit.
+  const updated = mod.date_updated ?? mod.date_modified;
   return (
     <article className="card mod store-card">
       <button type="button" className="card-hit" aria-label={`Open ${mod.name}`} onClick={() => onOpen(mod.id)} />
@@ -734,6 +737,10 @@ const StoreCard = memo(function StoreCard({
             </span>
           )}
           <span className="truncate">{mod.submitter.name}</span>
+        </div>
+        <div className="card-date" title={`Last updated ${day(updated)}`}>
+          <Icon name="clock" size={14} stroke={2.4} />
+          Updated {shortAgo(updated)}
         </div>
         <div className="mod-foot">
           <div className="stats">

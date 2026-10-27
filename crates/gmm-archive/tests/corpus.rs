@@ -298,6 +298,25 @@ fn zip_bomb_rejected_per_entry() {
 }
 
 #[test]
+fn blank_texture_over_ratio_installs_with_default_limits() {
+    // A 4096² FX mask from a real mod: 16 MiB of pixels plus a 148-byte DDS header, almost all
+    // zeros, so it compresses past 300:1.
+    let env = Env::new();
+    let mut texture = vec![0u8; 16 * 1024 * 1024 + 148];
+    texture[..4].copy_from_slice(b"DDS ");
+    let zip = zip_bytes(
+        &[E::File("Mod/FX.dds", &texture)],
+        CompressionMethod::Deflated,
+    );
+    assert!(
+        texture.len() as u64 > zip.len() as u64 * 200,
+        "test archive should beat 200:1"
+    );
+    let report = env.extract(&zip, &Limits::default()).unwrap();
+    assert_eq!(report.total_bytes, texture.len() as u64);
+}
+
+#[test]
 fn sevenz_bomb_rejected_by_archive_ratio() {
     // 7z has no per-entry compressed size, so this exercises the whole-archive ratio check.
     let env = Env::new();

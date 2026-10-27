@@ -15,9 +15,9 @@
 //! it are byte-for-byte the same), path tricks were refused, every command passed the
 //! capability (so the arguments reached it) and plugin or unknown commands did not.
 //!
-//! Left out, each because a valid call opens something on the user's desktop: the folder
-//! and archive pickers and `open_xxmi_releases` (native dialogs; they take no arguments),
-//! `open_log_folder` (the file manager) and `clear_xxmi_folder` (it would point GMM back at
+//! Left out, each because a valid call opens something on the user's desktop: the folder,
+//! archive and log pickers and `open_xxmi_releases` (native dialogs; they take no arguments),
+//! and `clear_xxmi_folder` (it would point GMM back at
 //! the real XXMI), and the window commands (they act on the calling window itself and take
 //! no arguments); `launch`, `pick_game_folder`, `open_mod_page`, `open_bug_report` and
 //! `open_app_release` only
@@ -235,17 +235,11 @@ fn specs() -> Vec<Spec> {
         s("clear_http_cache", json!({}), &[]),
         s("clear_image_cache", json!({}), &[]),
         s("network_status", json!({}), &[]),
-        s("error_log", json!({"limit": 10}), &[("limit", Page)]),
-        s("clear_error_log", json!({}), &[]),
+        s("report_log", json!({}), &[]),
         s(
             "log_ui_error",
             json!({"message": "x"}),
             &[("message", Text)],
-        ),
-        s(
-            "bug_report_draft",
-            json!({"title": "x", "description": "y"}),
-            &[("title", Text), ("description", Text)],
         ),
         // A valid call opens the confirmation dialog: only shapes that are refused first.
         s("open_bug_report", json!({"title": 1}), &[]),
@@ -322,9 +316,9 @@ fn specs() -> Vec<Spec> {
 const LEFT_OUT: &[&str] = &[
     "pick_xxmi_folder",
     "pick_archive",
+    "pick_report_log",
     "open_xxmi_releases",
     "clear_xxmi_folder",
-    "open_log_folder",
     "window_minimize",
     "window_toggle_maximize",
     "window_is_maximized",

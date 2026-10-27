@@ -58,6 +58,8 @@ pub struct AppState {
     pub releases: Client,
     /// The newer GMM the last check found: the only version `open_app_release` opens.
     pub newest_release: std::sync::Mutex<Option<String>>,
+    /// The log file Report a Bug attaches, when the user picked one (else the newest).
+    pub report_log: std::sync::Mutex<Option<String>>,
 }
 
 impl AppState {
@@ -119,6 +121,7 @@ impl AppState {
             errors,
             releases,
             newest_release: std::sync::Mutex::new(None),
+            report_log: std::sync::Mutex::new(None),
         })
     }
 }
@@ -202,11 +205,9 @@ fn handler<R: Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync
         commands::clear_download_cache,
         commands::clear_http_cache,
         commands::clear_image_cache,
-        report::error_log,
-        report::clear_error_log,
-        report::open_log_folder,
+        report::report_log,
+        report::pick_report_log,
         report::log_ui_error,
-        report::bug_report_draft,
         report::open_bug_report,
         commands::network_status,
         commands::launch_plan,
