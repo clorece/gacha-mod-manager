@@ -8,8 +8,9 @@ name: Release
 # (gmm-desktop.exe, gmm-extract.exe) are signed before they're packaged, then the MSI. Until
 # then the installer is unsigned and Smart App Control blocks it.
 #
-# A tag push makes a draft GitHub release with the MSI and its SHA-256; publishing it stays a
-# person's decision.
+# A tag push makes a draft GitHub release with the MSI, its SHA-256 and its update signature
+# (`.msi.sig`, made with the GMM_UPDATE_KEY secret; GMM's updater checks it). Publishing it
+# stays a person's decision.
 
 on:
   push:
@@ -101,6 +102,17 @@ jobs:
           wait-for-completion: true
           output-artifact-directory: out
 
+      # The updater installs only installers signed with GMM's update key (app_update.rs).
+      # Tag builds must sign; a dry run from the Actions tab signs when the secret is there.
+      - name: Sign the update
+        env:
+          GMM_UPDATE_KEY: ${{ secrets.GMM_UPDATE_KEY }}
+        run: |
+          if [ -z "$GMM_UPDATE_KEY" ] && [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            echo "No GMM_UPDATE_KEY: the installer stays unsigned for the updater (dry run)."
+          else
+            node scripts/sign-update.mjs "out/GMM-${{ steps.version.outputs.version }}-x64.msi" "${{ steps.version.outputs.version }}"
+          fi
       - name: Checksums
         run: cd out && sha256sum *.msi > SHA256SUMS.txt && cat SHA256SUMS.txt
       - uses: actions/upload-artifact@v4

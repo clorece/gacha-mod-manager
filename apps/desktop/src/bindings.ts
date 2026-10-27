@@ -183,6 +183,8 @@ cooldown_secs: number | null,
  */
 showing_saved: boolean, };
 
+export type UpdateProgress = { "phase": "downloading", downloaded: number, total: number | null, } | { "phase": "installing" };
+
 export type RollbackFile = { file_id: number, name: string, 
 /**
  * Upload date (Unix seconds), when GameBanana still lists the file.
@@ -667,4 +669,8 @@ name: string | null, prerelease: boolean,
 /**
  * ISO 8601, as GitHub sends it.
  */
-published_at: string | null, };
+published_at: string | null, 
+/**
+ * GMM can download and install it itself ([`SELF_UPDATES`]).
+ */
+installable: boolean, };

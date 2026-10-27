@@ -62,7 +62,9 @@ Origin](https://developercertificate.org/)).
    `apps/desktop/src-tauri/tauri.conf.json` (numbers only, e.g. `0.0.2`). Run
    `cargo update --workspace`.
 2. Write the notes in `docs/releases/v<version>.md`.
-3. Commit, then push the tag `v<version>`. The Release workflow builds the MSI and creates a
+3. Commit, then push the tag `v<version>`. The Release workflow builds the MSI, signs it for
+   GMM's updater with the `GMM_UPDATE_KEY` secret (`scripts/sign-update.mjs`; it refuses a key
+   whose public half isn't `UPDATE_PUBLIC_KEY` in `gmm-core`) and creates a
    draft release (signed automatically once the `SIGNPATH_ORGANIZATION_ID` variable and
    `SIGNPATH_API_TOKEN` secret are set).
 4. On the Releases page, open the draft with **Edit** and press **Publish release**.

@@ -765,6 +765,10 @@ dialog.drawer[open] {
   justify-content: flex-end;
   gap: 10px 14px;
 }
+/* The update's download, on a line of its own under the status. */
+.about-bar {
+  flex-basis: 100%;
+}
 .kv-row {
   display: flex;
   gap: 12px;

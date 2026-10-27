@@ -26,6 +26,7 @@
     "allow-queue-clear-finished",
     "allow-startup-check",
     "allow-app-update-check",
+    "allow-app-update-install",
     "allow-open-app-release",
     "allow-library",
     "allow-switch-version",

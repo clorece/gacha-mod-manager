@@ -30,6 +30,8 @@ pelite = { version = "0.10", default-features = false, features = ["std"] }
 # HTTPS via rustls with the ring backend (no aws-lc/C build tools) and the OS certificate
 # store. Only gmm-net may use reqwest (security rule R2).
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "http2"] }
+# Checks the app update installer's signature (ed25519). Already in the tree through rustls.
+ring = "0.17"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

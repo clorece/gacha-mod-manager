@@ -1576,6 +1576,7 @@ dependencies = [
  "gmm-net",
  "gmm-xxmi",
  "hex",
+ "ring",
  "semver",
  "serde",
  "serde_json",

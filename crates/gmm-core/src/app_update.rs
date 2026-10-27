@@ -1,17 +1,40 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! The app update check (security rule R2): GMM reads its own releases list
-//! on GitHub and says whether a newer version exists. It never downloads or runs anything:
-//! the user gets the release page in their browser (after a confirmation) and installs the
-//! new MSI themselves. Pre-releases count while GMM itself is a pre-release (the betas), so
-//! a beta user hears about the next beta and the first stable release; a stable build hears
-//! only about stable ones. Drafts never count.
+//! The app update (security rules R2 and R7): GMM reads its own releases list on GitHub and
+//! says whether a newer version exists. On Windows it then downloads that release's installer
+//! (`GMM-<version>-x64.msi`) and its signature, and installs it only when the signature
+//! matches [`UPDATE_PUBLIC_KEY`]: the release workflow signs `GMM update <version>` and the
+//! installer's SHA-256 with the private half, which only the repository's secrets hold. So a
+//! swapped file, an older installer passed off as newer, or a release made without the key is
+//! refused. Elsewhere the user gets the release page. Pre-releases count while GMM itself is a
+//! pre-release (the betas), so a beta user hears about the next beta and the first stable
+//! release; a stable build hears only about stable ones. Drafts never count.
 
-use gmm_net::{Client, GITHUB_RELEASES_HOST, GITHUB_RELEASES_PATH, Url};
+use std::ops::ControlFlow;
+use std::path::PathBuf;
+
+use gmm_net::{
+    Client, DownloadRequest, GITHUB_DOWNLOADS_HOST, GITHUB_DOWNLOADS_PATH, GITHUB_RELEASES_HOST,
+    GITHUB_RELEASES_PATH, Progress, Url,
+};
+use ring::signature::{ED25519, UnparsedPublicKey};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
 use crate::error::CoreError;
+use crate::workspace::Workspace;
+
+/// The public half of GMM's update key (ed25519, hex). The private half is the repository
+/// secret `GMM_UPDATE_KEY`; `scripts/sign-update.mjs` signs each release's installer with it.
+pub const UPDATE_PUBLIC_KEY: &str =
+    "e33c844b6a57e5a365814cbab927fcd1b5e432483004cb753fd8cc63505e3871";
+
+/// Most bytes an installer may have (the MSI is about 9 MB).
+const MAX_INSTALLER_BYTES: u64 = 256 * 1024 * 1024;
+
+/// Whether this build installs updates itself (Windows, from the MSI); elsewhere the update
+/// notice opens the release page.
+pub const SELF_UPDATES: bool = cfg!(windows);
 
 /// This build's version (`0.0.1-beta`): the workspace version every crate shares.
 pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -33,6 +56,8 @@ pub struct AppRelease {
     pub prerelease: bool,
     /// ISO 8601, as GitHub sends it.
     pub published_at: Option<String>,
+    /// GMM can download and install it itself ([`SELF_UPDATES`]).
+    pub installable: bool,
 }
 
 impl AppRelease {
@@ -96,7 +121,96 @@ pub fn newest_release(body: &[u8], current: &str) -> Result<Option<AppRelease>, 
         name: r.name.filter(|n| !n.trim().is_empty()),
         prerelease: r.prerelease || !version.pre.is_empty(),
         published_at: r.published_at,
+        installable: SELF_UPDATES,
     }))
+}
+
+/// What the release workflow signs for `version`'s installer with SHA-256 `sha256` (hex).
+fn signed_message(version: &str, sha256: &str) -> String {
+    format!("GMM update {version}\n{}\n", sha256.to_ascii_lowercase())
+}
+
+/// Whether `signature` (hex) is `public_key`'s signature of `version`'s installer.
+fn signature_matches(public_key: &[u8], version: &str, sha256: &str, signature: &str) -> bool {
+    let Ok(signature) = hex::decode(signature.trim()) else {
+        return false;
+    };
+    UnparsedPublicKey::new(&ED25519, public_key)
+        .verify(signed_message(version, sha256).as_bytes(), &signature)
+        .is_ok()
+}
+
+/// Whether `signature` is GMM's signature of `version`'s installer.
+pub fn update_signature_matches(version: &str, sha256: &str, signature: &str) -> bool {
+    hex::decode(UPDATE_PUBLIC_KEY)
+        .is_ok_and(|key| signature_matches(&key, version, sha256, signature))
+}
+
+fn download_url(file: &str, version: &Version) -> Result<Url, CoreError> {
+    Url::parse(&format!(
+        "https://{GITHUB_DOWNLOADS_HOST}{GITHUB_DOWNLOADS_PATH}v{version}/{file}"
+    ))
+    .map_err(|e| CoreError::BadUpdate(e.to_string()))
+}
+
+/// Downloads `version`'s installer into `<cache>/updates/` with `net` (a client scoped to
+/// GMM's release downloads), checks its signature, and returns its path for Windows
+/// Installer. Earlier installers there are removed first; a bad one is removed too.
+pub async fn download_app_update(
+    net: &Client,
+    ws: &Workspace,
+    version: &str,
+    on_progress: impl FnMut(Progress) -> ControlFlow<()>,
+) -> Result<PathBuf, CoreError> {
+    let version =
+        Version::parse(version).map_err(|e| CoreError::BadUpdate(format!("version: {e}")))?;
+    let guard = ws.guard();
+    let dir = guard.path(ws.cache_root(), "updates")?;
+    if guard.exists(&dir)? {
+        guard.remove_dir_all(&dir)?;
+    }
+    guard.create_dir_all(&dir)?;
+
+    let file = format!("GMM-{version}-x64.msi");
+    let dest = dir.join(&file)?;
+    let outcome = net
+        .download(
+            guard,
+            &DownloadRequest {
+                url: download_url(&file, &version)?,
+                dest: dest.clone(),
+                expected_size: None,
+                expected_md5: None,
+                max_bytes: MAX_INSTALLER_BYTES,
+            },
+            on_progress,
+        )
+        .await?;
+
+    let refuse = |why: &str| {
+        let _ = guard.remove_file(&dest);
+        CoreError::BadUpdate(why.to_owned())
+    };
+    let sig = match net
+        .get(&download_url(&format!("{file}.sig"), &version)?)
+        .await
+    {
+        Ok(r) if r.is_success() && r.body.len() <= 1024 => r.body,
+        Ok(r) => {
+            return Err(refuse(&format!(
+                "its signature couldn't be read (HTTP {})",
+                r.status
+            )));
+        }
+        Err(e) => return Err(refuse(&format!("its signature couldn't be read: {e}"))),
+    };
+    let sig = String::from_utf8_lossy(&sig);
+    if !update_signature_matches(&version.to_string(), &outcome.sha256, &sig) {
+        return Err(refuse(
+            "its signature doesn't match GMM's update key, so it may not come from GMM",
+        ));
+    }
+    Ok(guard.os_path_for_library(&dest)?)
 }
 
 #[cfg(test)]
@@ -148,6 +262,65 @@ mod tests {
         let body = list(&[("v0.1.0", false, false), ("v0.2.0-beta", false, true)]);
         assert_eq!(newest_release(&body, "0.1.0").unwrap(), None);
         assert_eq!(newest_release(&list(&[]), "0.1.0-beta").unwrap(), None);
+    }
+
+    #[test]
+    fn only_the_keys_signature_of_this_version_and_file_counts() {
+        use ring::rand::SystemRandom;
+        use ring::signature::{Ed25519KeyPair, KeyPair};
+
+        let pkcs8 = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();
+        let key = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
+        let public = key.public_key().as_ref();
+        let sha = "ab".repeat(32);
+        let sig = hex::encode(key.sign(signed_message("0.0.3-beta", &sha).as_bytes()));
+
+        assert!(signature_matches(public, "0.0.3-beta", &sha, &sig));
+        assert!(signature_matches(
+            public,
+            "0.0.3-beta",
+            &sha.to_uppercase(),
+            &format!("{sig}\n")
+        ));
+        assert!(
+            !signature_matches(public, "0.0.2-beta", &sha, &sig),
+            "an older version"
+        );
+        assert!(
+            !signature_matches(public, "0.0.3-beta", &"cd".repeat(32), &sig),
+            "another file"
+        );
+        let mut flipped = sig.clone().into_bytes();
+        flipped[0] = if flipped[0] == b'0' { b'1' } else { b'0' };
+        assert!(!signature_matches(
+            public,
+            "0.0.3-beta",
+            &sha,
+            &String::from_utf8(flipped).unwrap()
+        ));
+        assert!(!signature_matches(public, "0.0.3-beta", &sha, "not hex"));
+        assert!(!signature_matches(public, "0.0.3-beta", &sha, ""));
+        assert!(
+            !update_signature_matches("0.0.3-beta", &sha, &sig),
+            "another key's signature isn't GMM's"
+        );
+        assert_eq!(hex::decode(UPDATE_PUBLIC_KEY).unwrap().len(), 32);
+    }
+
+    #[test]
+    fn reads_what_the_release_script_signs() {
+        // Made by Node's crypto.sign with a throwaway key, as scripts/sign-update.mjs signs.
+        let public =
+            hex::decode("d08fccc042d7b97c6b086cc767ad40185638c2bec27d64ef8f0fa9457cda8513")
+                .unwrap();
+        let sig = "33e3ceb33fcffd4482dc35c1e3757a8a3a5ab81da97dd636c30a9f775a5ed15b\
+                   2cfd8f7ecfc22ee5e04481ed4d191b89ebd1ef6d320b0fed39aa186d4f8a6706\n";
+        assert!(signature_matches(
+            &public,
+            "0.0.3-beta",
+            &"ab".repeat(32),
+            sig
+        ));
     }
 
     #[test]

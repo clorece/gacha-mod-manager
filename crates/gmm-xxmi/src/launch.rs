@@ -22,6 +22,12 @@
 //!
 //! [`game_running`] looks at running process names (Windows ToolHelp snapshot), so GMM can
 //! hold off writing `d3dx_user.ini` while the game is open.
+//!
+//! [`install_update`] hands a GMM installer to Windows Installer (`msiexec.exe` from the
+//! System32 folder, never found by search) with fixed arguments: `/i "<msi>" /passive
+//! /norestart AUTOLAUNCHAPP=1`, so Windows shows its own progress bar and GMM reopens when it's
+//! done. The caller has checked the installer's signature against GMM's update key
+//! (`gmm_core::download_app_update`); Windows only.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -125,6 +131,22 @@ pub fn open_folder(dir: &Path) -> Result<(), String> {
     platform::shell_open(Shell::Folder, dir.as_os_str())
 }
 
+/// Starts Windows Installer on `msi`, a GMM installer whose signature the caller checked (see
+/// the module docs). Refuses anything but an existing absolute `.msi` path without quotes.
+/// GMM should quit right after, so the installer can replace its files.
+pub fn install_update(msi: &Path) -> Result<(), String> {
+    let plain = msi.is_absolute()
+        && msi.is_file()
+        && msi
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("msi"))
+        && !msi.to_string_lossy().contains('"');
+    if !plain {
+        return Err(format!("{} is not an installer", msi.display()));
+    }
+    platform::install_msi(msi)
+}
+
 /// Whether one of the game's executables is running. Only process image names are
 /// compared (nothing else about other processes is read or kept). GMM writes 3DMigoto's
 /// `d3dx_user.ini` only while this is false, because the running game rewrites that file
@@ -157,6 +179,7 @@ mod platform {
         CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
         TH32CS_SNAPPROCESS,
     };
+    use windows_sys::Win32::System::SystemInformation::GetSystemDirectoryW;
     use windows_sys::Win32::System::Threading::GetProcessId;
     use windows_sys::Win32::UI::Shell::{
         SEE_MASK_NOASYNC, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW, ShellExecuteExW,
@@ -196,6 +219,56 @@ mod platform {
         };
         if ok == 0 {
             return Err(format!("couldn't open it: {}", io::Error::last_os_error()));
+        }
+        Ok(())
+    }
+
+    /// `msiexec.exe` in the System32 folder, as Windows reports that folder.
+    fn msiexec() -> Result<std::path::PathBuf, String> {
+        let mut buf = [0u16; 260];
+        // SAFETY: `buf` is a writable buffer of the length passed; the call writes at most that
+        // many UTF-16 units and returns how many it wrote (0 on failure, more than the length
+        // when the buffer is too small, both refused below).
+        let len = unsafe { GetSystemDirectoryW(buf.as_mut_ptr(), buf.len() as u32) } as usize;
+        if len == 0 || len >= buf.len() {
+            return Err(format!(
+                "couldn't find Windows Installer: {}",
+                io::Error::last_os_error()
+            ));
+        }
+        Ok(Path::new(&String::from_utf16_lossy(&buf[..len])).join("msiexec.exe"))
+    }
+
+    pub fn install_msi(msi: &Path) -> Result<(), String> {
+        let exe = msiexec()?;
+        let file = wide(exe.as_os_str());
+        let params = wide(OsStr::new(&format!(
+            "/i \"{}\" /passive /norestart AUTOLAUNCHAPP=1",
+            msi.display()
+        )));
+        let mut info = SHELLEXECUTEINFOW {
+            cbSize: u32::try_from(std::mem::size_of::<SHELLEXECUTEINFOW>()).unwrap_or(0),
+            fMask: SEE_MASK_NOASYNC,
+            lpFile: file.as_ptr(),
+            lpParameters: params.as_ptr(),
+            nShow: SW_SHOWNORMAL,
+            ..SHELLEXECUTEINFOW::default()
+        };
+        // SAFETY: as in `start`: `info` is fully initialised, `cbSize` matches, and the string
+        // pointers refer to NUL-terminated buffers that outlive the call. No process handle is
+        // requested, so there is nothing to close.
+        let ok = unsafe {
+            let _ = CoInitializeEx(
+                std::ptr::null(),
+                (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
+            );
+            ShellExecuteExW(&mut info)
+        };
+        if ok == 0 {
+            return Err(format!(
+                "couldn't start the installer: {}",
+                io::Error::last_os_error()
+            ));
         }
         Ok(())
     }
@@ -307,6 +380,10 @@ mod platform {
         false
     }
 
+    pub fn install_msi(_msi: &Path) -> Result<(), String> {
+        Err("GMM installs its updates itself on Windows only".to_owned())
+    }
+
     pub fn start(command: &LaunchCommand, dir: &Path) -> Result<Option<u32>, String> {
         let child = Command::new(&command.exe)
             .args(&command.args)
@@ -323,6 +400,23 @@ mod platform {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[allow(clippy::disallowed_methods)]
+    fn only_existing_msi_files_go_to_the_installer() {
+        let dir = tempfile::tempdir().unwrap();
+        let exe = dir.path().join("GMM.exe");
+        std::fs::write(&exe, b"x").unwrap();
+        for bad in [
+            Path::new("GMM-1-x64.msi").to_path_buf(),
+            dir.path().join("missing.msi"),
+            dir.path().to_path_buf(),
+            exe,
+            dir.path().join("a\" /qn \"b.msi"),
+        ] {
+            assert!(install_update(&bad).is_err(), "{}", bad.display());
+        }
+    }
 
     #[test]
     fn only_plain_web_addresses_are_opened() {

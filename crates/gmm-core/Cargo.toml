@@ -24,6 +24,7 @@ gmm-migoto.workspace = true
 gmm-net.workspace = true
 gmm-xxmi.workspace = true
 hex.workspace = true
+ring.workspace = true
 semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true

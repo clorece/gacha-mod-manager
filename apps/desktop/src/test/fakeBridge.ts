@@ -11,15 +11,31 @@ type Args = Record<string, unknown> | undefined;
 
 export const calls: { cmd: string; args: Args }[] = [];
 
+/** Switches a test can flip; `resetBridge` turns them off again. */
+export const scenario = {
+  /** The startup check finds a newer GMM that can install itself. */
+  appUpdateAtStartup: false,
+};
+
 let prefs: Preferences = { ...fx.preferences };
 let libraries = structuredClone(fx.libraries);
 
 /** Back to the fixtures (between tests); `overrides` changes the preferences. */
 export function resetBridge(overrides: Partial<Preferences> = {}): void {
   calls.length = 0;
+  scenario.appUpdateAtStartup = false;
   prefs = { ...fx.preferences, ...overrides };
   libraries = structuredClone(fx.libraries);
 }
+
+/** The newer GMM the update checks find. */
+const newerGmm = {
+  version: "0.2.0-beta",
+  name: "GMM 0.2 beta",
+  prerelease: true,
+  published_at: "2026-11-02T10:00:00Z",
+  installable: true,
+};
 
 function fail(message: string): never {
   const err: CmdError = { kind: "other", message };
@@ -66,11 +82,17 @@ export async function fakeInvoke(cmd: string, args: Args = {}): Promise<unknown>
     case "storage":
       return fx.storage;
     case "startup_check":
-      return { checked: 4, updates: fx.updates, notes: [], app_update: null };
+      return { checked: 4, updates: fx.updates, notes: [], app_update: scenario.appUpdateAtStartup ? newerGmm : null };
     case "app_update_check":
-      return { version: "0.2.0-beta", name: "GMM 0.2 beta", prerelease: true, published_at: "2026-11-02T10:00:00Z" };
+      return newerGmm;
     case "open_app_release":
       return true;
+    case "app_update_install": {
+      const send = (a.onProgress as { onmessage?: (p: unknown) => void } | undefined)?.onmessage;
+      send?.({ phase: "downloading", downloaded: 4_500_000, total: 9_000_000 });
+      send?.({ phase: "installing" });
+      return null;
+    }
     case "catalog_list":
     case "catalog_search": {
       const game = (a.query as { game?: string } | undefined)?.game ?? a.game;

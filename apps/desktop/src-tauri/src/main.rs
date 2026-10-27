@@ -56,6 +56,8 @@ pub struct AppState {
     pub errors: Arc<gmm_core::ErrorLog>,
     /// The app update check's GitHub client (`app_update.rs`).
     pub releases: Client,
+    /// The updater's client: GMM's installers on its GitHub releases, nothing else.
+    pub updates: Client,
     /// The newer GMM the last check found: the only version `open_app_release` opens.
     pub newest_release: std::sync::Mutex<Option<String>>,
     /// The log file Report a Bug attaches, when the user picked one (else the newest).
@@ -80,6 +82,16 @@ impl AppState {
             allowlist: net.allowlist.for_github_releases(),
             rate_limit: RateLimit {
                 per_second: 0.2,
+                burst: 2,
+            },
+            ..net.clone()
+        })?;
+        // The updater downloads GMM's own installer and its signature, through a client that
+        // can reach nothing else (R2).
+        let updates = Client::new(NetConfig {
+            allowlist: net.allowlist.for_github_downloads(),
+            rate_limit: RateLimit {
+                per_second: 0.5,
                 burst: 2,
             },
             ..net.clone()
@@ -120,6 +132,7 @@ impl AppState {
             watchers: queue::Watchers::default(),
             errors,
             releases,
+            updates,
             newest_release: std::sync::Mutex::new(None),
             report_log: std::sync::Mutex::new(None),
         })
@@ -185,6 +198,7 @@ fn handler<R: Runtime>() -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync
         queue::queue_clear_finished,
         startup::startup_check,
         app_update::app_update_check,
+        app_update::app_update_install,
         app_update::open_app_release,
         commands::library,
         commands::switch_version,

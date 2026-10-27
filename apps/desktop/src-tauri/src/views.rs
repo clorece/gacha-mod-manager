@@ -253,6 +253,16 @@ pub struct InstallResult {
     pub conflicts: Vec<Conflict>,
 }
 
+/// Where an app update stands, sent while `app_update_install` works.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(tag = "phase", rename_all = "snake_case")]
+pub enum UpdateProgress {
+    /// The installer is downloading (its signature is checked as soon as it's in).
+    Downloading { downloaded: u64, total: Option<u64> },
+    /// Checked and handed to Windows Installer: GMM closes, and reopens when it's done.
+    Installing,
+}
+
 /// Where a startup-check step is.
 #[derive(Debug, Clone, Copy, Serialize, TS)]
 #[serde(rename_all = "snake_case")]

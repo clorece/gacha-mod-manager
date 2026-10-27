@@ -14,7 +14,7 @@ rules below are enforced in code and CI, and the test harnesses prove them.
 | T5 | Starting the wrong program | Only the exe inside a confirmed XXMI folder, confirmed by the user |
 | T6 | Deep-link abuse | No deep links exist; if added, they carry GameBanana ids only and need a confirmation |
 | T7 | Supply chain | Lockfiles, `cargo-deny`, `pnpm audit`, license checks, few dependencies |
-| T8 | A fake GMM update | GMM never downloads updates; it opens the GitHub release page |
+| T8 | A fake GMM update | Only GMM's own release installers are downloaded, and only one signed with GMM's update key (ed25519, private half in a repository secret) for that exact version is run |
 | T9 | Deleting the wrong mods | Every delete lists what goes and needs a confirmation |
 | T10 | Account or Terms of Service risk | GMM never injects anything or touches anti-cheat |
 
@@ -27,7 +27,10 @@ rules below are enforced in code and CI, and the test harnesses prove them.
 - **R2 — Network allowlist.** Only `gmm-net` opens connections (clippy bans other HTTP
   clients and sockets). Every request and redirect must be HTTPS to `gamebanana.com`,
   `files.gamebanana.com`, `images.gamebanana.com` or `filecache<N>.gamebanana.com`, plus
-  GitHub's releases list for the update check. The webview makes no network requests at all
+  GitHub's releases list for the update check and, for the updater, GMM's own installers
+  (`github.com/clorece/gacha-mod-manager/releases/download/v<version>/GMM-<version>-x64.msi`
+  and its `.sig`, then GitHub's file host). Each of the three uses its own client that can
+  reach nothing else. The webview makes no network requests at all
   (CSP `connect-src ipc:`); images come through the `gmmimg` protocol.
 - **R2a — Staying welcome on GameBanana.** No key, no account, an honest User-Agent, a small
   request budget, a response cache, and a shared pause when GameBanana says "slow down". See
@@ -55,9 +58,11 @@ rules below are enforced in code and CI, and the test harnesses prove them.
   webview only learns the file name.
 - **R6 — No debug bridges in release.** Devtools and test hooks need a `dev` feature; CI
   checks release builds don't have it.
-- **R7 — Minimal process launching.** GMM starts two programs, each from one place, with fixed
-  arguments: XXMI Launcher (`--nogui --xxmi <IMP>`, from `gmm-xxmi/src/launch.rs`) and its own
-  RAR helper (from `gmm-archive/src/helper.rs`). It also asks the OS to open a web page
+- **R7 — Minimal process launching.** GMM starts three programs, each from one place, with fixed
+  arguments: XXMI Launcher (`--nogui --xxmi <IMP>`, from `gmm-xxmi/src/launch.rs`), its own
+  RAR helper (from `gmm-archive/src/helper.rs`), and on Windows, Windows Installer for its own
+  update (System32's `msiexec.exe /i "<msi>" /passive /norestart AUTOLAUNCHAPP=1`, also from
+  `launch.rs`, only after the installer's signature checked out; see T8). It also asks the OS to open a web page
   (`http(s)` only, shown in a confirmation first), a mod folder, or GMM's log folder (after a
   bug report opens, to attach the log). Nothing from a mod is ever
   run. `unsafe` code is allowed in three reviewed files only; CI checks both.
@@ -120,6 +125,7 @@ All run in CI.
 | **IPC fuzz harness** (`src-tauri/src/ipc_fuzz.rs`): ~1,500 hostile calls through Tauri's real IPC path | No panic or hang, path tricks refused, nothing outside GMM's folders changes (R5) |
 | Slow-down tests (`gmm-net`, `gmm-catalog`) | A 429 or challenge pauses every client (R2a) |
 | Image cache and opener tests | Only GameBanana images get keys; only plain web addresses and real folders open (R2, R7) |
+| Updater tests (`gmm-core` app_update, allowlist, `launch.rs`) | Only this key's signature of this version and this file passes, including one made by the release script; the updater's client reaches only GMM's installers; only an existing `.msi` goes to Windows Installer (T8, R2, R7) |
 | Adapter conformance suite (`gmm-core/tests/conformance.rs`) | Detect → install → switch → conflicts → uninstall per game, with no writes outside `Mods/` |
 | XSS corpus (`RichText.test.tsx`, `html.rs` tests) | Hostile HTML comes out with only allowed tags and keys (T3) |
 | Component tests (Vitest) and the contrast audit (`tests/ui-audit.mjs`, Playwright) | Confirmations stay in place; text is readable in both themes |

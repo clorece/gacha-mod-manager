@@ -51,7 +51,8 @@ mod workspace;
 pub use adopt::{AdoptCandidate, Adopted, MatchReason, adopt, adopt_candidates};
 pub use analyze::{Analysis, Variant, VersionConflict, analyze};
 pub use app_update::{
-    APP_VERSION, AppRelease, RELEASES_PAGE, check_app_update, newest_release, release_page,
+    APP_VERSION, AppRelease, RELEASES_PAGE, SELF_UPDATES, UPDATE_PUBLIC_KEY, check_app_update,
+    download_app_update, newest_release, release_page, update_signature_matches,
 };
 pub use conflicts::{
     Conflict, ConflictReport, ModRef, conflicts, conflicts_after_install, conflicts_for,

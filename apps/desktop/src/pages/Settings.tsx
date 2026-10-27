@@ -15,7 +15,7 @@ import { setupLabel, sourceLabel } from "../games";
 import { Markdown, section } from "../markdown";
 import { usePrefs } from "../prefs";
 import { Badge, Button, Dialog, Segmented, Spinner, Switch, useToast } from "../ui";
-import { APP_VERSION, openRelease, versionLabel } from "../version";
+import { APP_VERSION, openRelease, updatePercent, useAppUpdate, versionLabel } from "../version";
 import { StorageBreakdown } from "./Storage";
 
 /** Settings › About's update check. */
@@ -34,6 +34,7 @@ export function Settings({ data }: { data: AppData }) {
 function SettingsCards({ data, onBreakdown }: { data: AppData; onBreakdown: () => void }) {
   const toast = useToast();
   const [appUpdate, setAppUpdate] = useState<UpdateState>({ state: "idle" });
+  const [updateRun, startUpdate] = useAppUpdate();
   const checkUpdate = () => {
     setAppUpdate({ state: "checking" });
     api
@@ -333,17 +334,47 @@ function SettingsCards({ data, onBreakdown }: { data: AppData; onBreakdown: () =
               <span>Updates</span>
               <span className="about-update">
                 <b>
-                  {appUpdate.state === "idle"
-                    ? "GMM looks for a newer version on GitHub each time it starts."
-                    : appUpdate.state === "checking"
-                      ? "Looking on GitHub…"
-                      : appUpdate.state === "failed"
-                        ? `Couldn't check: ${appUpdate.message}`
-                        : appUpdate.release
-                          ? `GMM ${versionLabel(appUpdate.release.version)} is out.`
-                          : "You have the newest version."}
+                  {updateRun.state === "downloading"
+                    ? `Downloading the update… ${updatePercent(updateRun)}%`
+                    : updateRun.state === "installing"
+                      ? "Installing; GMM closes and reopens by itself."
+                      : updateRun.state === "failed"
+                        ? `Couldn't update: ${updateRun.message}`
+                        : appUpdate.state === "idle"
+                          ? "GMM looks for a newer version on GitHub each time it starts."
+                          : appUpdate.state === "checking"
+                            ? "Looking on GitHub…"
+                            : appUpdate.state === "failed"
+                              ? `Couldn't check: ${appUpdate.message}`
+                              : appUpdate.release
+                                ? `GMM ${versionLabel(appUpdate.release.version)} is out.`
+                                : "You have the newest version."}
                 </b>
-                {appUpdate.state === "done" && appUpdate.release ? (
+                {(updateRun.state === "downloading" || updateRun.state === "installing") && (
+                  <div
+                    className="bar about-bar"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={updatePercent(updateRun)}
+                    aria-label="Update"
+                  >
+                    <span style={{ width: `${updatePercent(updateRun)}%` }} />
+                  </div>
+                )}
+                {appUpdate.state === "done" && appUpdate.release?.installable && updateRun.state !== "failed" ? (
+                  <Button
+                    variant="primary"
+                    icon="download"
+                    disabled={updateRun.state !== "idle"}
+                    onClick={() => {
+                      const release = appUpdate.state === "done" ? appUpdate.release : null;
+                      if (release) startUpdate(release.version);
+                    }}
+                  >
+                    {updateRun.state === "idle" ? "Update now" : "Updating…"}
+                  </Button>
+                ) : appUpdate.state === "done" && appUpdate.release ? (
                   <Button
                     variant="primary"
                     icon="download"

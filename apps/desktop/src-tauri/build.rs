@@ -27,6 +27,7 @@ const COMMANDS: &[&str] = &[
     "queue_clear_finished",
     "startup_check",
     "app_update_check",
+    "app_update_install",
     "open_app_release",
     "library",
     "switch_version",

@@ -3,14 +3,16 @@
 // newest catalogue pages and checks the installed mods for updates (`startup_check`). The
 // app works offline, so a failing step is shown and the app opens anyway; Skip for now
 // opens it at once while the check finishes in the background. When a newer GMM is on GitHub
-// the screen stays up with Get the update (its release page) and Later.
+// it updates itself where it can (Windows), like Discord: the bar follows the download, then
+// Windows Installer takes over and GMM reopens. If that fails, or elsewhere, the screen stays
+// up with its release page (Get the update) and Later.
 
 import { useEffect, useRef, useState } from "react";
 import { api, asCmdError, type GameInfo, type StartupReport, type StartupStep, type StepState } from "../api";
 import logo from "../assets/gmm-logo.svg";
-import { plural } from "../format";
+import { bytes, plural } from "../format";
 import { Button, Icon, useToast } from "../ui";
-import { APP_VERSION, openRelease, versionLabel } from "../version";
+import { APP_VERSION, openRelease, updatePercent, useAppUpdate, versionLabel } from "../version";
 
 /** How long "All set" stays up before the app opens. */
 const OPEN_AFTER_MS = 900;
@@ -89,16 +91,37 @@ export function Startup({
     return () => clearTimeout(timer);
   }, [finished, report]);
 
+  const appUpdate = report?.app_update ?? null;
+  const [run, startUpdate] = useAppUpdate();
+  // A new GMM that can install itself starts at once, once.
+  const started = useRef(false);
+  useEffect(() => {
+    if (!appUpdate?.installable || started.current) return;
+    started.current = true;
+    startUpdate(appUpdate.version);
+  }, [appUpdate, startUpdate]);
+  const selfUpdate = appUpdate?.installable === true;
+  // From the moment it's found (the download starts on the next tick) until it fails.
+  const updating = selfUpdate && run.state !== "failed";
+  const updateFailed = selfUpdate && run.state === "failed";
+
   const settled = rows.filter((r) => r.state === "done" || r.state === "failed").length;
-  const pct = finished ? 100 : Math.round((settled / Math.max(rows.length, 1)) * 100);
-  const working = rows.find((r) => r.state === "working");
   const failed = rows.filter((r) => r.state === "failed").length;
   const updates = report?.updates.length ?? 0;
-
-  const appUpdate = report?.app_update ?? null;
+  const working = rows.find((r) => r.state === "working");
+  let pct = finished ? 100 : Math.round((settled / Math.max(rows.length, 1)) * 100);
   let detail = working?.label.replace(/ mods$/, "") ?? `GMM ${APP_VERSION}`;
   if (finished) {
     detail = updates > 0 ? `${plural(updates, "mod update")} found` : "Opening GMM";
+  }
+  if (updating) {
+    pct = updatePercent(run);
+    detail =
+      run.state === "downloading" && run.total
+        ? `${bytes(run.downloaded)} of ${bytes(run.total)}`
+        : run.state === "installing"
+          ? "Checked and signed"
+          : "Starting the download";
   }
 
   return (
@@ -114,21 +137,33 @@ export function Startup({
 
         <section className="su-card" aria-live="polite">
           <h1 className="su-h">
-            {appUpdate
-              ? "New software update available"
-              : finished && failed === 0 && !failure
-                ? "You’re up to date"
-                : "Checking for updates"}
+            {updating
+              ? "Updating GMM"
+              : updateFailed
+                ? "GMM couldn’t update"
+                : appUpdate
+                  ? "New software update available"
+                  : finished && failed === 0 && !failure
+                    ? "You’re up to date"
+                    : "Checking for updates"}
           </h1>
-          <div className={`su-status${finished ? (appUpdate || failure || failed ? " is-warn" : " is-done") : ""}`}>
-            {!finished && <span className="spin" aria-hidden="true" />}
-            {appUpdate
-              ? `GMM ${versionLabel(appUpdate.version)} is out; you have ${APP_VERSION}`
-              : failure
-                ? "Couldn't finish the check; GMM opens with what it has"
-                : failed
-                  ? `All set, ${plural(failed, "step")} couldn't run`
-                  : statusLine(rows, finished)}
+          <div
+            className={`su-status${updating ? "" : finished ? (appUpdate || failure || failed ? " is-warn" : " is-done") : ""}`}
+          >
+            {(!finished || updating) && <span className="spin" aria-hidden="true" />}
+            {updating && appUpdate
+              ? run.state === "installing"
+                ? "Installing; GMM closes and reopens by itself"
+                : `Downloading GMM ${versionLabel(appUpdate.version)}`
+              : updateFailed
+                ? run.message
+                : appUpdate
+                  ? `GMM ${versionLabel(appUpdate.version)} is out; you have ${APP_VERSION}`
+                  : failure
+                    ? "Couldn't finish the check; GMM opens with what it has"
+                    : failed
+                      ? `All set, ${plural(failed, "step")} couldn't run`
+                      : statusLine(rows, finished)}
           </div>
           <div
             className="bar"
@@ -136,7 +171,7 @@ export function Startup({
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={pct}
-            aria-label="Startup check"
+            aria-label={updating ? "Update" : "Startup check"}
           >
             <span style={{ width: `${pct}%` }} />
           </div>
@@ -157,11 +192,20 @@ export function Startup({
             ))}
           </div>
           {failure && <p className="sub">{failure}</p>}
-          {appUpdate && (
+          {appUpdate && updating && (
             <div className="su-update">
               <p>
-                {appUpdate.name ?? `GMM ${versionLabel(appUpdate.version)}`} is on GitHub. Its page has the new
-                installer and what changed; your mods and settings stay as they are.
+                GMM checks the installer is really from GMM before it runs. Windows may ask you to allow it; your mods
+                and settings stay as they are.
+              </p>
+            </div>
+          )}
+          {appUpdate && !updating && (
+            <div className="su-update">
+              <p>
+                {updateFailed
+                  ? `${appUpdate.name ?? `GMM ${versionLabel(appUpdate.version)}`} couldn't install by itself. Its page on GitHub has the installer; your mods and settings stay as they are.`
+                  : `${appUpdate.name ?? `GMM ${versionLabel(appUpdate.version)}`} is on GitHub. Its page has the new installer and what changed; your mods and settings stay as they are.`}
               </p>
               <div className="su-update-actions">
                 <Button onClick={() => finish(report)}>Later</Button>
@@ -179,9 +223,11 @@ export function Startup({
 
         <div className="su-foot">
           <span>v{APP_VERSION} · talks only to GameBanana, and to GitHub for GMM updates</span>
-          <Button variant="link" onClick={() => finish(report)}>
-            {finished ? "Open GMM" : "Skip for now"}
-          </Button>
+          {!updating && (
+            <Button variant="link" onClick={() => finish(report)}>
+              {finished ? "Open GMM" : "Skip for now"}
+            </Button>
+          )}
         </div>
       </div>
     </div>

@@ -29,7 +29,7 @@ fn render() -> String {
         CmdError, GameInfo, GameCategory, CatalogQuery, CatalogPage, ModRow, LibraryView, ModKey, VariantPick,
         InstallArgs, InstallProgress, InstallResult, Toggled, UninstallItem, Uninstalled,
         GameStorageView, StorageView, LaunchInfo, Launched, FolderRow, Settings, StepState,
-        StartupStep, StartupReport, CardStats, NetworkStatus,
+        StartupStep, StartupReport, CardStats, NetworkStatus, UpdateProgress,
         RollbackFile, ThemeChoice, Preferences,
         // Setup (gmm-xxmi, gmm-detect).
         gmm_xxmi::GameStatus, gmm_xxmi::SetupState, gmm_xxmi::ImporterInfo,

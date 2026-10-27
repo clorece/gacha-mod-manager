@@ -22,12 +22,25 @@ const NUMBERED_HOSTS: &[(&str, &str)] = &[("filecache", "gamebanana.com")];
 pub const GITHUB_RELEASES_HOST: &str = "api.github.com";
 pub const GITHUB_RELEASES_PATH: &str = "/repos/clorece/gacha-mod-manager/releases";
 
+/// Where the app update's installer and its signature are downloaded from (R2, amended
+/// 2026-10-27): `GMM-<version>-x64.msi[.sig]` of one of GMM's own releases.
+pub const GITHUB_DOWNLOADS_HOST: &str = "github.com";
+pub const GITHUB_DOWNLOADS_PATH: &str = "/clorece/gacha-mod-manager/releases/download/";
+/// GitHub answers a release download with a redirect to its file host (signed, expiring
+/// addresses), so only these hosts, and only as that redirect's target in practice.
+const GITHUB_FILE_HOSTS: &[&str] = &[
+    "release-assets.githubusercontent.com",
+    "objects.githubusercontent.com",
+];
+
 /// What a client is for. Each kind of client reaches only its own hosts, so the GameBanana
-/// clients can't reach GitHub and the update check can't reach anything but the releases list.
+/// clients can't reach GitHub, the update check can't reach anything but the releases list,
+/// and the updater can't reach anything but GMM's installers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Scope {
     GameBanana,
     GitHubReleases,
+    GitHubDownloads,
 }
 
 #[derive(Debug, Clone)]
@@ -63,6 +76,15 @@ impl Allowlist {
     pub fn for_github_releases(&self) -> Self {
         Self {
             scope: Scope::GitHubReleases,
+            ..self.clone()
+        }
+    }
+
+    /// GMM's installers on its own GitHub releases, and nothing else: the updater's client.
+    /// A deny-all list stays deny-all.
+    pub fn for_github_downloads(&self) -> Self {
+        Self {
+            scope: Scope::GitHubDownloads,
             ..self.clone()
         }
     }
@@ -120,9 +142,33 @@ impl Allowlist {
             Scope::GitHubReleases => {
                 host == GITHUB_RELEASES_HOST && url.path() == GITHUB_RELEASES_PATH
             }
+            Scope::GitHubDownloads => {
+                (host == GITHUB_DOWNLOADS_HOST && is_installer_path(url.path()))
+                    || GITHUB_FILE_HOSTS.contains(&host)
+            }
         };
         if allowed { Ok(()) } else { Err(denied()) }
     }
+}
+
+/// `<GITHUB_DOWNLOADS_PATH>v<tag>/GMM-<...>-x64.msi` or `.msi.sig`, nothing deeper.
+fn is_installer_path(path: &str) -> bool {
+    let Some((tag, file)) = path
+        .strip_prefix(GITHUB_DOWNLOADS_PATH)
+        .and_then(|rest| rest.split_once('/'))
+    else {
+        return false;
+    };
+    let plain = |s: &str| {
+        !s.is_empty()
+            && s.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-')
+    };
+    tag.starts_with('v')
+        && plain(tag)
+        && plain(file)
+        && file.starts_with("GMM-")
+        && (file.ends_with("-x64.msi") || file.ends_with("-x64.msi.sig"))
 }
 
 fn matches_numbered(host: &str, (prefix, domain): &(&str, &str)) -> bool {
@@ -225,6 +271,51 @@ mod tests {
                     &Url::parse("https://api.github.com/repos/clorece/gacha-mod-manager/releases")
                         .unwrap()
                 )
+                .is_err(),
+            "deny-all stays deny-all"
+        );
+    }
+
+    #[test]
+    fn github_downloads_reach_only_gmms_installers() {
+        let dl = |s: &str| {
+            Allowlist::production()
+                .for_github_downloads()
+                .check(&Url::parse(s).unwrap())
+                .is_ok()
+        };
+        let base = "https://github.com/clorece/gacha-mod-manager/releases/download";
+        assert!(dl(&format!("{base}/v0.0.3-beta/GMM-0.0.3-beta-x64.msi")));
+        assert!(dl(&format!(
+            "{base}/v0.0.3-beta/GMM-0.0.3-beta-x64.msi.sig"
+        )));
+        assert!(dl(
+            "https://release-assets.githubusercontent.com/github-production-release-asset/1/2?sig=x"
+        ));
+        for bad in [
+            format!("{base}/v0.0.3-beta/SHA256SUMS.txt"),
+            format!("{base}/v0.0.3-beta/evil.exe"),
+            format!("{base}/v0.0.3-beta/sub/GMM-0.0.3-beta-x64.msi"),
+            format!("{base}/0.0.3-beta/GMM-0.0.3-beta-x64.msi"),
+            format!("{base}/v0.0.3-beta/GMM-%2e%2e-x64.msi"),
+            "https://github.com/other/gacha-mod-manager/releases/download/v1/GMM-1-x64.msi"
+                .to_owned(),
+            "https://api.github.com/repos/clorece/gacha-mod-manager/releases".to_owned(),
+            "https://evil.githubusercontent.com/x".to_owned(),
+            "https://gamebanana.com/dl/1".to_owned(),
+            "http://github.com/clorece/gacha-mod-manager/releases/download/v1/GMM-1-x64.msi"
+                .to_owned(),
+        ] {
+            assert!(!dl(&bad), "{bad}");
+        }
+        assert!(
+            !ok(&format!("{base}/v0.0.3-beta/GMM-0.0.3-beta-x64.msi")),
+            "the GameBanana clients can't reach GitHub"
+        );
+        assert!(
+            Allowlist::deny_all()
+                .for_github_downloads()
+                .check(&Url::parse(&format!("{base}/v1/GMM-1-x64.msi")).unwrap())
                 .is_err(),
             "deny-all stays deny-all"
         );

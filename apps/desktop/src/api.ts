@@ -48,6 +48,7 @@ import type {
   ToggleOutcome,
   Uninstalled,
   UninstallItem,
+  UpdateProgress,
   VariantPick,
 } from "./bindings";
 
@@ -104,6 +105,13 @@ export const api = {
 
   /** Whether a newer GMM is on GitHub (GMM's own releases list, nothing downloaded). */
   appUpdateCheck: () => invoke<AppRelease | null>("app_update_check"),
+  /** Downloads the update the last check found, checks its signature, starts the installer
+   *  and closes GMM (it reopens when done). Windows only (`AppRelease.installable`). */
+  appUpdateInstall: (version: string, onProgress: (p: UpdateProgress) => void) => {
+    const channel = new Channel<UpdateProgress>();
+    channel.onmessage = onProgress;
+    return invoke<null>("app_update_install", { version, onProgress: channel });
+  },
   /** Opens the page of the release the last check found, after a native dialog; false when cancelled. */
   openAppRelease: (version: string) => invoke<boolean>("open_app_release", { version }),
 

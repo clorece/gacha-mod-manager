@@ -135,11 +135,17 @@ fn specs() -> Vec<Spec> {
             &[("gbModId", GbId), ("fileId", GbId)],
         ),
         s("app_update_check", json!({}), &[]),
-        // Only the version the last check found opens anything; the checks here never find one.
+        // Only the version the last check found opens or installs anything; the checks here
+        // never find one.
         s(
             "open_app_release",
             json!({"version": "9.9.9"}),
             &[("version", Text)],
+        ),
+        s(
+            "app_update_install",
+            json!({"version": "9.9.9", "onProgress": "nope"}),
+            &[("version", Text), ("onProgress", Channel)],
         ),
         s("queue_jobs", json!({}), &[]),
         s(

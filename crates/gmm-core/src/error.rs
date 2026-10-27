@@ -38,6 +38,8 @@ pub enum CoreError {
     Io(String),
     #[error("choose a log file from GMM's log folder")]
     NotALog,
+    #[error("the GMM update can't be installed: {0}")]
+    BadUpdate(String),
 
     #[error("{0}")]
     BadProfile(String),

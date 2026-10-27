@@ -67,6 +67,10 @@ The result must match the line in `SHA256SUMS.txt`.
 
 </details>
 
+**Updates:** from 0.0.2 beta on, GMM updates itself. When it starts and finds a newer version,
+it downloads it with a progress bar, checks the installer is signed by GMM, and installs it;
+Windows may ask you to allow it, then GMM reopens. Settings › About has **Update now** too.
+
 **Uninstall:** Settings → Apps → Installed apps → Gacha Mod Manager. Your mods stay in XXMI's
 Mods folders.
 
