@@ -39,19 +39,59 @@ pub(crate) fn install_to(game: &GameManifest) -> String {
     format!("{}\\Mods\\{GMM_DIR}", game.xxmi.importer.as_str())
 }
 
+/// The folder a version installs to under `Mods/GMM/`: the mod's name and id, plus the
+/// version's name inside the archive (`variant`, empty for an archive with one mod). Some mods
+/// ship each variant as a GameBanana file of its own, each holding one mod (or the same
+/// version names), so every file would get the same folder; when that folder already holds
+/// another of the mod's files, this file's name (without its extension) is added. `file` is
+/// the GameBanana file's id and name, when the version comes from one.
+pub(crate) async fn version_folder(
+    db: &Db,
+    game: &GameManifest,
+    mod_name: &str,
+    gb_mod_id: Option<u64>,
+    file: Option<(u64, &str)>,
+    variant: &str,
+) -> Result<String, CoreError> {
+    let plain = mod_folder_name(
+        mod_name,
+        gb_mod_id,
+        (!variant.is_empty()).then_some(variant),
+    );
+    let Some((file_id, file_name)) = file else {
+        return Ok(plain);
+    };
+    match db.installed_mod_by_folder(game.id(), &plain).await? {
+        Some(row) if row.gb_file_id != Some(file_id) => {
+            let label = file_name
+                .rsplit_once('.')
+                .map_or(file_name, |(stem, _)| stem)
+                .trim();
+            let label = if label.is_empty() { file_name } else { label };
+            let extra = if variant.is_empty() {
+                label.to_owned()
+            } else {
+                format!("{variant}, {label}")
+            };
+            Ok(mod_folder_name(mod_name, gb_mod_id, Some(&extra)))
+        }
+        _ => Ok(plain),
+    }
+}
+
 /// Every version of an analysed archive: its folder, size, blocked files and warnings, and
-/// whether it's installed already.
+/// whether it's installed already. `file` as in [`version_folder`].
 pub(crate) async fn version_plans(
     db: &Db,
     game: &GameManifest,
     analysis: &Analysis,
     mod_name: &str,
     gb_mod_id: Option<u64>,
+    file: Option<(u64, &str)>,
 ) -> Result<Vec<VersionPlan>, CoreError> {
     let mut versions = Vec::with_capacity(analysis.variants.len());
     for v in &analysis.variants {
-        let variant = (!v.name.is_empty()).then_some(v.name.as_str());
-        let folder = mod_folder_name(mod_name, gb_mod_id, variant);
+        let folder = version_folder(db, game, mod_name, gb_mod_id, file, &v.name).await?;
         let installed = db
             .installed_mod_by_folder(game.id(), &folder)
             .await?
@@ -127,12 +167,14 @@ pub async fn review(
     if analysis.kind.is_none() || analysis.variants.is_empty() {
         return Ok(None);
     }
+    let file = &prepared.fetched.file;
     let versions = version_plans(
         db,
         game,
         analysis,
         &prepared.mod_name,
         Some(prepared.mod_id),
+        Some((file.id, file.name.as_str())),
     )
     .await?;
     let multi = versions.len() > 1;

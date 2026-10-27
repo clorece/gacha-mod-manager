@@ -196,7 +196,7 @@ pub async fn local_plan(
         file_name: prepared.file_name.clone(),
         archive_bytes: prepared.bytes,
         kind: analysis.kind.clone(),
-        versions: version_plans(db, game, analysis, &prepared.name, None).await?,
+        versions: version_plans(db, game, analysis, &prepared.name, None, None).await?,
         version_conflicts: analysis.version_conflicts.clone(),
         install_to: install_to(game),
     })

@@ -16,7 +16,8 @@ use serde::{Deserialize, Serialize};
 use crate::analyze::{Analysis, Variant, analyze};
 use crate::error::CoreError;
 use crate::fetch::{FetchEvent, FetchedArchive, fetch_archive};
-use crate::names::{GMM_DIR, SIDECAR_FILE, STAGING_DIR, mod_folder_name, on_disk_name};
+use crate::names::{GMM_DIR, SIDECAR_FILE, STAGING_DIR, on_disk_name};
+use crate::plan::version_folder;
 use crate::stop::StopSignal;
 use crate::workspace::{STALE_TEMP, Workspace, remove_stale, unique_id};
 
@@ -403,9 +404,10 @@ pub async fn install_analyzed(
     let gmm_dir = guard.path(mods, GMM_DIR)?;
     let mut plans = Vec::with_capacity(chosen.len());
     let mut names_seen = HashSet::new();
+    let file = meta.gb_file_id.zip(meta.file_name.as_deref());
     for variant in chosen {
-        let variant_name = (!variant.name.is_empty()).then_some(variant.name.as_str());
-        let folder = mod_folder_name(&meta.name, meta.gb_mod_id, variant_name);
+        let folder =
+            version_folder(db, game, &meta.name, meta.gb_mod_id, file, &variant.name).await?;
         if !names_seen.insert(folder.to_ascii_lowercase()) {
             return Err(CoreError::FolderTaken { folder });
         }

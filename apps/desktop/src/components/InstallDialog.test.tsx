@@ -47,6 +47,36 @@ describe("InstallDialog", () => {
     expect(calls.some((c) => c.cmd.startsWith("prepare"))).toBe(false);
   });
 
+  it("never picks or queues a file that's installed whole", async () => {
+    // The newest file is installed as one mod; the user adds the other file.
+    const libraries = structuredClone(fx.libraries);
+    const zzz = libraries.zzz;
+    if (!zzz) throw new Error("no zzz library");
+    const sword = zzz.managed.find((m) => m.gb_mod_id === 553203);
+    if (!sword) throw new Error("no sword pack");
+    zzz.managed = [
+      ...zzz.managed.filter((m) => m.gb_mod_id !== 553203),
+      { ...sword, gb_file_id: 1314110, variant: null, group: null },
+    ];
+    const onQueued = vi.fn();
+    renderApp(
+      <InstallDialog modId={553203} games={fx.games} libraries={libraries} onClose={() => {}} onQueued={onQueued} />,
+    );
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByText("Choose variants");
+    expect(within(dialog).getByText("Installed")).toBeTruthy();
+    expect(within(dialog).getByText("0 of 2 selected")).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: /sample_swords_lite\.7z/ }));
+    expect(within(dialog).getByText("1 of 2 selected")).toBeTruthy();
+    fireEvent.click(primary(dialog));
+    await within(dialog).findByText("Switch it on after installing");
+    expect(primary(dialog).textContent).toBe("Install");
+    fireEvent.click(primary(dialog));
+    await waitFor(() => expect(onQueued).toHaveBeenCalledWith(1, "Sample Sword Pack"));
+    expect(queued()).toEqual([expect.objectContaining({ file_id: 1314111 })]);
+  });
+
   it("resolves a conflict with a mod on for the same character", async () => {
     renderApp(
       <InstallDialog modId={700101} games={fx.games} libraries={fx.libraries} onClose={() => {}} onQueued={() => {}} />,

@@ -353,6 +353,58 @@ async fn blocked_files_outside_the_chosen_mod_dont_matter() {
 }
 
 #[tokio::test]
+async fn another_file_of_the_same_mod_gets_a_folder_of_its_own() {
+    // Some mods ship each variant as a GameBanana file with one mod in it.
+    let f = Fixture::new().await;
+    let a = f.analyze(&[("Mod/m.ini", INI)]);
+    f.install(&a, InstallOptions::default()).await.unwrap();
+
+    let red = ModMeta {
+        gb_file_id: Some(1_400_002),
+        file_name: Some("Ellen Maid Red.7z".to_owned()),
+        ..meta("Ellen - Maid", 652_373)
+    };
+    let installed = install_analyzed(
+        &f.db,
+        &f.ws,
+        f.mods,
+        zzz(),
+        &red,
+        &a,
+        &InstallOptions::default(),
+        |_| {},
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        installed[0].folder_name,
+        "Ellen - Maid [gb-652373] (Ellen Maid Red)"
+    );
+    assert!(f.gmm().join("Ellen - Maid [gb-652373]/m.ini").exists());
+    assert!(
+        f.gmm()
+            .join("Ellen - Maid [gb-652373] (Ellen Maid Red)/m.ini")
+            .exists()
+    );
+
+    // The same file again is still "already installed".
+    assert!(matches!(
+        install_analyzed(
+            &f.db,
+            &f.ws,
+            f.mods,
+            zzz(),
+            &red,
+            &a,
+            &InstallOptions::default(),
+            |_| {}
+        )
+        .await,
+        Err(CoreError::AlreadyInstalled { .. })
+    ));
+}
+
+#[tokio::test]
 async fn existing_folders_are_never_overwritten() {
     let f = Fixture::new().await;
     let a = f.analyze(&[("Mod/m.ini", INI)]);

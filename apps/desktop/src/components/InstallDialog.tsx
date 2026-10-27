@@ -71,7 +71,8 @@ export function InstallDialog({
   const toast = useToast();
   const [profile, setProfile] = useState<ModProfile | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const [picked, setPicked] = useState<number[]>([]);
+  /** What the user ticked; `null` until they tick or untick something. */
+  const [pickedByUser, setPickedByUser] = useState<number[] | null>(null);
   const [step, setStep] = useState<Step>("files");
   const [resolve, setResolve] = useState<Resolve>("new");
   const [switchOn, setSwitchOn] = useState(true);
@@ -81,18 +82,12 @@ export function InstallDialog({
     let live = true;
     api
       .catalogMod(modId)
-      .then((p) => {
-        if (!live) return;
-        setProfile(p);
-        const files = installableFiles(p, initialFileId);
-        const start = files.find((f) => f.id === initialFileId) ?? files.find((f) => !f.archived);
-        setPicked(start ? [start.id] : []);
-      })
+      .then((p) => live && setProfile(p))
       .catch((e) => live && setFailed(asCmdError(e).message));
     return () => {
       live = false;
     };
-  }, [modId, initialFileId]);
+  }, [modId]);
 
   const game = games.find((g) => g.gamebanana_id === profile?.summary.game_id);
   const view = game ? libraries[game.id] : undefined;
@@ -119,10 +114,15 @@ export function InstallDialog({
   const index = steps.indexOf(at);
   const go = (d: number) => setStep(steps[Math.max(0, Math.min(steps.length - 1, index + d))]);
 
-  const toggle = (id: number, on: boolean) => setPicked((now) => (on ? [...now, id] : now.filter((x) => x !== id)));
+  // A file that's installed whole has nothing to add: it's never ticked or queued again.
   const choosable = files.filter((f) => installed.get(f.id) !== "whole");
+  // Until the user ticks something: the file picked on the mod page, else the newest current
+  // file, unless that one is installed whole already.
+  const start = files.find((f) => f.id === initialFileId) ?? files.find((f) => !f.archived);
+  const picked = pickedByUser ?? (start && installed.get(start.id) !== "whole" ? [start.id] : []);
+  const toggle = (id: number, on: boolean) => setPickedByUser(on ? [...picked, id] : picked.filter((x) => x !== id));
   const allPicked = choosable.length > 0 && choosable.every((f) => picked.includes(f.id));
-  const chosen = files.filter((f) => picked.includes(f.id));
+  const chosen = choosable.filter((f) => picked.includes(f.id));
 
   const confirm = async () => {
     if (!profile || chosen.length === 0) return;
@@ -239,11 +239,11 @@ export function InstallDialog({
           <div className="cf-h-row">
             <h3 className="cf-h">Choose variants</h3>
             <span className="count">
-              {picked.length} of {files.length} selected
+              {chosen.length} of {files.length} selected
             </span>
             <span className="grow" />
             {choosable.length > 1 && (
-              <Button variant="link" onClick={() => setPicked(allPicked ? [] : choosable.map((f) => f.id))}>
+              <Button variant="link" onClick={() => setPickedByUser(allPicked ? [] : choosable.map((f) => f.id))}>
                 {allPicked ? "Clear" : "Select all"}
               </Button>
             )}
