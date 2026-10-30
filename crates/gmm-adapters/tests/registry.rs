@@ -154,6 +154,25 @@ fn bad_ids_and_empty_lists_rejected() {
     assert!(p.iter().any(|m| m.contains("ini_markers")), "{p:?}");
 }
 
+/// `template/game.toml` keeps every schema field (it parses), and its placeholders keep a copy
+/// that wasn't filled in from loading.
+#[test]
+fn template_matches_schema() {
+    let p = problems(include_str!("../template/game.toml"));
+    for field in [
+        "game.id",
+        "game.name",
+        "gamebanana.game_id",
+        "root category",
+        "d3dx_target",
+        "exe_names",
+        "steam.appid",
+        "epic.display_names",
+    ] {
+        assert!(p.iter().any(|m| m.contains(field)), "{field}: {p:?}");
+    }
+}
+
 #[test]
 fn duplicates_across_manifests_rejected() {
     let other_id = VALID.replace("id = \"test\"", "id = \"other\"");

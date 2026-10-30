@@ -100,7 +100,9 @@ XXMI also supports Endfield (EFMI), Star Rail (SRMI), Genshin (GIMI) and Honkai 
 
 1. Find the GameBanana game id and root categories.
 2. Record the folder markers, Steam appid and other launcher sources from a real install.
-3. Write `crates/gmm-adapters/games/<id>.toml` and add it to `BUILTIN` in `registry.rs`.
+3. Copy [`crates/gmm-adapters/template/game.toml`](../crates/gmm-adapters/template/game.toml)
+   to `games/<id>.toml` and fill in its TODOs. Its header lists every other file a new game
+   touches (`BUILTIN` in `registry.rs`, tests, banner).
 4. The conformance suite (`crates/gmm-core/tests/conformance.rs`) runs against every manifest
    automatically: detect, setup state, install, switch, conflicts, storage, uninstall.
 5. Review the new paths; they become filesystem roots.
