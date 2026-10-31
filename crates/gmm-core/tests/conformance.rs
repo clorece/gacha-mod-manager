@@ -44,6 +44,9 @@ impl Environment for NoEnv {
     fn xxmi_install_locations(&self) -> Vec<PathBuf> {
         Vec::new()
     }
+    fn gryphlink_roots(&self) -> Vec<PathBuf> {
+        Vec::new()
+    }
 }
 
 #[derive(Default)]

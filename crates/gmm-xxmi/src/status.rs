@@ -105,7 +105,7 @@ pub fn evaluate(
     };
     if detected.is_empty() {
         s.notes.push(format!(
-            "GMM didn't find {name} on this PC (checked Steam, HoYoPlay, Epic)."
+            "GMM didn't find {name} on this PC (checked Steam, HoYoPlay, GRYPHLINK, Epic)."
         ));
     }
 
@@ -313,7 +313,8 @@ fn launch_mismatch(
         InstallSource::Epic => {
             (!matches!(launch.as_str(), "EPIC_GAMES" | "EPIC" | "MANUAL")).then_some("Epic Games")
         }
-        InstallSource::HoYoPlay | InstallSource::Manual => {
+        // On Direct, XXMI starts GRYPHLINK first, then the game (XXMI source).
+        InstallSource::HoYoPlay | InstallSource::Gryphlink | InstallSource::Manual => {
             matches!(launch.as_str(), "STEAM" | "EPIC_GAMES" | "EPIC").then_some("Direct")
         }
     }
@@ -336,7 +337,7 @@ mod tests {
 
     #[test]
     fn launch_rules() {
-        use InstallSource::{Epic, HoYoPlay, Manual, Steam};
+        use InstallSource::{Epic, Gryphlink, HoYoPlay, Manual, Steam};
         // A Steam copy that only runs when Steam starts it (ZZZ).
         assert_eq!(launch_mismatch(Steam, "DIRECT", false), Some("Steam"));
         assert_eq!(launch_mismatch(Steam, "STEAM", false), None);
@@ -349,6 +350,11 @@ mod tests {
         assert_eq!(launch_mismatch(Epic, "EPIC_GAMES", false), None);
         assert_eq!(launch_mismatch(HoYoPlay, "DIRECT", false), None);
         assert_eq!(launch_mismatch(HoYoPlay, "STEAM", false), Some("Direct"));
+        assert_eq!(launch_mismatch(Gryphlink, "DIRECT", false), None);
+        assert_eq!(
+            launch_mismatch(Gryphlink, "EPIC_GAMES", false),
+            Some("Direct")
+        );
         assert_eq!(launch_mismatch(Manual, "CUSTOM", false), None);
     }
 }

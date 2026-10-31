@@ -64,6 +64,8 @@ pub enum Engine {
 #[serde(deny_unknown_fields)]
 pub struct GameBananaInfo {
     pub game_id: u64,
+    /// The Store's top-level categories. Usually GameBanana's roots, but any category works:
+    /// Endfield's characters sit under Skins > Operators, so it lists Operators.
     pub root_categories: Vec<RootCategory>,
 }
 

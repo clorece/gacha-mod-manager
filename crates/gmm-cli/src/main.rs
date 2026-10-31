@@ -45,7 +45,7 @@ struct Cli {
 enum Command {
     /// List the supported games.
     Games,
-    /// Find installed games (Steam, HoYoPlay, Epic) and XXMI. Read-only.
+    /// Find installed games (Steam, HoYoPlay, GRYPHLINK, Epic) and XXMI. Read-only.
     Detect {
         /// XXMI Launcher folder, if it isn't found automatically (portable install). Overrides
         /// `gmm config set-xxmi` for this run.

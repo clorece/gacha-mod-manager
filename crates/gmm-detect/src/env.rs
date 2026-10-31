@@ -18,6 +18,8 @@ pub trait Environment {
     fn program_data(&self) -> Option<PathBuf>;
     /// `InstallLocation` of uninstall entries named "XXMI Launcher".
     fn xxmi_install_locations(&self) -> Vec<PathBuf>;
+    /// Where GRYPHLINK may be: its registry `install_path` values, then its default folders.
+    fn gryphlink_roots(&self) -> Vec<PathBuf>;
 }
 
 /// The real machine.
@@ -40,6 +42,12 @@ impl Environment for SystemEnvironment {
     fn xxmi_install_locations(&self) -> Vec<PathBuf> {
         registry::xxmi_install_locations()
     }
+
+    fn gryphlink_roots(&self) -> Vec<PathBuf> {
+        let mut roots = registry::gryphlink_install_paths();
+        roots.extend(default_gryphlink_roots());
+        roots
+    }
 }
 
 #[cfg(windows)]
@@ -50,6 +58,24 @@ fn default_steam_root() -> Option<PathBuf> {
 #[cfg(not(windows))]
 fn default_steam_root() -> Option<PathBuf> {
     dirs::home_dir().map(|h| h.join(".steam").join("steam"))
+}
+
+/// The launcher's default folders, as XXMI also checks them.
+#[cfg(windows)]
+fn default_gryphlink_roots() -> Vec<PathBuf> {
+    [
+        r"C:\Program Files\GRYPHLINK",
+        r"C:\Program Files (x86)\GRYPHLINK",
+        r"C:\Program Files\Hypergryph Launcher",
+        r"C:\Program Files (x86)\Hypergryph Launcher",
+    ]
+    .map(PathBuf::from)
+    .to_vec()
+}
+
+#[cfg(not(windows))]
+fn default_gryphlink_roots() -> Vec<PathBuf> {
+    Vec::new()
 }
 
 #[cfg(windows)]
@@ -107,6 +133,28 @@ mod registry {
         }
         out
     }
+
+    /// `install_path` of each key under `HKCU\Software\GRYPHLINK\Launcher` (one per launcher
+    /// install, named by an id). No other value is read.
+    pub(super) fn gryphlink_install_paths() -> Vec<PathBuf> {
+        let mut out = Vec::new();
+        let Ok(root) = RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey_with_flags(r"Software\GRYPHLINK\Launcher", KEY_READ)
+        else {
+            return out;
+        };
+        for name in root.enum_keys().flatten() {
+            let Ok(entry) = root.open_subkey_with_flags(&name, KEY_READ) else {
+                continue;
+            };
+            let path: String = entry.get_value("install_path").unwrap_or_default();
+            let path = PathBuf::from(path.trim().replace('/', "\\"));
+            if !path.as_os_str().is_empty() && !out.contains(&path) {
+                out.push(path);
+            }
+        }
+        out
+    }
 }
 
 #[cfg(not(windows))]
@@ -118,6 +166,10 @@ mod registry {
     }
 
     pub(super) fn xxmi_install_locations() -> Vec<PathBuf> {
+        Vec::new()
+    }
+
+    pub(super) fn gryphlink_install_paths() -> Vec<PathBuf> {
         Vec::new()
     }
 }

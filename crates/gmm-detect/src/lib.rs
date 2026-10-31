@@ -9,6 +9,7 @@
 
 mod env;
 mod epic;
+mod gryphlink;
 mod hoyoplay;
 mod markers;
 mod steam;
@@ -29,6 +30,7 @@ pub use markers::{is_game_folder, resolve_game_folder};
 pub enum InstallSource {
     Steam,
     HoYoPlay,
+    Gryphlink,
     Epic,
     /// A folder the user named.
     Manual,
@@ -39,6 +41,7 @@ impl InstallSource {
         match self {
             Self::Steam => "Steam",
             Self::HoYoPlay => "HoYoPlay",
+            Self::Gryphlink => "GRYPHLINK",
             Self::Epic => "Epic Games",
             Self::Manual => "manual",
         }
@@ -78,6 +81,7 @@ pub fn detect(
     let mut report = DetectReport::default();
     steam::detect(registry, env, &mut report);
     hoyoplay::detect(registry, env, &mut report);
+    gryphlink::detect(registry, env, &mut report);
     epic::detect(registry, env, &mut report);
     for (game_id, folder) in manual {
         match registry.get(game_id) {

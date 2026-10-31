@@ -281,7 +281,7 @@ export type GameInstall = { game_id: string, source: InstallSource,
  */
 folder: string, steam_appid: number | null, };
 
-export type InstallSource = "steam" | "ho_yo_play" | "epic" | "manual";
+export type InstallSource = "steam" | "ho_yo_play" | "gryphlink" | "epic" | "manual";
 
 export type Page<T> = { items: Array<T>, 
 /**

@@ -14,6 +14,7 @@ struct FakeEnv {
     steam: Option<PathBuf>,
     app_data: Option<PathBuf>,
     program_data: Option<PathBuf>,
+    gryphlink: Vec<PathBuf>,
 }
 
 impl Environment for FakeEnv {
@@ -29,6 +30,9 @@ impl Environment for FakeEnv {
     fn xxmi_install_locations(&self) -> Vec<PathBuf> {
         Vec::new()
     }
+    fn gryphlink_roots(&self) -> Vec<PathBuf> {
+        self.gryphlink.clone()
+    }
 }
 
 fn write(path: &Path, contents: &str) {
@@ -39,6 +43,11 @@ fn write(path: &Path, contents: &str) {
 fn make_zzz(folder: &Path) {
     write(&folder.join("ZenlessZoneZero.exe"), "MZ");
     fs::create_dir_all(folder.join("ZenlessZoneZero_Data")).unwrap();
+}
+
+fn make_endfield(folder: &Path) {
+    write(&folder.join("Endfield.exe"), "MZ");
+    fs::create_dir_all(folder.join("Endfield_Data")).unwrap();
 }
 
 fn make_wuwa(folder: &Path) {
@@ -100,6 +109,12 @@ fn finds_installs_from_every_source() {
     fs::create_dir_all(gamedata.parent().unwrap()).unwrap();
     fs::write(&gamedata, data).unwrap();
 
+    // GRYPHLINK: the registry names the launcher's versioned folder, the game is in
+    // <launcher>/games. A default folder that doesn't exist stays quiet.
+    let gryphlink = root.join("GRYPHLINK");
+    make_endfield(&gryphlink.join("games/EndField Game"));
+    fs::create_dir_all(gryphlink.join("1.2.0")).unwrap();
+
     // Epic: WuWa installed into a folder that contains "Wuthering Waves Game".
     let program_data = root.join("ProgramData");
     let epic_wuwa = root.join("Epic").join("WuWa");
@@ -116,6 +131,7 @@ fn finds_installs_from_every_source() {
         steam: Some(steam.clone()),
         app_data: Some(app_data),
         program_data: Some(program_data),
+        gryphlink: vec![gryphlink.join("1.2.0"), root.join("NoLauncher")],
     };
     let not_a_game = root.join("Random");
     fs::create_dir_all(&not_a_game).unwrap();
@@ -151,6 +167,11 @@ fn finds_installs_from_every_source() {
                     .to_owned()
             ),
             ("zzz", InstallSource::HoYoPlay, "HoYoverse/ZenlessZoneZero Game".to_owned()),
+            (
+                "endfield",
+                InstallSource::Gryphlink,
+                "GRYPHLINK/games/EndField Game".to_owned()
+            ),
             ("wuwa", InstallSource::Epic, "Epic/WuWa/Wuthering Waves Game".to_owned()),
         ]
     );
@@ -178,6 +199,7 @@ fn missing_sources_are_quiet() {
         steam: Some(tmp.path().join("nope")),
         app_data: None,
         program_data: Some(tmp.path().join("also-nope")),
+        gryphlink: vec![tmp.path().join("no-launcher")],
     };
     let report = detect(Registry::builtin().unwrap(), &env, &[]);
     assert!(report.installs.is_empty());
@@ -196,6 +218,7 @@ fn hostile_installdir_is_ignored() {
         steam: Some(steam),
         app_data: None,
         program_data: None,
+        gryphlink: Vec::new(),
     };
     let report = detect(Registry::builtin().unwrap(), &env, &[]);
     assert!(report.installs.is_empty());

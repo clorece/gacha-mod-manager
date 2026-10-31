@@ -10,6 +10,7 @@ use crate::validate;
 const BUILTIN: &[(&str, &str)] = &[
     ("zzz.toml", include_str!("../games/zzz.toml")),
     ("wuwa.toml", include_str!("../games/wuwa.toml")),
+    ("endfield.toml", include_str!("../games/endfield.toml")),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

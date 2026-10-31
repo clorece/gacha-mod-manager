@@ -34,7 +34,7 @@ The `gmm` command line uses the same crates as the app. Every feature works from
 | `gmm-extract` | The RAR helper: a separate sandboxed program with UnRAR that streams entries back and never writes a file |
 | `gmm-catalog` | GameBanana client: lists, search, mod pages, files, updates, categories, trending, counters |
 | `gmm-adapters` | The game manifests (`games/*.toml`) and their validation |
-| `gmm-detect` | Finds games: Steam, HoYoPlay, Epic, manual folders |
+| `gmm-detect` | Finds games: Steam, HoYoPlay, GRYPHLINK, Epic, manual folders |
 | `gmm-xxmi` | Reads XXMI's setup (allowed fields only), works out each game's setup state, launches XXMI |
 | `gmm-migoto` | Reads 3DMigoto `.ini` files: override hashes, namespaces, key bindings |
 | `gmm-db` | The SQLite database |
@@ -113,7 +113,7 @@ none). Switching on a mod that conflicts asks first; GMM never edits a mod's fil
 ## Catalog flow (GameBanana apiv11)
 
 GMM reads GameBanana's public `apiv11` (no key, no login). Game ids: ZZZ = 19567,
-WuWa = 20357.
+WuWa = 20357, Endfield = 21842.
 
 | Purpose | Endpoint |
 |---|---|

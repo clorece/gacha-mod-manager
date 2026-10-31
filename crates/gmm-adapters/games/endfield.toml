@@ -1,0 +1,64 @@
+# Arknights: Endfield. Facts and their sources: docs/game-adapters.md.
+# Compiled into GMM; never loaded from disk at runtime (docs/security.md, R7).
+
+[game]
+id = "endfield"
+name = "Arknights: Endfield"
+short_name = "Endfield"
+engine = "unity"
+risk_notice = "Modding may violate the game's Terms of Service. Use at your own risk."
+
+[gamebanana]
+game_id = 21842
+
+# Characters sit one level deeper than in ZZZ and WuWa (Skins > Operators > <operator>), so the
+# Store lists Operators instead of the Skins root. Mods in Skins' smaller subcategories
+# (Enemies, Factory, Other/Misc) show under "All".
+[[gamebanana.root_categories]]
+id = 42770
+name = "Operators"
+tag = "character_skin"
+subcategories_are_characters = true
+
+[[gamebanana.root_categories]]
+id = 42772
+name = "Weapons"
+tag = "other"
+
+[[gamebanana.root_categories]]
+id = 42706
+name = "UI"
+tag = "ui"
+
+[[gamebanana.root_categories]]
+id = 42780
+name = "Other/Misc"
+tag = "other"
+
+[xxmi]
+importer = "EFMI"
+d3dx_target = "Endfield.exe"
+
+[detect]
+exe_names = ["Endfield.exe"]
+required_children = ["Endfield_Data"]
+# GRYPHLINK installs into <launcher>/games/EndField Game; Steam's folder is "Arknights Endfield".
+folder_names = ["EndField Game", "Arknights Endfield"]
+
+[detect.steam]
+appid = 4732690
+# The Steam folder is the game folder (observed 2026-10-30).
+subpath = ""
+# XXMI starts the Steam copy fine with "Game Launch" on Direct (observed 2026-10-30).
+direct_launch = true
+
+[detect.epic]
+# The store title; not yet seen in a real Epic manifest.
+display_names = ["Arknights: Endfield"]
+
+[[mod_kind]]
+id = "migoto"
+ini_markers = ["[TextureOverride", "[ShaderOverride"]
+
+[conflicts]
+ignore_namespaces = []

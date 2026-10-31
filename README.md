@@ -6,7 +6,7 @@
 # Gacha Mod Manager
 
 Find, download and organize [GameBanana](https://gamebanana.com) mods for **Zenless Zone
-Zero** and **Wuthering Waves**. Mods are loaded by
+Zero**, **Wuthering Waves** and **Arknights: Endfield**. Mods are loaded by
 [XXMI Launcher](https://github.com/SpectrumQT/XXMI-Launcher).
 
 **Status:** 0.0.2 beta. Windows installer (unsigned for now); Linux is experimental.
@@ -24,7 +24,8 @@ You need:
 1. **Windows 10 or 11** (64-bit).
 2. **[XXMI Launcher](https://github.com/SpectrumQT/XXMI-Launcher/releases)**, set up for your
    game. GMM finds it and tells you if anything is missing.
-3. **Zenless Zone Zero** and/or **Wuthering Waves** (Steam, HoYoPlay, Epic, or any folder).
+3. **Zenless Zone Zero**, **Wuthering Waves** or **Arknights: Endfield** (Steam, HoYoPlay,
+   Epic, or any folder).
 
 GMM downloads and manages mods; XXMI loads them. Mods only work when the game is started
 through XXMI (GMM's **Launch** button does that for you).

@@ -20,6 +20,7 @@ export function bannerClass(scope: Scope): string {
 const installSource: Record<string, string> = {
   steam: "Steam",
   ho_yo_play: "HoYoPlay",
+  gryphlink: "GRYPHLINK",
   epic: "Epic Games",
   manual: "a folder you added",
 };

@@ -43,8 +43,8 @@ rules below are enforced in code and CI, and the test harnesses prove them.
   - **Detection reads exact files only:** Steam's `libraryfolders.vdf` and
     `appmanifest_<appid>.acf`, HoYoPlay's `gamedata.dat` (only install paths kept), Epic's
     `*.item` manifests (only name and install location).
-  - **Registry (read-only):** Steam's `SteamPath`, and the install location of XXMI's
-    uninstall entry. All registry code is in `gmm-detect/src/env.rs`.
+  - **Registry (read-only):** Steam's `SteamPath`, the install location of XXMI's uninstall
+    entry, and GRYPHLINK's `install_path`. All registry code is in `gmm-detect/src/env.rs`.
   - **`d3dx_user.ini` is the one file GMM writes outside `Mods/`**: it only adds back saved
     toggle lines it copied from that same file, keeps a backup, writes atomically and never
     while the game runs.

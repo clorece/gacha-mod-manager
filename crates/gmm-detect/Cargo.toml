@@ -1,6 +1,6 @@
 [package]
 name = "gmm-detect"
-description = "Finds installed games: Steam, HoYoPlay, Epic, or a folder the user picks"
+description = "Finds installed games: Steam, HoYoPlay, GRYPHLINK, Epic, or a folder the user picks"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

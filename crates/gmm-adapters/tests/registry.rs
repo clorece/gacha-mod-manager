@@ -8,7 +8,7 @@ use gmm_adapters::{Engine, Importer, ManifestError, Registry, Tag};
 fn builtin_manifests_load() {
     let registry = Registry::builtin().unwrap();
     let ids: Vec<_> = registry.games().iter().map(|g| g.id()).collect();
-    assert_eq!(ids, ["zzz", "wuwa"]);
+    assert_eq!(ids, ["zzz", "wuwa", "endfield"]);
 }
 
 #[test]
@@ -49,10 +49,31 @@ fn wuwa_facts() {
 }
 
 #[test]
+fn endfield_facts() {
+    let endfield = Registry::builtin().unwrap().get("endfield").unwrap();
+    assert_eq!(endfield.game.engine, Engine::Unity);
+    assert_eq!(endfield.gamebanana.game_id, 21842);
+    assert_eq!(endfield.xxmi.importer, Importer::Efmi);
+    assert_eq!(endfield.xxmi.d3dx_target, "Endfield.exe");
+    assert_eq!(endfield.detect.steam.as_ref().unwrap().appid, 4732690);
+    assert_eq!(endfield.detect.steam.as_ref().unwrap().subpath, "");
+    assert!(
+        endfield.detect.steam.as_ref().unwrap().direct_launch,
+        "Endfield's Steam copy runs when XXMI starts it directly"
+    );
+    assert_eq!(endfield.xxmi_launch_args(), ["--nogui", "--xxmi", "EFMI"]);
+    // Characters are under Skins > Operators, not a root category.
+    let operators = endfield.root_category(42770).unwrap();
+    assert_eq!(operators.tag, Tag::CharacterSkin);
+    assert!(operators.subcategories_are_characters);
+}
+
+#[test]
 fn lookups() {
     let r = Registry::builtin().unwrap();
     assert_eq!(r.get("ZZZ").unwrap().id(), "zzz", "case-insensitive");
     assert_eq!(r.by_gamebanana_id(20357).unwrap().id(), "wuwa");
+    assert_eq!(r.by_gamebanana_id(21842).unwrap().id(), "endfield");
     assert!(r.get("genshin").is_none());
 }
 

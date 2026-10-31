@@ -15,8 +15,9 @@
 #        apps/desktop/src/styles.css                `.bn-<id>` background, and `.bn-<id>::after`
 #        THIRD-PARTY-NOTICES.md, docs/licensing.md, README.md   credit the art
 #   6. docs/game-adapters.md     a column in "The games"; README.md's list of games
-#   7. A launcher GMM can't detect yet (not Steam, HoYoPlay or Epic) is a new source in
-#      crates/gmm-detect, shared by every game that uses it. Manual folders work meanwhile.
+#   7. A launcher GMM can't detect yet (not Steam, HoYoPlay, GRYPHLINK or Epic) is a new
+#      source in crates/gmm-detect, shared by every game that uses it. Manual folders work
+#      meanwhile.
 #
 # The conformance suite (crates/gmm-core/tests/conformance.rs) then runs against the new game.
 #

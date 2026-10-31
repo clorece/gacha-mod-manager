@@ -1,8 +1,9 @@
 # Game adapters, detection & XXMI setup states
 
 Every supported game is loaded by an **XXMI importer** (ZZMI for Zenless Zone Zero, WWMI for
-Wuthering Waves). A game's adapter says where it is on GameBanana, how to find it on disk,
-which importer folder its mods go in, and how to recognise a mod in an archive.
+Wuthering Waves, EFMI for Arknights: Endfield). A game's adapter says where it is on
+GameBanana, how to find it on disk, which importer folder its mods go in, and how to recognise a
+mod in an archive.
 
 > Facts marked "XXMI source" were learned by reading XXMI Launcher (GPL-3.0); "observed" means
 > seen on a real Windows 11 install. They're written here in our own words. Implement from this
@@ -30,6 +31,7 @@ Every candidate folder must have the game's marker files (an exe and required fo
 |---|---|---|
 | **Steam** | `SteamPath` (registry; `~/.steam/steam` on Linux) → `libraryfolders.vdf` → `appmanifest_<appid>.acf` → the game folder | ✅ observed (WuWa) |
 | **HoYoPlay** | `%APPDATA%\Cognosphere\HYP\<version>\data\gamedata.dat`: only `"installPath"` values are read | ✅ observed (ZZZ), Windows only |
+| **GRYPHLINK** | `install_path` of each key under `HKCU\Software\GRYPHLINK\Launcher` (registry) and the default `Program Files` folders → `games\<game folder>` in that folder or its parent (XXMI source) | ✅ fixture-tested only, Windows only |
 | **Epic** | `%PROGRAMDATA%\Epic\EpicGamesLauncher\Data\Manifests\*.item` (name and install location only) | ✅ fixture-tested only |
 | **Manual** | Settings → Games, or `gmm config add-folder game=PATH` | ✅ |
 | Kuro launcher | `kr_starter_game.json` (XXMI source) | ⏳ not built |
@@ -66,10 +68,11 @@ matters.
 | `LaunchModeMismatch` | XXMI's **Game Launch** setting won't work for this copy | XXMI settings → **General** → **Game Launch** |
 | `Ready` | All good | — |
 
-**Game Launch rules:** a Steam copy needs **Steam** (WuWa's Steam copy also works with
-**Direct**), an Epic copy needs **Epic Games**, and HoYoPlay or manual installs need
-**Direct**. **Manual** always passes. Why: with Direct, XXMI starts the exe itself, and ZZZ's
-Steam copy refuses to run that way (observed).
+**Game Launch rules:** a Steam copy needs **Steam** (WuWa's and Endfield's Steam copies also
+work with **Direct**), an Epic copy needs **Epic Games**, and HoYoPlay, GRYPHLINK or manual
+installs need **Direct**. **Manual** always passes. Why: with Direct, XXMI starts the exe itself
+(for GRYPHLINK, after starting the launcher; XXMI source), and ZZZ's Steam copy refuses to run
+that way (observed).
 
 ### Reading the XXMI config safely
 
@@ -81,13 +84,16 @@ secrets never show up.
 
 ## The games
 
-| | Zenless Zone Zero | Wuthering Waves |
-|---|---|---|
-| GameBanana id | 19567 | 20357 |
-| Importer | ZZMI, `d3dx.ini target = ZenlessZoneZero.exe` | WWMI, `target = Client-Win64-Shipping.exe` |
-| Folder markers | `ZenlessZoneZero.exe` + `ZenlessZoneZero_Data/` | `Wuthering Waves.exe` + `Client/` + `Engine/` |
-| Steam | appid 4162040, game in `games/ZenlessZoneZero Game`; Game Launch = Steam | appid 3513350; Game Launch = Steam or Direct |
-| Other sources | HoYoPlay; Game Launch = Direct | — |
+| | Zenless Zone Zero | Wuthering Waves | Arknights: Endfield |
+|---|---|---|---|
+| GameBanana id | 19567 | 20357 | 21842; characters under Skins › Operators (42770) |
+| Importer | ZZMI, `d3dx.ini target = ZenlessZoneZero.exe` | WWMI, `target = Client-Win64-Shipping.exe` | EFMI, `target = Endfield.exe`, core ini `Core\EFMI\main.ini` |
+| Folder markers | `ZenlessZoneZero.exe` + `ZenlessZoneZero_Data/` | `Wuthering Waves.exe` + `Client/` + `Engine/` | `Endfield.exe` + `Endfield_Data/` |
+| Steam | appid 4162040, game in `games/ZenlessZoneZero Game`; Game Launch = Steam | appid 3513350; Game Launch = Steam or Direct | appid 4732690; the Steam folder is the game folder; Game Launch = Steam or Direct |
+| Other sources | HoYoPlay; Game Launch = Direct | — | GRYPHLINK (fixture-tested only); Game Launch = Direct; Epic as "Arknights: Endfield" (not observed) |
+
+Endfield's Steam copy, EFMI and Direct launch were observed on 2026-10-30. The GRYPHLINK
+layout comes from XXMI's source; the Epic name from the store listing.
 
 Game settings XXMI changes (ZZZ's animation and image quality, WuWa's ray tracing and LOD) stay
 with XXMI; GMM never touches them. WuWa's `~mods` pak mods are out of scope (XXMI doesn't load
@@ -95,8 +101,7 @@ them).
 
 ## Adding a game
 
-XXMI also supports Endfield (EFMI), Star Rail (SRMI), Genshin (GIMI) and Honkai Impact 3rd
-(HIMI). For each:
+XXMI also supports Star Rail (SRMI), Genshin (GIMI) and Honkai Impact 3rd (HIMI). For each:
 
 1. Find the GameBanana game id and root categories.
 2. Record the folder markers, Steam appid and other launcher sources from a real install.
