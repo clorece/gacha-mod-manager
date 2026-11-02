@@ -41,7 +41,9 @@ jobs:
         run: |
           tag=""
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then tag="${GITHUB_REF_NAME}"; fi
-          echo "version=$(node scripts/check-release-version.mjs $tag)" >> "$GITHUB_OUTPUT"
+          # Its own line: inside `echo "...$(...)"` a failed check would be ignored.
+          version="$(node scripts/check-release-version.mjs $tag)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - uses: Swatinem/rust-cache@v2
       - run: pnpm install --frozen-lockfile
         working-directory: apps/desktop
