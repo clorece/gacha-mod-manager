@@ -73,5 +73,5 @@ name or logo. The README and the app's About page carry the disclaimer.
 - [ ] `cargo deny check` and the npm license check pass
 - [ ] `THIRD-PARTY-NOTICES.md` current and shown in Settings → About
 - [ ] README Credits current, with the contact line for credit changes or removal
-- [ ] No request from GameBanana, HoYoverse or Kuro Games is outstanding
+- [ ] No request from GameBanana, HoYoverse, Kuro Games or Hypergryph / GRYPHLINE is outstanding
 - [ ] GameBanana's Terms of Service re-read (they can change without notice)

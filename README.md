@@ -9,7 +9,7 @@ Find, download and organize [GameBanana](https://gamebanana.com) mods for **Zenl
 Zero**, **Wuthering Waves** and **Arknights: Endfield**. Mods are loaded by
 [XXMI Launcher](https://github.com/SpectrumQT/XXMI-Launcher).
 
-**Status:** 0.0.2 beta. Windows installer (unsigned for now); Linux is experimental.
+**Status:** 0.0.3 beta. Windows installer (unsigned for now); Linux is experimental.
 
 - Browse and search GameBanana's mods, with previews, files and updates.
 - Every download is checked before it reaches your Mods folder. Zip, 7z and RAR work.
@@ -61,7 +61,7 @@ for a signed release.
 Download `SHA256SUMS.txt` from the same release, then in PowerShell, in your Downloads folder:
 
 ```powershell
-Get-FileHash .\GMM-0.0.2-beta-x64.msi -Algorithm SHA256
+Get-FileHash .\GMM-0.0.3-beta-x64.msi -Algorithm SHA256
 ```
 
 The result must match the line in `SHA256SUMS.txt`.
