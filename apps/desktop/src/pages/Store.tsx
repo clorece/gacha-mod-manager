@@ -284,7 +284,8 @@ export function Store({
     setHideInstalled(false);
   };
 
-  const charKind = cat?.name.toLowerCase().includes("bangboo") ? "Bangboo" : "Characters";
+  const catName = cat?.name.toLowerCase() ?? "";
+  const charKind = catName.includes("bangboo") ? "Bangboo" : catName.includes("operator") ? "Operators" : "Characters";
   const charReason = !game
     ? "Pick a game to filter by character"
     : !cat

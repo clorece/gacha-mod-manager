@@ -1323,9 +1323,13 @@ dialog.drawer[open] {
 .bn-wuwa {
   background: #0f3340 url("./assets/banners/wuwa.jpg") 50% 40% / cover no-repeat;
 }
+.bn-endfield {
+  background: #3a3812 url("./assets/banners/endfield.jpg") 35% 25% / cover no-repeat;
+}
 /* Art speaks for itself: no watermark over it */
 .bn-zzz::after,
-.bn-wuwa::after {
+.bn-wuwa::after,
+.bn-endfield::after {
   content: none;
 }
 .fade {

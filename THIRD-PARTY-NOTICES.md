@@ -12,6 +12,7 @@ and recompressed from official key art. The ZZZ logo in the source image is crop
 
 - `zzz.jpg`: Zenless Zone Zero key art, © COGNOSPHERE / HoYoverse. All rights reserved.
 - `wuwa.jpg`: Wuthering Waves key art, © Kuro Games. All rights reserved.
+- `endfield.jpg`: Arknights: Endfield key art, © Hypergryph / GRYPHLINE. All rights reserved.
 
 These images are **not** covered by GMM's license (MIT OR Apache-2.0). They are used to
 identify each game, without endorsement, and will be removed or replaced at the request of

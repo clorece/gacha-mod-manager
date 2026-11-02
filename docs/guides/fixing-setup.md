@@ -15,8 +15,8 @@ choose its folder in **Settings › XXMI Launcher**.
 ## Mod loader not installed
 
 XXMI is there, but not the part that loads this game's mods (ZZMI for Zenless Zone Zero, WWMI
-for Wuthering Waves). In XXMI Launcher, tick the game under "Select Games To Mod:", select it
-and press "Install".
+for Wuthering Waves, EFMI for Arknights: Endfield). In XXMI Launcher, tick the game under
+"Select Games To Mod:", select it and press "Install".
 
 ## Mod loader damaged
 

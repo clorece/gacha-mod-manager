@@ -73,7 +73,7 @@ export function Dashboard({ data }: { data: AppData }) {
         <div className="ghost-bubble">
           <Icon name="plus" size={28} />
           More games later
-          <span className="sub">Arknights: Endfield is next</span>
+          <span className="sub">Other XXMI games are next</span>
         </div>
       </div>
 

@@ -6,8 +6,8 @@ What happens between pressing Launch and seeing a mod in game.
 
 XXMI Launcher starts the game and adds its mod loader (built on 3Dmigoto) as the game starts.
 The loader reads every mod in the game's **Mods** folder, for example `ZZMI\Mods` for Zenless
-Zone Zero or `WWMI\Mods` for Wuthering Waves. Nothing is written into the game's own files, so
-starting the game any other way starts it without mods.
+Zone Zero, `WWMI\Mods` for Wuthering Waves or `EFMI\Mods` for Arknights: Endfield. Nothing is
+written into the game's own files, so starting the game any other way starts it without mods.
 
 ## What GMM does
 

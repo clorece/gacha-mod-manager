@@ -49,8 +49,8 @@ script:
 - **The GMM mark and lockups** (`docs/brand/`, the app icons) were made for this project by
   its owner (with Claude Design) and are original to it.
 - **Game banner art** (`apps/desktop/src/assets/banners/`): official key art of Zenless Zone
-  Zero (© COGNOSPHERE / HoYoverse) and Wuthering Waves (© Kuro Games), used only to identify
-  each game. It's the one shipped item that isn't ours or openly licensed: it isn't covered by
+  Zero (© COGNOSPHERE / HoYoverse), Wuthering Waves (© Kuro Games) and Arknights: Endfield
+  (© Hypergryph / GRYPHLINE), used only to identify each game. It's the one shipped item that isn't ours or openly licensed: it isn't covered by
   GMM's license, the README and `THIRD-PARTY-NOTICES.md` say so, and it will be removed at the
   owners' request.
 - GameBanana's logo is never used, only its name as text.

@@ -165,8 +165,9 @@ Gacha Mod Manager is an open-source interface built on other people's work:
   under its own freeware license (see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)).
 - **[Nunito](https://github.com/googlefonts/nunito)** by the Nunito Project Authors: the
   interface font (SIL Open Font License 1.1).
-- **Game banner art**: official key art of Zenless Zone Zero (© COGNOSPHERE / HoYoverse) and
-  Wuthering Waves (© Kuro Games), cropped for the game banners. Not covered by GMM's license;
+- **Game banner art**: official key art of Zenless Zone Zero (© COGNOSPHERE / HoYoverse),
+  Wuthering Waves (© Kuro Games) and Arknights: Endfield (© Hypergryph / GRYPHLINE), cropped for
+  the game banners. Not covered by GMM's license;
   see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 - **Open-source libraries**, among them [Tauri](https://tauri.app), [React](https://react.dev),
   [DOMPurify](https://github.com/cure53/DOMPurify), [TanStack Virtual](https://tanstack.com/virtual),

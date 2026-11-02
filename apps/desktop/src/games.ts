@@ -9,7 +9,7 @@ import type { Tone } from "./ui";
 export const ALL = "all";
 export type Scope = typeof ALL | string;
 
-const knownBanners = new Set(["zzz", "wuwa"]);
+const knownBanners = new Set(["zzz", "wuwa", "endfield"]);
 
 /** The banner class for a game id; unknown games get the neutral banner. */
 export function bannerClass(scope: Scope): string {

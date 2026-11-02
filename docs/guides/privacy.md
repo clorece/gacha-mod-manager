@@ -26,7 +26,7 @@ answers. **Settings › Storage** shows the sizes and clears each cache.
 
 ## What GMM reads
 
-GMM looks for your games (in Steam, HoYoPlay and Epic's own lists) and reads a few of XXMI
-Launcher's settings: where it is, which games it handles, each game's folder and launch
+GMM looks for your games (in Steam, HoYoPlay, GRYPHLINK and Epic's own lists) and reads a few
+of XXMI Launcher's settings: where it is, which games it handles, each game's folder and launch
 setting. It never reads passwords, tokens, login files or game logs, and XXMI's settings file
 is read into a list of only the fields GMM needs.
